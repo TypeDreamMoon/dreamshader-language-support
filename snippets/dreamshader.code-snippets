@@ -1,0 +1,127 @@
+{
+  "DreamShader Shader": {
+    "scope": "dreamshaderlang",
+    "prefix": "shader",
+    "body": [
+      "Shader(Name=\"Materials/${1:MyMaterial}\")",
+      "{",
+      "\tProperties = {",
+      "\t\tTexture2D ${2:InTex} = Path(Engine, \"/EngineResources/DefaultTexture\");",
+      "\t\tfloat3 ${3:InTint} = float3(1.0, 1.0, 1.0);",
+      "\t}",
+      "",
+      "\tSettings = {",
+      "\t\tMaterialDomain = \"Surface\";",
+      "\t\tShadingModel = \"DefaultLit\";",
+      "\t\tBlendMode = \"Opaque\";",
+      "\t}",
+      "",
+      "\tOutputs = {",
+      "\t\tfloat3 ${4:OutColor};",
+      "\t\tBaseColor = ${4:OutColor};",
+      "\t}",
+      "",
+      "\tCode = {",
+      "\t\t${4:OutColor} = ${3:InTint};",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a DreamShader material block for a .dsm file"
+  },
+  "DreamShader Shared Function": {
+    "scope": "dreamshaderlang",
+    "prefix": "function",
+    "body": [
+      "Function ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {",
+      "\t${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);",
+      "}"
+    ],
+    "description": "Create a reusable DreamShader Function block"
+  },
+  "DreamShader Namespace": {
+    "scope": "dreamshaderlang",
+    "prefix": "namespace",
+    "body": [
+      "Namespace(Name=\"${1:Common}\")",
+      "{",
+      "\tFunction ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {",
+      "\t\t${6:result} = ${4:input};",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a DreamShader Namespace block containing shared Functions"
+  },
+  "DreamShader Import Header": {
+    "scope": "dreamshaderlang",
+    "prefix": "import",
+    "body": [
+      "import \"${1:Shared/Common.dsh}\";"
+    ],
+    "description": "Import a DreamShader header file"
+  },
+  "DreamShader ShaderFunction": {
+    "scope": "dreamshaderlang",
+    "prefix": "shaderfunction",
+    "body": [
+      "ShaderFunction(Name=\"Functions/${1:MyFunction}\")",
+      "{",
+      "\tInputs = {",
+      "\t\t${2:float} ${3:Value};",
+      "\t}",
+      "",
+      "\tOutputs = {",
+      "\t\t${4:float} ${5:Result};",
+      "\t}",
+      "",
+      "\tCode = {",
+      "\t\t${5:Result} = ${3:Value};",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a DreamShader MaterialFunction asset"
+  },
+  "DreamShader Code Block": {
+    "scope": "dreamshaderlang",
+    "prefix": "codeblock",
+    "body": [
+      "Code = {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Create a Code block"
+  },
+  "DreamShader UE Panner": {
+    "scope": "dreamshaderlang",
+    "prefix": "uepanner",
+    "body": [
+      "UE.Panner(",
+      "\tCoordinate=UE.TexCoord(Index=${1:0}),",
+      "\tTime=UE.Time(Period=${2:4.0}),",
+      "\tSpeed=float2(${3:0.05}, ${4:0.0}))"
+    ],
+    "description": "Insert a UE.Panner call"
+  },
+  "DreamShader Generic Expression": {
+    "scope": "dreamshaderlang",
+    "prefix": "ueexpr",
+    "body": [
+      "UE.Expression(",
+      "\tClass=\"${1:Sine}\",",
+      "\tOutputType=\"${2:float1}\",",
+      "\t${3:Input}=${4:Value})"
+    ],
+    "description": "Insert a generic reflected MaterialExpression call"
+  },
+  "DreamShader Transform Vector": {
+    "scope": "dreamshaderlang",
+    "prefix": "uetransform",
+    "body": [
+      "UE.TransformVector(",
+      "\tInput=${1:NormalTS},",
+      "\tSource=\"${2:Tangent}\",",
+      "\tDestination=\"${3:World}\")"
+    ],
+    "description": "Insert a UE.TransformVector call"
+  }
+}
+

@@ -1,0 +1,108 @@
+{
+  "scopeName": "source.dreamshaderlang",
+  "name": "DreamShaderLang",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#shaderKeywords" },
+    { "include": "#sections" },
+    { "include": "#types" },
+    { "include": "#booleans" },
+    { "include": "#settings" },
+    { "include": "#materialOutputs" },
+    { "include": "#ueCalls" },
+    { "include": "#namespaceCalls" },
+    { "include": "#functionCalls" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.dreamshader", "match": "//.*$" },
+        { "name": "comment.block.dreamshader", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.dreamshader",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.dreamshader", "match": "\\\\." }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.dreamshader", "match": "\\b-?(?:\\d+\\.\\d+|\\d+|\\.\\d+)(?:[fF])?\\b" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Function|Namespace|ShaderFunction|import)\\b" },
+        { "name": "entity.name.function.definition.dreamshader", "match": "(?<=\\bFunction\\s)[A-Za-z_][A-Za-z0-9_]*\\b" },
+        { "name": "entity.name.namespace.definition.dreamshader", "match": "(?<=\\bNamespace\\s*\\(\\s*Name\\s*=\\s*\")[A-Za-z_][A-Za-z0-9_]*\\b" },
+        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time)\\b(?=\\s*=)" }
+      ]
+    },
+    "shaderKeywords": {
+      "patterns": [
+        { "name": "keyword.control.shadercode.dreamshader", "match": "\\b(?:if|else|for|while|do|switch|case|default|break|continue|return)\\b" },
+        { "name": "storage.modifier.shadercode.dreamshader", "match": "\\b(?:const|static|in|out|inout|struct)\\b" }
+      ]
+    },
+    "sections": {
+      "patterns": [
+        { "name": "entity.name.section.dreamshader", "match": "\\b(?:Properties|Settings|Outputs|Code|Inputs)\\b(?=\\s*=\\s*\\{)" }
+      ]
+    },
+    "types": {
+      "patterns": [
+        { "name": "storage.type.dreamshader", "match": "\\b(?:float|float1|float2|float3|float4|float2x2|float3x3|float4x4|half|half1|half2|half3|half4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool|bool2|bool3|bool4|void|Texture2D|TextureCube|Texture2DArray|SamplerState|MaterialAttributes|vec2|vec3|vec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|bvec2|bvec3|bvec4|mat2|mat3|mat4)\\b" }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        { "name": "constant.language.boolean.dreamshader", "match": "\\b(?:true|false)\\b" }
+      ]
+    },
+    "settings": {
+      "patterns": [
+        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|Description|ExposeToLibrary|UserExposedCaption|LibraryCategories)\\b(?=\\s*=)" }
+      ]
+    },
+    "materialOutputs": {
+      "patterns": [
+        { "name": "variable.language.output.dreamshader", "match": "\\b(?:BaseColor|EmissiveColor|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|Anisotropy|Tangent)\\b(?=\\s*=)" }
+      ]
+    },
+    "ueCalls": {
+      "patterns": [
+        { "name": "support.class.namespace.dreamshader", "match": "\\bUE\\b(?=\\.)" },
+        { "name": "support.function.ue.dreamshader", "match": "(?<=\\bUE\\.)[A-Za-z_][A-Za-z0-9_]*\\b" }
+      ]
+    },
+    "namespaceCalls": {
+      "patterns": [
+        { "name": "support.class.namespace.dreamshader", "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b(?=::[A-Za-z_])" },
+        { "name": "punctuation.separator.scope-resolution.dreamshader", "match": "::" },
+        { "name": "entity.name.function.dreamshader", "match": "(?<=::)[A-Za-z_][A-Za-z0-9_]*\\b(?=\\s*\\()" }
+      ]
+    },
+    "functionCalls": {
+      "patterns": [
+        { "name": "entity.name.function.dreamshader", "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?:(?:::|\\.)[A-Za-z_][A-Za-z0-9_]*)*\\b(?=\\s*\\()" }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "name": "keyword.operator.dreamshader", "match": "(::|=|\\+|\\-|\\*|/|\\.|,|;)" }
+      ]
+    }
+  }
+}
+
