@@ -1,6 +1,8 @@
 "use strict";
 
 const fs = require("fs");
+const https = require("https");
+const childProcess = require("child_process");
 const path = require("path");
 const vscode = require("vscode");
 
@@ -9,6 +11,9 @@ const BRIDGE_DIAGNOSTIC_COLLECTION_NAME = "dreamshader";
 const LOCAL_DIAGNOSTIC_COLLECTION_NAME = "dreamshader-local";
 const DREAMSHADER_EXTENSIONS = new Set([".dsm", ".dsh"]);
 const INDENT = "    ";
+const PACKAGE_MANIFEST_NAME = "dreamshader.package.json";
+const PACKAGE_LOCK_NAME = "dreamshader.lock.json";
+const DEFAULT_PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json";
 
 const LEGACY_SECTION_NAMES = [
     "Properties",
@@ -209,7 +214,8 @@ const HOVER_DOCS = new Map([
     ["shader", "Top-level DreamShader material declaration. DreamShader material implementation files use `.dsm`."],
     ["function", "Reusable shared function block. Define with `Function Name(in float Value, out vec3 Result) { ... }` and call with explicit out variables like `Name(Value, Result);`."],
     ["namespace", "Groups shared Function blocks. Define with `Namespace(Name=\"Texture\") { ... }` and call with `Texture::Sample(...)`."],
-    ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";`."],
+    ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
+    ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
     ["properties", "Declares user inputs or UE-generated property nodes."],
     ["settings", "Declares Unreal material or ShaderFunction settings."],
@@ -309,8 +315,10 @@ function activate(context) {
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider({ language: LANGUAGE_ID }, createCompletionProvider(), ".", "\"", "/"),
         vscode.languages.registerHoverProvider({ language: LANGUAGE_ID }, createHoverProvider()),
+        vscode.languages.registerSignatureHelpProvider({ language: LANGUAGE_ID }, createSignatureHelpProvider(), "(", ","),
         vscode.languages.registerDocumentSymbolProvider({ language: LANGUAGE_ID }, createDocumentSymbolProvider()),
         vscode.languages.registerDefinitionProvider({ language: LANGUAGE_ID }, createDefinitionProvider()),
+        vscode.languages.registerReferenceProvider({ language: LANGUAGE_ID }, createReferenceProvider()),
         vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider())
     );
 
@@ -320,6 +328,42 @@ function activate(context) {
         }),
         vscode.commands.registerCommand("dreamshader.recompileAll", async () => {
             await requestRecompile("all");
+        }),
+        vscode.commands.registerCommand("dreamshader.installPackageFromGitHub", async () => {
+            await installPackageFromGitHubCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.browsePackages", async () => {
+            await browsePackagesCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.updatePackages", async () => {
+            await updatePackagesCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.removePackage", async () => {
+            await removePackageCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.openPackagesFolder", async () => {
+            await openPackagesFolderCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.addPackageStoreIndex", async () => {
+            await addPackageStoreIndexCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.removePackageStoreIndex", async () => {
+            await removePackageStoreIndexCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.createPackage", async () => {
+            await createPackageCommand();
+        }),
+        vscode.commands.registerCommand("dreamshader.createMaterial", async () => {
+            await createDreamShaderTemplateCommand("material");
+        }),
+        vscode.commands.registerCommand("dreamshader.createHeader", async () => {
+            await createDreamShaderTemplateCommand("header");
+        }),
+        vscode.commands.registerCommand("dreamshader.createTextureSample", async () => {
+            await createDreamShaderTemplateCommand("texture");
+        }),
+        vscode.commands.registerCommand("dreamshader.createNoiseMaterial", async () => {
+            await createDreamShaderTemplateCommand("noise");
         })
     );
 
@@ -407,6 +451,13 @@ function createHoverProvider() {
                 return new vscode.Hover(new vscode.MarkdownString(`\`UE.${builtin[0]}\`\n\n${builtin[2]}\n\nExample: \`${builtin[1]}\``));
             }
 
+            const context = analyzeDocument(document, position);
+            const visibleEntry = collectVisibleIdentifierEntries(context)
+                .find((entry) => normalizeSymbolKey(entry.name) === normalized);
+            if (visibleEntry) {
+                return new vscode.Hover(new vscode.MarkdownString(`\`${visibleEntry.name}\`\n\n${visibleEntry.detail}`));
+            }
+
             const qualifiedIdentifier = getQualifiedIdentifierAtPosition(document, position);
             const definitions = collectReachableFunctionDefinitions(document);
             const matchingDefinitions = getDefinitionsForName(definitions, qualifiedIdentifier ? qualifiedIdentifier.text : word);
@@ -416,6 +467,28 @@ function createHoverProvider() {
             }
 
             return undefined;
+        }
+    };
+}
+
+function createSignatureHelpProvider() {
+    return {
+        provideSignatureHelp(document, position) {
+            const callContext = getActiveCallContext(document, position);
+            if (!callContext) {
+                return undefined;
+            }
+
+            const signatures = getCallableSignatureHelpEntries(document, callContext.callee);
+            if (signatures.length === 0) {
+                return undefined;
+            }
+
+            const help = new vscode.SignatureHelp();
+            help.signatures = signatures.map((signature) => buildSignatureInformation(signature));
+            help.activeSignature = 0;
+            help.activeParameter = Math.max(0, Math.min(callContext.activeParameter, help.signatures[0].parameters.length - 1));
+            return help;
         }
     };
 }
@@ -475,6 +548,55 @@ function createDefinitionProvider() {
     };
 }
 
+function createReferenceProvider() {
+    return {
+        async provideReferences(document, position) {
+            const qualifiedIdentifier = getQualifiedIdentifierAtPosition(document, position);
+            if (!qualifiedIdentifier) {
+                return undefined;
+            }
+
+            const targetText = qualifiedIdentifier.text;
+            const definitions = collectReachableFunctionDefinitions(document);
+            const matchingDefinitions = getDefinitionsForName(definitions, targetText);
+            const searchNames = new Set([targetText]);
+            let uris = [document.uri];
+
+            if (matchingDefinitions) {
+                for (const definition of matchingDefinitions) {
+                    searchNames.add(definition.name);
+                    if (definition.localName) {
+                        searchNames.add(definition.localName);
+                    }
+                }
+
+                uris = await vscode.workspace.findFiles("**/*.{dsm,dsh}", "**/{node_modules,.git}/**", 2000);
+                if (!uris.some((uri) => normalizeFsPath(uri.fsPath) === normalizeFsPath(document.uri.fsPath))) {
+                    uris.push(document.uri);
+                }
+            }
+
+            const locations = [];
+            for (const uri of uris) {
+                let text = "";
+                if (normalizeFsPath(uri.fsPath) === normalizeFsPath(document.uri.fsPath)) {
+                    text = document.getText();
+                } else {
+                    try {
+                        text = fs.readFileSync(uri.fsPath, "utf8");
+                    } catch (_error) {
+                        continue;
+                    }
+                }
+
+                locations.push(...findReferenceLocations(uri, text, searchNames));
+            }
+
+            return locations;
+        }
+    };
+}
+
 function getQualifiedIdentifierAtPosition(document, position) {
     const lineText = document.lineAt(position.line).text;
     const regex = /[A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*/g;
@@ -500,11 +622,219 @@ function getDefinitionsForName(definitions, name) {
     }
     const normalized = name.toLowerCase();
     for (const [key, entries] of definitions.entries()) {
-        if (key.toLowerCase() === normalized) {
+        if (key.toLowerCase() === normalized || entries.some((entry) => String(entry.localName || "").toLowerCase() === normalized)) {
             return entries;
         }
     }
     return undefined;
+}
+
+function getActiveCallContext(document, position) {
+    const offset = document.offsetAt(position);
+    const textBeforeCursor = stripCommentsPreserveLayout(document.getText().slice(0, offset));
+    let depth = 0;
+
+    for (let index = textBeforeCursor.length - 1; index >= 0; index -= 1) {
+        const char = textBeforeCursor[index];
+        if (char === ")") {
+            depth += 1;
+            continue;
+        }
+        if (char !== "(") {
+            continue;
+        }
+        if (depth > 0) {
+            depth -= 1;
+            continue;
+        }
+
+        const callee = readQualifiedIdentifierBefore(textBeforeCursor, index);
+        if (!callee) {
+            return null;
+        }
+
+        return {
+            callee: callee.name,
+            openParenOffset: index,
+            activeParameter: countTopLevelCommas(textBeforeCursor.slice(index + 1))
+        };
+    }
+
+    return null;
+}
+
+function readQualifiedIdentifierBefore(text, endIndex) {
+    const before = text.slice(0, endIndex).trimEnd();
+    const match = before.match(/[A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*$/);
+    if (!match) {
+        return null;
+    }
+    return {
+        name: match[0],
+        start: before.length - match[0].length,
+        end: before.length
+    };
+}
+
+function countTopLevelCommas(text) {
+    let count = 0;
+    let parenDepth = 0;
+    let braceDepth = 0;
+    let bracketDepth = 0;
+    let inString = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        if (inString) {
+            if (char === "\\") {
+                index += 1;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            continue;
+        }
+        if (char === "(") {
+            parenDepth += 1;
+            continue;
+        }
+        if (char === ")") {
+            parenDepth = Math.max(0, parenDepth - 1);
+            continue;
+        }
+        if (char === "{") {
+            braceDepth += 1;
+            continue;
+        }
+        if (char === "}") {
+            braceDepth = Math.max(0, braceDepth - 1);
+            continue;
+        }
+        if (char === "[") {
+            bracketDepth += 1;
+            continue;
+        }
+        if (char === "]") {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+            continue;
+        }
+        if (char === "," && parenDepth === 0 && braceDepth === 0 && bracketDepth === 0) {
+            count += 1;
+        }
+    }
+
+    return count;
+}
+
+function getCallableSignatureHelpEntries(document, callee) {
+    const normalized = normalizeSymbolKey(callee);
+    const callableSignatures = collectReachableCallableSignatures(document);
+    const signatures = callableSignatures.get(normalized) || [];
+    if (signatures.length > 0) {
+        return signatures;
+    }
+
+    const ueBuiltin = UE_BUILTINS.find(([name]) => normalizeSymbolKey(`UE.${name}`) === normalized || normalizeSymbolKey(name) === normalized);
+    if (ueBuiltin) {
+        return [{
+            kind: "UE",
+            name: `UE.${ueBuiltin[0]}`,
+            inputs: parseSignatureFromSnippet(ueBuiltin[1]),
+            outputs: [],
+            detail: ueBuiltin[2]
+        }];
+    }
+
+    if (isConstructorName(callee)) {
+        return [{
+            kind: "Constructor",
+            name: callee,
+            inputs: [{ qualifier: "in", type: "...", name: "components" }],
+            outputs: [],
+            detail: "Constructs a scalar or vector value."
+        }];
+    }
+
+    return [];
+}
+
+function parseSignatureFromSnippet(snippet) {
+    const openIndex = snippet.indexOf("(");
+    const closeIndex = snippet.lastIndexOf(")");
+    if (openIndex === -1 || closeIndex === -1 || closeIndex <= openIndex) {
+        return [];
+    }
+
+    return splitTopLevelDelimitedWithOffsets(snippet.slice(openIndex + 1, closeIndex), 0, ",")
+        .map((segment) => {
+            const assignment = splitTopLevelAssignment(segment.text);
+            if (!assignment) {
+                return { qualifier: "in", type: "value", name: segment.text.trim() };
+            }
+            return { qualifier: "in", type: "value", name: assignment.left.trim() };
+        });
+}
+
+function buildSignatureInformation(signature) {
+    const parameters = [...(signature.inputs || []), ...(signature.outputs || [])];
+    const parameterLabels = parameters.map((parameter) => {
+        const qualifier = parameter.qualifier || ((signature.outputs || []).includes(parameter) ? "out" : "in");
+        return `${qualifier} ${parameter.type || "value"} ${parameter.name || "value"}`.trim();
+    });
+    const label = `${signature.name}(${parameterLabels.join(", ")})`;
+    const info = new vscode.SignatureInformation(label, new vscode.MarkdownString(signature.detail || `${signature.kind || "DreamShader"} callable`));
+    info.parameters = parameterLabels.map((parameterLabel) => new vscode.ParameterInformation(parameterLabel));
+    return info;
+}
+
+function findReferenceLocations(uri, text, searchNames) {
+    const locations = [];
+    const sortedNames = Array.from(searchNames)
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length);
+
+    for (const name of sortedNames) {
+        let index = 0;
+        while (index < text.length) {
+            const foundIndex = text.indexOf(name, index);
+            if (foundIndex === -1) {
+                break;
+            }
+
+            const before = text[foundIndex - 1];
+            const after = text[foundIndex + name.length];
+            if (isReferenceBoundary(before) && isReferenceBoundary(after)) {
+                const start = offsetToPosition(text, foundIndex);
+                const end = offsetToPosition(text, foundIndex + name.length);
+                locations.push(new vscode.Location(uri, new vscode.Range(start.line, start.character, end.line, end.character)));
+            }
+            index = foundIndex + Math.max(1, name.length);
+        }
+    }
+
+    return dedupeLocations(locations);
+}
+
+function isReferenceBoundary(char) {
+    return !char || !/[A-Za-z0-9_]/.test(char);
+}
+
+function dedupeLocations(locations) {
+    const seen = new Set();
+    const result = [];
+    for (const location of locations) {
+        const key = `${normalizeFsPath(location.uri.fsPath)}:${location.range.start.line}:${location.range.start.character}:${location.range.end.character}`;
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(location);
+    }
+    return result;
 }
 
 function createFormattingProvider() {
@@ -568,7 +898,7 @@ function addImportItems(items, context) {
     for (const headerPath of collectAvailableHeaderImports(context.document)) {
         const item = new vscode.CompletionItem(headerPath, vscode.CompletionItemKind.File);
         item.insertText = new vscode.SnippetString(`"${headerPath}"`);
-        item.detail = "DreamShader header import";
+        item.detail = headerPath.startsWith("@") ? "DreamShader package header import" : "DreamShader header import";
         items.push(item);
     }
 }
@@ -1601,22 +1931,23 @@ function collectAvailableHeaderImports(document) {
     const candidateRoots = [];
 
     if (root) {
-        candidateRoots.push(path.join(root, "DShader"));
-        candidateRoots.push(path.join(root, "Plugins", "DreamShader", "Library"));
+        candidateRoots.push({ rootDirectory: path.join(root, "DShader"), skipTopLevelPackages: true });
+        candidateRoots.push({ rootDirectory: getPackagesDirectory(root), skipTopLevelPackages: false });
+        candidateRoots.push({ rootDirectory: path.join(root, "Plugins", "DreamShader", "Library"), skipTopLevelPackages: false });
     }
 
-    for (const headerRoot of candidateRoots) {
-        if (!fs.existsSync(headerRoot)) {
+    for (const candidateRoot of candidateRoots) {
+        if (!fs.existsSync(candidateRoot.rootDirectory)) {
             continue;
         }
 
-        collectHeaderFiles(headerRoot, headerRoot, headers);
+        collectHeaderFiles(candidateRoot.rootDirectory, candidateRoot.rootDirectory, headers, candidateRoot);
     }
 
     return Array.from(headers).sort();
 }
 
-function collectHeaderFiles(rootDirectory, currentDirectory, outHeaders) {
+function collectHeaderFiles(rootDirectory, currentDirectory, outHeaders, options = {}) {
     let entries = [];
     try {
         entries = fs.readdirSync(currentDirectory, { withFileTypes: true });
@@ -1627,7 +1958,10 @@ function collectHeaderFiles(rootDirectory, currentDirectory, outHeaders) {
     for (const entry of entries) {
         const absolutePath = path.join(currentDirectory, entry.name);
         if (entry.isDirectory()) {
-            collectHeaderFiles(rootDirectory, absolutePath, outHeaders);
+            if (options.skipTopLevelPackages && normalizeFsPath(currentDirectory) === normalizeFsPath(rootDirectory) && entry.name.toLowerCase() === "packages") {
+                continue;
+            }
+            collectHeaderFiles(rootDirectory, absolutePath, outHeaders, options);
             continue;
         }
 
@@ -2726,6 +3060,1847 @@ function computeBraceDiagnostics(document, text) {
     return diagnostics;
 }
 
+async function installPackageFromGitHubCommand() {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const repositorySpecifier = await vscode.window.showInputBox({
+        title: "Install DreamShader Package",
+        prompt: "GitHub repository URL or owner/repo, for example TypeDreamMoon/dream-noise.",
+        placeHolder: "TypeDreamMoon/dream-noise"
+    });
+
+    if (!repositorySpecifier) {
+        return;
+    }
+
+    try {
+        const result = await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Installing DreamShader package",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ message: repositorySpecifier });
+            return installPackageFromRepository(projectRoot, repositorySpecifier, { askBeforeReplace: true });
+        });
+
+        vscode.window.showInformationMessage(`Installed DreamShader package ${result.name}@${result.version}.`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`DreamShader package install failed: ${formatError(error)}`);
+    }
+}
+
+async function browsePackagesCommand() {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+        "dreamshaderPackageStore",
+        "DreamShader Package Store",
+        vscode.ViewColumn.One,
+        {
+            enableScripts: true,
+            retainContextWhenHidden: true
+        });
+
+    panel.webview.html = renderPackageStoreHtml(panel.webview, {
+        entries: [],
+        installed: collectInstalledPackages(projectRoot),
+        sources: getPackageIndexSources(),
+        loading: true,
+        status: "Loading package store..."
+    });
+
+    panel.webview.onDidReceiveMessage(async (message) => {
+        await handlePackageStoreWebviewMessage(panel, projectRoot, message);
+    });
+
+    await refreshPackageStorePanel(panel, projectRoot);
+}
+
+async function updatePackagesCommand() {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const installed = collectInstalledPackages(projectRoot).filter((entry) => entry.repository);
+    if (installed.length === 0) {
+        vscode.window.showInformationMessage("No installed DreamShader packages with repository metadata were found.");
+        return;
+    }
+
+    const confirmation = await vscode.window.showQuickPick(["Update all packages", "Cancel"], {
+        title: "Update DreamShader Packages",
+        placeHolder: `${installed.length} package(s) will be reinstalled from their Git repositories.`
+    });
+
+    if (confirmation !== "Update all packages") {
+        return;
+    }
+
+    const failures = [];
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Updating DreamShader packages",
+        cancellable: false
+    }, async (progress) => {
+        for (const entry of installed) {
+            progress.report({ message: entry.name });
+            try {
+                await installPackageFromRepository(projectRoot, entry.repository, { forceReplace: true });
+            } catch (error) {
+                failures.push(`${entry.name}: ${formatError(error)}`);
+            }
+        }
+    });
+
+    if (failures.length > 0) {
+        vscode.window.showWarningMessage(`DreamShader updated with ${failures.length} failure(s). Check the output log for details.`);
+        const channel = vscode.window.createOutputChannel("DreamShader Packages");
+        channel.appendLine("DreamShader package update failures:");
+        for (const failure of failures) {
+            channel.appendLine(`- ${failure}`);
+        }
+        channel.show();
+        return;
+    }
+
+    vscode.window.showInformationMessage(`Updated ${installed.length} DreamShader package(s).`);
+}
+
+async function removePackageCommand() {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const installed = collectInstalledPackages(projectRoot);
+    if (installed.length === 0) {
+        vscode.window.showInformationMessage("No installed DreamShader packages were found.");
+        return;
+    }
+
+    const picked = await vscode.window.showQuickPick(installed.map((entry) => ({
+        label: entry.name,
+        description: entry.version || "",
+        detail: entry.description || entry.repository || "",
+        entry
+    })), {
+        title: "Remove DreamShader Package",
+        placeHolder: "Select an installed package to remove"
+    });
+
+    if (!picked) {
+        return;
+    }
+
+    const confirmation = await vscode.window.showQuickPick(["Remove package", "Cancel"], {
+        title: `Remove ${picked.entry.name}?`,
+        placeHolder: "This deletes the package folder under DShader/Packages."
+    });
+
+    if (confirmation !== "Remove package") {
+        return;
+    }
+
+    try {
+        const targetDirectory = getPackageInstallDirectory(projectRoot, picked.entry.name);
+        if (fs.existsSync(targetDirectory)) {
+            fs.rmSync(targetDirectory, { recursive: true, force: true });
+        }
+
+        const lock = readPackageLock(projectRoot);
+        delete lock.packages[picked.entry.name];
+        writePackageLock(projectRoot, lock);
+        vscode.window.showInformationMessage(`Removed DreamShader package ${picked.entry.name}.`);
+    } catch (error) {
+        vscode.window.showErrorMessage(`DreamShader package remove failed: ${formatError(error)}`);
+    }
+}
+
+async function openPackagesFolderCommand() {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const packagesDirectory = getPackagesDirectory(projectRoot);
+    fs.mkdirSync(packagesDirectory, { recursive: true });
+    await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(packagesDirectory));
+}
+
+async function addPackageStoreIndexCommand() {
+    const source = await vscode.window.showInputBox({
+        title: "Add DreamShader Package Store Source",
+        prompt: "Enter a packages.json URL or local file path.",
+        placeHolder: DEFAULT_PACKAGE_INDEX_URL
+    });
+
+    if (!source) {
+        return;
+    }
+
+    await addPackageIndexSource(source);
+    vscode.window.showInformationMessage("DreamShader package store source added.");
+}
+
+async function removePackageStoreIndexCommand() {
+    const sources = getPackageIndexSources();
+    if (sources.length === 0) {
+        vscode.window.showInformationMessage("No DreamShader package store sources are configured.");
+        return;
+    }
+
+    const picked = await vscode.window.showQuickPick(sources, {
+        title: "Remove DreamShader Package Store Source",
+        placeHolder: "Select an index source to remove"
+    });
+
+    if (!picked) {
+        return;
+    }
+
+    await removePackageIndexSource(picked);
+    vscode.window.showInformationMessage("DreamShader package store source removed.");
+}
+
+async function createDreamShaderTemplateCommand(kind) {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const template = getDreamShaderTemplateSpec(kind);
+    if (!template) {
+        return;
+    }
+
+    const relativePathInput = await vscode.window.showInputBox({
+        title: template.title,
+        prompt: template.prompt,
+        placeHolder: template.placeHolder,
+        validateInput: (value) => {
+            const normalized = normalizeTemplateRelativePath(value, template.extension);
+            if (!normalized) {
+                return "A file name is required.";
+            }
+            return isSafeRelativePath(normalized) ? undefined : "Use a relative path inside DShader without '..'.";
+        }
+    });
+    if (!relativePathInput) {
+        return;
+    }
+
+    const relativePath = normalizeTemplateRelativePath(relativePathInput, template.extension);
+    const targetPath = path.resolve(projectRoot, "DShader", relativePath);
+    const dshaderRoot = path.resolve(projectRoot, "DShader");
+    const relativeToRoot = path.relative(dshaderRoot, targetPath);
+    if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+        vscode.window.showErrorMessage("DreamShader template path must stay inside DShader.");
+        return;
+    }
+
+    if (fs.existsSync(targetPath)) {
+        const replace = await vscode.window.showQuickPick(["Replace existing file", "Cancel"], {
+            title: `DreamShader file already exists`,
+            placeHolder: targetPath
+        });
+        if (replace !== "Replace existing file") {
+            return;
+        }
+    }
+
+    const templateText = buildDreamShaderTemplate(kind, relativePath);
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, templateText, "utf8");
+    await vscode.window.showTextDocument(vscode.Uri.file(targetPath));
+    vscode.window.showInformationMessage(`Created ${path.basename(targetPath)}.`);
+}
+
+function getDreamShaderTemplateSpec(kind) {
+    const specs = {
+        material: {
+            title: "Create DreamShader Material",
+            prompt: "Relative .dsm path under DShader.",
+            placeHolder: "Materials/M_NewMaterial.dsm",
+            extension: ".dsm"
+        },
+        header: {
+            title: "Create DreamShader Header",
+            prompt: "Relative .dsh path under DShader.",
+            placeHolder: "Shared/Common.dsh",
+            extension: ".dsh"
+        },
+        texture: {
+            title: "Create DreamShader Texture Sample",
+            prompt: "Relative .dsm path under DShader.",
+            placeHolder: "Materials/M_TextureSample.dsm",
+            extension: ".dsm"
+        },
+        noise: {
+            title: "Create DreamShader Noise Material",
+            prompt: "Relative .dsm path under DShader.",
+            placeHolder: "Materials/M_Noise.dsm",
+            extension: ".dsm"
+        }
+    };
+
+    return specs[kind];
+}
+
+function normalizeTemplateRelativePath(value, extension) {
+    let result = String(value || "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!result) {
+        return "";
+    }
+    if (path.extname(result).toLowerCase() !== extension) {
+        result += extension;
+    }
+    return normalizeFsPath(result);
+}
+
+function isSafeRelativePath(relativePath) {
+    return Boolean(relativePath)
+        && !path.isAbsolute(relativePath)
+        && !relativePath.split(/[\\/]+/).includes("..");
+}
+
+function getTemplateSymbolName(relativePath, fallback) {
+    const baseName = path.basename(relativePath, path.extname(relativePath)).replace(/[^A-Za-z0-9_]/g, "");
+    if (!baseName || /^[0-9]/.test(baseName)) {
+        return fallback;
+    }
+    return baseName;
+}
+
+function getTemplateShaderAssetPath(relativePath) {
+    const withoutExtension = normalizeFsPath(relativePath).replace(/\.(dsm|dsh)$/i, "");
+    return withoutExtension.includes("/")
+        ? withoutExtension
+        : `Materials/${withoutExtension}`;
+}
+
+function buildDreamShaderTemplate(kind, relativePath) {
+    const symbolName = getTemplateSymbolName(relativePath, "DreamShaderExample");
+    const shaderName = getTemplateShaderAssetPath(relativePath);
+    if (kind === "header") {
+        return `Namespace(Name="${symbolName}")
+{
+    Function Identity(in vec3 input, out vec3 result) {
+        result = input;
+    }
+
+    Function ApplyTint(in vec3 color, in vec3 tint, out vec3 result) {
+        result = color * tint;
+    }
+}
+`;
+    }
+
+    if (kind === "texture") {
+        return `import "Builtin/Texture.dsh";
+
+Shader(Name="${shaderName}")
+{
+    Properties = {
+        Texture2D InTexture = Path(Engine, "/EngineResources/DefaultTexture");
+        vec3 InTint = vec3(1.0, 1.0, 1.0);
+    }
+
+    Settings = {
+        Domain = "Surface";
+        ShadingModel = "DefaultLit";
+        BlendMode = "Opaque";
+    }
+
+    Outputs = {
+        vec3 Color;
+        BaseColor = Color;
+    }
+
+    Code = {
+        vec2 uv = UE.TexCoord(Index=0);
+        vec3 sampledColor;
+        Texture::Sample2DRGB(InTexture, uv, sampledColor);
+        Color = sampledColor * InTint;
+    }
+}
+`;
+    }
+
+    if (kind === "noise") {
+        return `import "Builtin/Noise.dsh";
+
+Shader(Name="${shaderName}")
+{
+    Properties = {
+        float Scale = 8.0;
+        vec3 LowColor = vec3(0.05, 0.08, 0.12);
+        vec3 HighColor = vec3(0.8, 0.95, 1.0);
+    }
+
+    Settings = {
+        Domain = "Surface";
+        ShadingModel = "Unlit";
+        BlendMode = "Opaque";
+    }
+
+    Outputs = {
+        vec3 Color;
+        EmissiveColor = Color;
+    }
+
+    Code = {
+        vec2 uv = UE.TexCoord(Index=0) * Scale;
+        float noiseValue;
+        Noise::FBM2D(uv, 5.0, noiseValue);
+        Color = lerp(LowColor, HighColor, saturate(noiseValue));
+    }
+}
+`;
+    }
+
+    return `Shader(Name="${shaderName}")
+{
+    Properties = {
+        vec3 InColor = vec3(1.0, 0.45, 0.2);
+    }
+
+    Settings = {
+        Domain = "Surface";
+        ShadingModel = "Unlit";
+        BlendMode = "Opaque";
+    }
+
+    Outputs = {
+        vec3 Color;
+        EmissiveColor = Color;
+    }
+
+    Code = {
+        Color = InColor;
+    }
+}
+`;
+}
+
+async function createPackageCommand() {
+    const projectRoot = findProjectRootForPackageCommand();
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const packageNameInput = await vscode.window.showInputBox({
+        title: "Create DreamShader Package - Package Name",
+        prompt: "Use 'name' or '@scope/name'.",
+        placeHolder: "@typedreammoon/my-shader-pack",
+        validateInput: (value) => {
+            const normalized = normalizePackageName(value);
+            if (!normalized) {
+                return "Package name is required.";
+            }
+            return isValidPackageName(normalized) ? undefined : "Use 'name' or '@scope/name' with letters, numbers, '.', '_' or '-'.";
+        }
+    });
+    if (!packageNameInput) {
+        return;
+    }
+
+    const packageName = normalizePackageName(packageNameInput);
+    const defaultDisplayName = packageNameToDisplayName(packageName);
+    const displayName = await vscode.window.showInputBox({
+        title: "Create DreamShader Package - Display Name",
+        prompt: "Human-readable package name.",
+        value: defaultDisplayName
+    });
+    if (displayName === undefined) {
+        return;
+    }
+
+    const description = await vscode.window.showInputBox({
+        title: "Create DreamShader Package - Description",
+        prompt: "Short package description.",
+        value: `Reusable DreamShaderLang functions for ${displayName || defaultDisplayName}.`
+    });
+    if (description === undefined) {
+        return;
+    }
+
+    const namespaceName = await vscode.window.showInputBox({
+        title: "Create DreamShader Package - Namespace",
+        prompt: "Default Namespace(Name=\"...\") used by the generated entry header.",
+        value: packageNameToNamespace(packageName),
+        validateInput: (value) => isValidIdentifier(value) ? undefined : "Namespace must be a valid identifier."
+    });
+    if (!namespaceName) {
+        return;
+    }
+
+    const author = await vscode.window.showInputBox({
+        title: "Create DreamShader Package - Author",
+        prompt: "Package author.",
+        value: "TypeDreamMoon"
+    });
+    if (author === undefined) {
+        return;
+    }
+
+    const repository = await vscode.window.showInputBox({
+        title: "Create DreamShader Package - Repository",
+        prompt: "Optional GitHub repository URL. You can leave this empty for a local draft package.",
+        placeHolder: `https://github.com/TypeDreamMoon/${packageName.split("/").pop()}`
+    });
+    if (repository === undefined) {
+        return;
+    }
+
+    const targetPick = await vscode.window.showQuickPick([
+        {
+            label: "Create in current project DShader/Packages",
+            description: "Recommended",
+            target: "project"
+        },
+        {
+            label: "Choose another parent folder",
+            description: "Creates the package folder under the selected parent folder",
+            target: "custom"
+        }
+    ], {
+        title: "Create DreamShader Package - Target Folder"
+    });
+    if (!targetPick) {
+        return;
+    }
+
+    let targetDirectory = "";
+    let isProjectPackage = false;
+    if (targetPick.target === "project") {
+        targetDirectory = getPackageInstallDirectory(projectRoot, packageName);
+        isProjectPackage = true;
+    } else {
+        const folders = await vscode.window.showOpenDialog({
+            title: "Select Package Parent Folder",
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false
+        });
+        if (!folders || folders.length === 0) {
+            return;
+        }
+        targetDirectory = path.join(folders[0].fsPath, ...packageName.split("/"));
+    }
+
+    const examplePick = await vscode.window.showQuickPick([
+        { label: "Create example material", picked: true, value: true },
+        { label: "No example material", value: false }
+    ], {
+        title: "Create DreamShader Package - Examples"
+    });
+    if (!examplePick) {
+        return;
+    }
+
+    if (fs.existsSync(targetDirectory)) {
+        const replace = await vscode.window.showQuickPick(["Replace existing folder", "Cancel"], {
+            title: `Package folder already exists`,
+            placeHolder: targetDirectory
+        });
+        if (replace !== "Replace existing folder") {
+            return;
+        }
+        fs.rmSync(targetDirectory, { recursive: true, force: true });
+    }
+
+    const manifest = {
+        name: packageName,
+        version: "0.1.0",
+        displayName: displayName || defaultDisplayName,
+        description: description || "",
+        author: author || "",
+        repository: repository || "",
+        license: "MIT",
+        dreamshader: {
+            language: "DreamShaderLang",
+            version: ">=1.0.0",
+            entry: `Library/${namespaceName}.dsh`
+        },
+        keywords: ["dreamshader", "dreamshader-package"]
+    };
+
+    createPackageScaffold(targetDirectory, manifest, namespaceName, Boolean(examplePick.value));
+
+    if (isProjectPackage) {
+        const lock = readPackageLock(projectRoot);
+        lock.packages[packageName] = {
+            name: packageName,
+            version: manifest.version,
+            displayName: manifest.displayName,
+            description: manifest.description,
+            repository: manifest.repository,
+            resolved: "local",
+            commit: "local",
+            installedAtUtc: new Date().toISOString(),
+            installPath: normalizeFsPath(path.relative(projectRoot, targetDirectory)),
+            entry: manifest.dreamshader.entry
+        };
+        writePackageLock(projectRoot, lock);
+    }
+
+    const entryHeader = path.join(targetDirectory, manifest.dreamshader.entry);
+    await vscode.window.showTextDocument(vscode.Uri.file(entryHeader));
+    vscode.window.showInformationMessage(`Created DreamShader package ${packageName}.`);
+}
+
+function createPackageScaffold(targetDirectory, manifest, namespaceName, includeExample) {
+    const libraryDirectory = path.join(targetDirectory, "Library");
+    const examplesDirectory = path.join(targetDirectory, "Examples");
+    fs.mkdirSync(libraryDirectory, { recursive: true });
+    if (includeExample) {
+        fs.mkdirSync(examplesDirectory, { recursive: true });
+    }
+
+    fs.writeFileSync(path.join(targetDirectory, PACKAGE_MANIFEST_NAME), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    fs.writeFileSync(path.join(targetDirectory, "README.md"), buildPackageReadme(manifest, namespaceName), "utf8");
+    fs.writeFileSync(path.join(targetDirectory, "LICENSE"), buildPackageLicense(manifest.author || "DreamShader Package Author"), "utf8");
+    fs.writeFileSync(path.join(libraryDirectory, `${namespaceName}.dsh`), buildPackageEntryHeader(namespaceName), "utf8");
+
+    if (includeExample) {
+        fs.writeFileSync(
+            path.join(examplesDirectory, `M_${namespaceName}Preview.dsm`),
+            buildPackageExampleMaterial(manifest, namespaceName),
+            "utf8");
+    }
+}
+
+function buildPackageReadme(manifest, namespaceName) {
+    return `# ${manifest.displayName || manifest.name}
+
+${manifest.description || "Reusable DreamShaderLang functions."}
+
+## Install
+
+\`\`\`text
+DreamShaderLang: Install Package from GitHub
+${manifest.repository || manifest.name}
+\`\`\`
+
+## Import
+
+\`\`\`c
+import "${manifest.name}/${manifest.dreamshader.entry}";
+\`\`\`
+
+## Example
+
+\`\`\`c
+Code = {
+    float3 color = float3(1.0, 0.5, 0.25);
+    float3 result;
+    ${namespaceName}::Identity(color, result);
+}
+\`\`\`
+`;
+}
+
+function buildPackageLicense(author) {
+    return `MIT License
+
+Copyright (c) 2026 ${author}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`;
+}
+
+function buildPackageEntryHeader(namespaceName) {
+    return `Namespace(Name="${namespaceName}")
+{
+    Function Identity(in vec3 input, out vec3 result) {
+        result = input;
+    }
+
+    Function Lerp(in vec3 a, in vec3 b, in float alpha, out vec3 result) {
+        result = lerp(a, b, saturate(alpha));
+    }
+}
+`;
+}
+
+function buildPackageExampleMaterial(manifest, namespaceName) {
+    return `import "${manifest.name}/${manifest.dreamshader.entry}";
+
+Shader(Name="DreamShaderExamples/M_${namespaceName}Preview")
+{
+    Properties = {
+        vec3 InColor = vec3(1.0, 0.45, 0.2);
+    }
+
+    Settings = {
+        Domain = "Surface";
+        ShadingModel = "Unlit";
+        BlendMode = "Opaque";
+    }
+
+    Outputs = {
+        vec3 Res;
+        Base.EmissiveColor = Res;
+    }
+
+    Code = {
+        ${namespaceName}::Identity(InColor, Res);
+    }
+}
+`;
+}
+
+function packageNameToDisplayName(packageName) {
+    const baseName = normalizePackageName(packageName).split("/").pop() || "dreamshader-package";
+    return baseName
+        .replace(/^dreamshader[-_]/i, "")
+        .split(/[-_.]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+}
+
+function packageNameToNamespace(packageName) {
+    const displayName = packageNameToDisplayName(packageName);
+    const namespaceName = displayName.replace(/[^A-Za-z0-9_]/g, "");
+    if (!namespaceName || /^[0-9]/.test(namespaceName)) {
+        return "DreamPackage";
+    }
+    return namespaceName;
+}
+
+async function refreshPackageStorePanel(panel, projectRoot, status = "") {
+    try {
+        const entries = await loadPackageStoreEntries();
+        panel.webview.html = renderPackageStoreHtml(panel.webview, {
+            entries,
+            installed: collectInstalledPackages(projectRoot),
+            sources: getPackageIndexSources(),
+            loading: false,
+            status
+        });
+    } catch (error) {
+        panel.webview.html = renderPackageStoreHtml(panel.webview, {
+            entries: [],
+            installed: collectInstalledPackages(projectRoot),
+            sources: getPackageIndexSources(),
+            loading: false,
+            status: `Failed to load package store: ${formatError(error)}`
+        });
+    }
+}
+
+async function handlePackageStoreWebviewMessage(panel, projectRoot, message) {
+    if (!message || typeof message.command !== "string") {
+        return;
+    }
+
+    switch (message.command) {
+        case "refresh":
+            panel.webview.postMessage({ type: "status", text: "Refreshing package store..." });
+            await refreshPackageStorePanel(panel, projectRoot);
+            return;
+        case "install":
+            if (!message.repository) {
+                return;
+            }
+            await installPackageFromStorePanel(panel, projectRoot, message.repository);
+            return;
+        case "addSource":
+            if (!message.source) {
+                return;
+            }
+            await addPackageIndexSource(message.source);
+            await refreshPackageStorePanel(panel, projectRoot, "Package source added.");
+            return;
+        case "removeSource":
+            if (!message.source) {
+                return;
+            }
+            await removePackageIndexSource(message.source);
+            await refreshPackageStorePanel(panel, projectRoot, "Package source removed.");
+            return;
+        case "openRepository":
+            if (message.repository) {
+                await vscode.env.openExternal(vscode.Uri.parse(normalizeRepositoryWebUrl(message.repository)));
+            }
+            return;
+        case "openSettings":
+            await vscode.commands.executeCommand("workbench.action.openSettings", "dreamshader.packageStoreIndexUrls");
+            return;
+        case "createPackage":
+            await createPackageCommand();
+            await refreshPackageStorePanel(panel, projectRoot, "Package scaffold created.");
+            return;
+        default:
+            return;
+    }
+}
+
+async function installPackageFromStorePanel(panel, projectRoot, packageSource) {
+    try {
+        panel.webview.postMessage({ type: "status", text: `Installing ${getRepositoryDisplayName(packageSource)}...` });
+        const result = await installPackageFromRepository(projectRoot, packageSource, { askBeforeReplace: true });
+        await refreshPackageStorePanel(panel, projectRoot, `Installed ${result.name}@${result.version}.`);
+        vscode.window.showInformationMessage(`Installed DreamShader package ${result.name}@${result.version}.`);
+    } catch (error) {
+        const message = `DreamShader package install failed: ${formatError(error)}`;
+        panel.webview.postMessage({ type: "status", text: message, isError: true });
+        vscode.window.showErrorMessage(message);
+    }
+}
+
+function renderPackageStoreHtml(webview, state) {
+    const nonce = createNonce();
+    const safeState = JSON.stringify({
+        entries: state.entries || [],
+        installed: (state.installed || []).map((entry) => ({
+            name: entry.name,
+            version: entry.version || "",
+            repository: entry.repository || ""
+        })),
+        sources: state.sources || [],
+        loading: Boolean(state.loading),
+        status: state.status || ""
+    }).replace(/</g, "\\u003c");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DreamShader Package Store</title>
+    <style>
+        :root {
+            --bg: var(--vscode-editor-background);
+            --fg: var(--vscode-editor-foreground);
+            --muted: var(--vscode-descriptionForeground);
+            --panel: var(--vscode-sideBar-background);
+            --border: var(--vscode-panel-border);
+            --button: var(--vscode-button-background);
+            --button-fg: var(--vscode-button-foreground);
+            --button-hover: var(--vscode-button-hoverBackground);
+            --input: var(--vscode-input-background);
+            --input-fg: var(--vscode-input-foreground);
+            --focus: var(--vscode-focusBorder);
+            --badge: var(--vscode-badge-background);
+            --badge-fg: var(--vscode-badge-foreground);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+        }
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 300px minmax(0, 1fr);
+        }
+        aside {
+            border-right: 1px solid var(--border);
+            background:
+                radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--focus) 20%, transparent), transparent 36%),
+                var(--panel);
+            padding: 20px;
+        }
+        main {
+            padding: 22px 26px;
+        }
+        h1 {
+            margin: 0 0 6px;
+            font-size: 24px;
+            letter-spacing: -0.02em;
+        }
+        h2 {
+            margin: 24px 0 10px;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+        }
+        .subtitle {
+            color: var(--muted);
+            line-height: 1.45;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 18px 0 20px;
+        }
+        .search {
+            flex: 1;
+            min-width: 240px;
+            padding: 9px 11px;
+            color: var(--input-fg);
+            background: var(--input);
+            border: 1px solid var(--border);
+            outline: none;
+        }
+        .search:focus { border-color: var(--focus); }
+        button {
+            border: 0;
+            color: var(--button-fg);
+            background: var(--button);
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 2px;
+            font: inherit;
+        }
+        button:hover { background: var(--button-hover); }
+        button.secondary {
+            color: var(--fg);
+            background: transparent;
+            border: 1px solid var(--border);
+        }
+        .source-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+        }
+        .source-url {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .source-form {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .source-input {
+            width: 100%;
+            padding: 8px 9px;
+            color: var(--input-fg);
+            background: var(--input);
+            border: 1px solid var(--border);
+            outline: none;
+        }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+        }
+        .card {
+            border: 1px solid var(--border);
+            background: color-mix(in srgb, var(--panel) 72%, var(--bg));
+            padding: 16px;
+            border-radius: 6px;
+            min-height: 188px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .card-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .name {
+            font-weight: 700;
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+        .pkg {
+            color: var(--muted);
+            font-size: 12px;
+            overflow-wrap: anywhere;
+        }
+        .desc {
+            color: var(--fg);
+            opacity: 0.9;
+            line-height: 1.45;
+            flex: 1;
+        }
+        .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .tag, .badge {
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 11px;
+        }
+        .tag {
+            border: 1px solid var(--border);
+            color: var(--muted);
+        }
+        .badge {
+            color: var(--badge-fg);
+            background: var(--badge);
+            white-space: nowrap;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 2px;
+        }
+        .status {
+            margin: 0 0 14px;
+            color: var(--muted);
+        }
+        .status.error { color: var(--vscode-errorForeground); }
+        .empty {
+            padding: 34px;
+            border: 1px dashed var(--border);
+            color: var(--muted);
+            text-align: center;
+        }
+        code {
+            color: var(--vscode-textPreformat-foreground);
+        }
+        @media (max-width: 820px) {
+            .shell { grid-template-columns: 1fr; }
+            aside { border-right: 0; border-bottom: 1px solid var(--border); }
+            .toolbar { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <aside>
+            <h1>DreamShader Store</h1>
+            <div class="subtitle">Browse GitHub-hosted DreamShader packages, install shared <code>.dsh</code> libraries, and manage package index sources.</div>
+
+            <h2>Index Sources</h2>
+            <div id="sources"></div>
+            <div class="source-form">
+                <input id="sourceInput" class="source-input" placeholder="packages.json URL or local path" />
+                <button id="addSource">Add Source</button>
+                <button id="settings" class="secondary">Open Settings</button>
+            </div>
+
+            <h2>Discovery</h2>
+            <div class="subtitle">The store merges configured indexes with GitHub repositories tagged <code>dreamshader-package</code>.</div>
+            <div class="source-form">
+                <button id="createPackage" class="secondary">Create Package Step by Step</button>
+            </div>
+        </aside>
+        <main>
+            <div class="toolbar">
+                <input id="search" class="search" placeholder="Search packages, tags, repositories..." />
+                <button id="refresh">Refresh</button>
+            </div>
+            <div id="status" class="status"></div>
+            <div id="cards" class="cards"></div>
+        </main>
+    </div>
+    <script nonce="${nonce}">
+        const vscode = acquireVsCodeApi();
+        const state = ${safeState};
+        const installedNames = new Set(state.installed.map((entry) => (entry.name || "").toLowerCase()));
+
+        const sourceRoot = document.getElementById("sources");
+        const cardsRoot = document.getElementById("cards");
+        const statusRoot = document.getElementById("status");
+        const searchInput = document.getElementById("search");
+        const sourceInput = document.getElementById("sourceInput");
+
+        function escapeHtml(value) {
+            const replacements = new Map([
+                ["&", "&amp;"],
+                ["<", "&lt;"],
+                [">", "&gt;"],
+                ['"', "&quot;"],
+                ["'", "&#39;"]
+            ]);
+            return String(value || "").replace(/[&<>"']/g, (char) => replacements.get(char));
+        }
+
+        function renderSources() {
+            sourceRoot.innerHTML = "";
+            if (!state.sources.length) {
+                sourceRoot.innerHTML = '<div class="subtitle">No index sources configured.</div>';
+                return;
+            }
+            for (const source of state.sources) {
+                const row = document.createElement("div");
+                row.className = "source-row";
+                row.innerHTML = '<div class="source-url" title="' + escapeHtml(source) + '">' + escapeHtml(source) + '</div><button class="secondary" data-remove-source="' + escapeHtml(source) + '">Remove</button>';
+                sourceRoot.appendChild(row);
+            }
+        }
+
+        function renderCards() {
+            const query = searchInput.value.trim().toLowerCase();
+            const entries = state.entries.filter((entry) => {
+                const haystack = [entry.name, entry.displayName, entry.description, entry.repository, entry.source, entry.sourceUrl, ...(entry.tags || [])].join(" ").toLowerCase();
+                return !query || haystack.includes(query);
+            });
+
+            cardsRoot.innerHTML = "";
+            if (state.loading) {
+                cardsRoot.innerHTML = '<div class="empty">Loading package store...</div>';
+                return;
+            }
+            if (!entries.length) {
+                cardsRoot.innerHTML = '<div class="empty">No packages found. Try another search or add an index source.</div>';
+                return;
+            }
+
+            for (const entry of entries) {
+                const installed = installedNames.has(String(entry.name || "").toLowerCase());
+                const tags = (entry.tags || []).slice(0, 8).map((tag) => '<span class="tag">' + escapeHtml(tag) + '</span>').join("");
+                const card = document.createElement("article");
+                card.className = "card";
+                card.innerHTML = [
+                    '<div class="card-title">',
+                    '<div><div class="name">' + escapeHtml(entry.displayName || entry.name || "Unnamed Package") + '</div><div class="pkg">' + escapeHtml(entry.name || "") + '</div></div>',
+                    installed ? '<span class="badge">Installed</span>' : '<span class="badge">' + escapeHtml(entry.source || "index") + '</span>',
+                    '</div>',
+                    '<div class="desc">' + escapeHtml(entry.description || "No description provided.") + '</div>',
+                    '<div class="tags">' + tags + '</div>',
+                    '<div class="pkg">' + escapeHtml(entry.localPath || entry.repository || "") + '</div>',
+                    '<div class="actions">',
+                    '<button data-install="' + escapeHtml(entry.installSource || entry.localPath || entry.repository || "") + '">' + (installed ? "Reinstall" : "Install") + '</button>',
+                    entry.repository ? '<button class="secondary" data-repo="' + escapeHtml(entry.repository || "") + '">Repository</button>' : '',
+                    '</div>'
+                ].join("");
+                cardsRoot.appendChild(card);
+            }
+        }
+
+        function setStatus(text, isError) {
+            statusRoot.textContent = text || state.status || "";
+            statusRoot.className = isError ? "status error" : "status";
+        }
+
+        document.addEventListener("click", (event) => {
+            const target = event.target;
+            if (!target || !target.dataset) {
+                return;
+            }
+            if (target.dataset.install) {
+                setStatus("Installing " + target.dataset.install + "...");
+                vscode.postMessage({ command: "install", repository: target.dataset.install });
+            } else if (target.dataset.repo) {
+                vscode.postMessage({ command: "openRepository", repository: target.dataset.repo });
+            } else if (target.dataset.removeSource) {
+                vscode.postMessage({ command: "removeSource", source: target.dataset.removeSource });
+            }
+        });
+
+        document.getElementById("refresh").addEventListener("click", () => {
+            setStatus("Refreshing package store...");
+            vscode.postMessage({ command: "refresh" });
+        });
+        document.getElementById("addSource").addEventListener("click", () => {
+            const value = sourceInput.value.trim();
+            if (!value) {
+                setStatus("Enter an index source first.", true);
+                return;
+            }
+            setStatus("Adding package source...");
+            vscode.postMessage({ command: "addSource", source: value });
+        });
+        document.getElementById("settings").addEventListener("click", () => {
+            vscode.postMessage({ command: "openSettings" });
+        });
+        document.getElementById("createPackage").addEventListener("click", () => {
+            vscode.postMessage({ command: "createPackage" });
+        });
+        searchInput.addEventListener("input", renderCards);
+        window.addEventListener("message", (event) => {
+            const message = event.data;
+            if (message && message.type === "status") {
+                setStatus(message.text, message.isError);
+            }
+        });
+
+        renderSources();
+        renderCards();
+        setStatus(state.status || (state.entries.length ? state.entries.length + " package(s) loaded." : ""));
+    </script>
+</body>
+</html>`;
+}
+
+async function installPackageFromRepository(projectRoot, repositorySpecifier, options = {}) {
+    const localSourceDirectory = resolveExistingLocalPackageDirectory(repositorySpecifier);
+    if (localSourceDirectory) {
+        return installPackageFromLocalDirectory(projectRoot, localSourceDirectory, options);
+    }
+
+    const repository = normalizeRepositorySpecifier(repositorySpecifier);
+    const installRoot = path.join(projectRoot, "Saved", "DreamShader", "PackageInstall", `${Date.now()}-${Math.floor(Math.random() * 100000)}`);
+    const checkoutDirectory = path.join(installRoot, "source");
+    fs.mkdirSync(installRoot, { recursive: true });
+
+    try {
+        await runGit(["clone", "--depth", "1", repository, checkoutDirectory], projectRoot);
+
+        const manifest = readPackageManifest(checkoutDirectory);
+        const commit = (await runGit(["-C", checkoutDirectory, "rev-parse", "HEAD"], projectRoot)).stdout.trim();
+        const resolvedRepository = getPackageRepository(manifest) || repository;
+        const installDirectory = getPackageInstallDirectory(projectRoot, manifest.name);
+
+        if (fs.existsSync(installDirectory) && !options.forceReplace) {
+            if (options.askBeforeReplace) {
+                const choice = await vscode.window.showQuickPick(["Replace existing package", "Cancel"], {
+                    title: `Package ${manifest.name} is already installed`,
+                    placeHolder: installDirectory
+                });
+                if (choice !== "Replace existing package") {
+                    throw new Error("Install cancelled.");
+                }
+            } else {
+                throw new Error(`Package '${manifest.name}' is already installed.`);
+            }
+        }
+
+        fs.mkdirSync(path.dirname(installDirectory), { recursive: true });
+        fs.rmSync(installDirectory, { recursive: true, force: true });
+        fs.cpSync(checkoutDirectory, installDirectory, { recursive: true });
+        fs.rmSync(path.join(installDirectory, ".git"), { recursive: true, force: true });
+
+        const lock = readPackageLock(projectRoot);
+        lock.packages[manifest.name] = {
+            name: manifest.name,
+            version: manifest.version || "0.0.0",
+            displayName: manifest.displayName || manifest.name,
+            description: manifest.description || "",
+            repository: resolvedRepository,
+            resolved: repository,
+            commit,
+            installedAtUtc: new Date().toISOString(),
+            installPath: normalizeFsPath(path.relative(projectRoot, installDirectory)),
+            entry: manifest.dreamshader && typeof manifest.dreamshader.entry === "string" ? manifest.dreamshader.entry : ""
+        };
+        writePackageLock(projectRoot, lock);
+
+        return lock.packages[manifest.name];
+    } finally {
+        fs.rmSync(installRoot, { recursive: true, force: true });
+    }
+}
+
+async function installPackageFromLocalDirectory(projectRoot, sourceDirectory, options = {}) {
+    const normalizedSourceDirectory = normalizeFsPath(path.resolve(sourceDirectory));
+    const manifest = readPackageManifest(normalizedSourceDirectory);
+    const installDirectory = getPackageInstallDirectory(projectRoot, manifest.name);
+    const normalizedInstallDirectory = normalizeFsPath(path.resolve(installDirectory));
+
+    if (normalizedInstallDirectory.toLowerCase() === normalizedSourceDirectory.toLowerCase()) {
+        const lock = readPackageLock(projectRoot);
+        lock.packages[manifest.name] = buildPackageLockEntry(projectRoot, installDirectory, manifest, "local", normalizedSourceDirectory, "local");
+        writePackageLock(projectRoot, lock);
+        return lock.packages[manifest.name];
+    }
+
+    if (fs.existsSync(installDirectory) && !options.forceReplace) {
+        if (options.askBeforeReplace) {
+            const choice = await vscode.window.showQuickPick(["Replace existing package", "Cancel"], {
+                title: `Package ${manifest.name} is already installed`,
+                placeHolder: installDirectory
+            });
+            if (choice !== "Replace existing package") {
+                throw new Error("Install cancelled.");
+            }
+        } else {
+            throw new Error(`Package '${manifest.name}' is already installed.`);
+        }
+    }
+
+    fs.mkdirSync(path.dirname(installDirectory), { recursive: true });
+    fs.rmSync(installDirectory, { recursive: true, force: true });
+    fs.cpSync(normalizedSourceDirectory, installDirectory, { recursive: true });
+    fs.rmSync(path.join(installDirectory, ".git"), { recursive: true, force: true });
+
+    const lock = readPackageLock(projectRoot);
+    lock.packages[manifest.name] = buildPackageLockEntry(projectRoot, installDirectory, manifest, "local", normalizedSourceDirectory, "local");
+    writePackageLock(projectRoot, lock);
+    return lock.packages[manifest.name];
+}
+
+function buildPackageLockEntry(projectRoot, installDirectory, manifest, resolvedRepository, resolvedSource, commit) {
+    return {
+        name: manifest.name,
+        version: manifest.version || "0.0.0",
+        displayName: manifest.displayName || manifest.name,
+        description: manifest.description || "",
+        repository: getPackageRepository(manifest) || resolvedRepository || "",
+        resolved: resolvedSource,
+        commit,
+        installedAtUtc: new Date().toISOString(),
+        installPath: normalizeFsPath(path.relative(projectRoot, installDirectory)),
+        entry: manifest.dreamshader && typeof manifest.dreamshader.entry === "string" ? manifest.dreamshader.entry : ""
+    };
+}
+
+function readPackageManifest(packageDirectory) {
+    const manifestPath = path.join(packageDirectory, PACKAGE_MANIFEST_NAME);
+    if (!fs.existsSync(manifestPath)) {
+        throw new Error(`Repository is not a DreamShader package. Missing ${PACKAGE_MANIFEST_NAME}.`);
+    }
+
+    let manifest;
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch (error) {
+        throw new Error(`Invalid ${PACKAGE_MANIFEST_NAME}: ${formatError(error)}`);
+    }
+
+    if (!manifest || typeof manifest.name !== "string" || !manifest.name.trim()) {
+        throw new Error(`${PACKAGE_MANIFEST_NAME} must declare a non-empty string field 'name'.`);
+    }
+
+    manifest.name = normalizePackageName(manifest.name);
+    if (!isValidPackageName(manifest.name)) {
+        throw new Error(`Invalid DreamShader package name '${manifest.name}'. Use 'name' or '@scope/name'.`);
+    }
+
+    if (manifest.version !== undefined && typeof manifest.version !== "string") {
+        throw new Error(`${PACKAGE_MANIFEST_NAME} field 'version' must be a string.`);
+    }
+
+    return manifest;
+}
+
+async function loadPackageStoreEntries() {
+    const entriesByRepository = new Map();
+    const addEntry = (entry, source) => {
+        if (!entry) {
+            return;
+        }
+
+        const repository = getPackageRepository(entry);
+        const localPath = getPackageLocalPath(entry);
+        if (!repository && !localPath) {
+            return;
+        }
+
+        let normalizedRepository = "";
+        if (repository) {
+            try {
+                normalizedRepository = normalizeRepositorySpecifier(repository);
+            } catch (_error) {
+                if (!localPath) {
+                    return;
+                }
+            }
+        }
+
+        const installSource = localPath || normalizedRepository;
+        const key = (entry.name || installSource).toLowerCase();
+        if (entriesByRepository.has(key)) {
+            return;
+        }
+
+        entriesByRepository.set(key, {
+            name: typeof entry.name === "string" ? entry.name : getRepositoryDisplayName(installSource),
+            displayName: typeof entry.displayName === "string" ? entry.displayName : "",
+            description: typeof entry.description === "string" ? entry.description : "",
+            repository: normalizedRepository,
+            localPath,
+            installSource,
+            tags: Array.isArray(entry.tags) ? entry.tags.filter((tag) => typeof tag === "string") : [],
+            source: source === "github" ? "GitHub" : "Index",
+            sourceUrl: source
+        });
+    };
+
+    for (const entry of await loadConfiguredPackageIndexEntries()) {
+        addEntry(entry, "index");
+    }
+
+    for (const entry of await loadGitHubTopicPackageEntries()) {
+        addEntry(entry, "github");
+    }
+
+    return Array.from(entriesByRepository.values()).sort((a, b) => {
+        const left = (a.displayName || a.name || "").toLowerCase();
+        const right = (b.displayName || b.name || "").toLowerCase();
+        return left.localeCompare(right);
+    });
+}
+
+async function loadConfiguredPackageIndexEntries() {
+    const entries = [];
+    for (const source of getPackageIndexSources()) {
+        try {
+            const parsed = await readJsonFromUrlOrFile(source);
+            const sourceEntries = Array.isArray(parsed)
+                ? parsed
+                : parsed && Array.isArray(parsed.packages)
+                    ? parsed.packages
+                    : [];
+
+            for (const entry of sourceEntries) {
+                if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+                    entries.push({ ...entry, source, localPath: resolvePackageEntryLocalPath(entry, source) });
+                }
+            }
+        } catch (_error) {
+            // Keep the store usable even if one source is down.
+        }
+    }
+
+    return entries;
+}
+
+function getPackageIndexSources() {
+    const configuration = vscode.workspace.getConfiguration("dreamshader");
+    const configuredSources = configuration.get("packageStoreIndexUrls", []);
+    const sourceInspection = configuration.inspect("packageStoreIndexUrls");
+    const hasExplicitSourceList = Boolean(sourceInspection && (
+        Array.isArray(sourceInspection.globalValue)
+        || Array.isArray(sourceInspection.workspaceValue)
+        || Array.isArray(sourceInspection.workspaceFolderValue)));
+    const legacyInspection = configuration.inspect("packageStoreIndexUrl");
+    const legacySource = legacyInspection
+        ? (legacyInspection.workspaceFolderValue || legacyInspection.workspaceValue || legacyInspection.globalValue || "")
+        : "";
+    const sources = [];
+
+    if (Array.isArray(configuredSources)) {
+        for (const source of configuredSources) {
+            addUniquePackageSource(sources, source);
+        }
+    }
+
+    addUniquePackageSource(sources, legacySource);
+
+    if (sources.length === 0 && !hasExplicitSourceList) {
+        sources.push(DEFAULT_PACKAGE_INDEX_URL);
+    }
+
+    return sources;
+}
+
+async function addPackageIndexSource(source) {
+    const sources = getPackageIndexSources();
+    addUniquePackageSource(sources, source);
+    await vscode.workspace.getConfiguration("dreamshader").update("packageStoreIndexUrls", sources, vscode.ConfigurationTarget.Global);
+}
+
+async function removePackageIndexSource(source) {
+    const normalizedSource = normalizePackageSource(source);
+    const sources = getPackageIndexSources().filter((entry) => normalizePackageSource(entry).toLowerCase() !== normalizedSource.toLowerCase());
+    await vscode.workspace.getConfiguration("dreamshader").update("packageStoreIndexUrls", sources, vscode.ConfigurationTarget.Global);
+}
+
+function addUniquePackageSource(sources, source) {
+    const normalized = normalizePackageSource(source);
+    if (!normalized) {
+        return;
+    }
+
+    if (!sources.some((entry) => normalizePackageSource(entry).toLowerCase() === normalized.toLowerCase())) {
+        sources.push(normalized);
+    }
+}
+
+function normalizePackageSource(source) {
+    return String(source || "").trim();
+}
+
+async function loadGitHubTopicPackageEntries() {
+    const enabled = vscode.workspace.getConfiguration("dreamshader").get("enableGitHubPackageSearch", true);
+    if (!enabled) {
+        return [];
+    }
+
+    try {
+        const response = await fetchJson("https://api.github.com/search/repositories?q=topic:dreamshader-package&sort=stars&order=desc&per_page=50");
+        if (!response || !Array.isArray(response.items)) {
+            return [];
+        }
+
+        return response.items.map((repo) => ({
+            name: repo.full_name,
+            displayName: repo.name,
+            description: repo.description || "",
+            repository: repo.clone_url || repo.html_url,
+            tags: Array.isArray(repo.topics) ? repo.topics : []
+        }));
+    } catch (_error) {
+        return [];
+    }
+}
+
+function collectInstalledPackages(projectRoot) {
+    const entries = new Map();
+    const lock = readPackageLock(projectRoot);
+    for (const [name, entry] of Object.entries(lock.packages)) {
+        entries.set(name, { ...entry, name });
+    }
+
+    const packagesDirectory = getPackagesDirectory(projectRoot);
+    for (const manifestPath of findPackageManifestFiles(packagesDirectory, 4)) {
+        try {
+            const manifest = readPackageManifest(path.dirname(manifestPath));
+            const existing = entries.get(manifest.name) || {};
+            entries.set(manifest.name, {
+                ...existing,
+                name: manifest.name,
+                version: manifest.version || existing.version || "0.0.0",
+                displayName: manifest.displayName || existing.displayName || manifest.name,
+                description: manifest.description || existing.description || "",
+                repository: getPackageRepository(manifest) || existing.repository || "",
+                installPath: normalizeFsPath(path.relative(projectRoot, path.dirname(manifestPath)))
+            });
+        } catch (_error) {
+            // Ignore malformed packages in the list view; diagnostics happen at import time.
+        }
+    }
+
+    return Array.from(entries.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function findPackageManifestFiles(rootDirectory, maxDepth) {
+    const results = [];
+    if (!fs.existsSync(rootDirectory) || maxDepth < 0) {
+        return results;
+    }
+
+    let entries = [];
+    try {
+        entries = fs.readdirSync(rootDirectory, { withFileTypes: true });
+    } catch (_error) {
+        return results;
+    }
+
+    for (const entry of entries) {
+        const absolutePath = path.join(rootDirectory, entry.name);
+        if (entry.isFile() && entry.name === PACKAGE_MANIFEST_NAME) {
+            results.push(absolutePath);
+            continue;
+        }
+
+        if (entry.isDirectory() && maxDepth > 0) {
+            results.push(...findPackageManifestFiles(absolutePath, maxDepth - 1));
+        }
+    }
+
+    return results;
+}
+
+function readPackageLock(projectRoot) {
+    const lockPath = getPackageLockPath(projectRoot);
+    if (!fs.existsSync(lockPath)) {
+        return { version: 1, packages: {} };
+    }
+
+    try {
+        const parsed = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+        if (!parsed || typeof parsed !== "object") {
+            return { version: 1, packages: {} };
+        }
+
+        if (!parsed.packages || typeof parsed.packages !== "object" || Array.isArray(parsed.packages)) {
+            parsed.packages = {};
+        }
+
+        parsed.version = 1;
+        return parsed;
+    } catch (_error) {
+        return { version: 1, packages: {} };
+    }
+}
+
+function writePackageLock(projectRoot, lock) {
+    const lockPath = getPackageLockPath(projectRoot);
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    const normalizedLock = {
+        version: 1,
+        packages: lock && lock.packages && typeof lock.packages === "object" ? lock.packages : {}
+    };
+    fs.writeFileSync(lockPath, `${JSON.stringify(normalizedLock, null, 2)}\n`, "utf8");
+}
+
+function findProjectRootForPackageCommand() {
+    const document = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
+    return findProjectRoot(document ? document.uri.fsPath : "");
+}
+
+function getPackagesDirectory(projectRoot) {
+    return path.join(projectRoot, "DShader", "Packages");
+}
+
+function getPackageLockPath(projectRoot) {
+    return path.join(projectRoot, "DShader", PACKAGE_LOCK_NAME);
+}
+
+function getPackageInstallDirectory(projectRoot, packageName) {
+    const packagesDirectory = path.resolve(getPackagesDirectory(projectRoot));
+    const installDirectory = path.resolve(packagesDirectory, ...normalizePackageName(packageName).split("/"));
+    const relative = path.relative(packagesDirectory, installDirectory);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+        throw new Error(`Package '${packageName}' resolves outside DShader/Packages.`);
+    }
+    return installDirectory;
+}
+
+function normalizePackageName(packageName) {
+    return String(packageName || "").trim().replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
+}
+
+function isValidPackageName(packageName) {
+    return /^(@[a-z0-9._-]+\/)?[a-z0-9._-]+$/i.test(packageName) && !packageName.includes("..");
+}
+
+function isValidIdentifier(value) {
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || "").trim());
+}
+
+function getPackageRepository(entry) {
+    if (!entry) {
+        return "";
+    }
+
+    if (typeof entry.repository === "string") {
+        return entry.repository;
+    }
+
+    if (entry.repository && typeof entry.repository.url === "string") {
+        return entry.repository.url;
+    }
+
+    if (typeof entry.github === "string") {
+        return entry.github;
+    }
+
+    return "";
+}
+
+function getPackageLocalPath(entry) {
+    if (!entry) {
+        return "";
+    }
+
+    if (typeof entry.localPath === "string" && entry.localPath.trim()) {
+        return normalizeFsPath(entry.localPath.trim());
+    }
+
+    if (typeof entry.path === "string" && entry.path.trim()) {
+        return normalizeFsPath(entry.path.trim());
+    }
+
+    return "";
+}
+
+function resolvePackageEntryLocalPath(entry, source) {
+    const rawPath = getPackageLocalPath(entry);
+    if (!rawPath) {
+        return "";
+    }
+
+    const directPath = rawPath.startsWith("file://")
+        ? vscode.Uri.parse(rawPath).fsPath
+        : rawPath;
+    if (path.isAbsolute(directPath)) {
+        return fs.existsSync(directPath) ? normalizeFsPath(path.resolve(directPath)) : "";
+    }
+
+    const sourceFilePath = getLocalIndexSourceFilePath(source);
+    if (sourceFilePath) {
+        const resolvedPath = path.resolve(path.dirname(sourceFilePath), directPath);
+        return fs.existsSync(resolvedPath) ? normalizeFsPath(resolvedPath) : "";
+    }
+
+    return "";
+}
+
+function getLocalIndexSourceFilePath(source) {
+    const text = String(source || "").trim();
+    if (!text || /^https?:\/\//i.test(text)) {
+        return "";
+    }
+
+    if (text.startsWith("file://")) {
+        return vscode.Uri.parse(text).fsPath;
+    }
+
+    return path.resolve(text);
+}
+
+function resolveExistingLocalPackageDirectory(source) {
+    const text = String(source || "").trim();
+    if (!text || /^https?:\/\//i.test(text) || /^git@/i.test(text) || /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(text)) {
+        return "";
+    }
+
+    const candidate = text.startsWith("file://")
+        ? vscode.Uri.parse(text).fsPath
+        : text;
+    const resolved = path.resolve(candidate);
+    if (!fs.existsSync(resolved)) {
+        return "";
+    }
+
+    const stat = fs.statSync(resolved);
+    const directory = stat.isFile() && path.basename(resolved) === PACKAGE_MANIFEST_NAME
+        ? path.dirname(resolved)
+        : resolved;
+
+    if (!fs.existsSync(path.join(directory, PACKAGE_MANIFEST_NAME))) {
+        return "";
+    }
+
+    return directory;
+}
+
+function normalizeRepositorySpecifier(repositorySpecifier) {
+    const value = String(repositorySpecifier || "").trim().replace(/^git\+/i, "");
+    if (!value) {
+        throw new Error("Repository is empty.");
+    }
+
+    if (/^https?:\/\/github\.com\/[^/]+\/[^/]+\.git\/?$/i.test(value)) {
+        return value.replace(/\/$/, "");
+    }
+
+    if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
+        return `https://github.com/${value}.git`;
+    }
+
+    if (/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/i.test(value)) {
+        return `${value.replace(/\/$/, "")}.git`;
+    }
+
+    if (/^https?:\/\//i.test(value) || /^git@/i.test(value)) {
+        return value;
+    }
+
+    throw new Error(`Unsupported repository specifier '${value}'. Use a GitHub URL or owner/repo.`);
+}
+
+function getRepositoryDisplayName(repository) {
+    const text = String(repository || "").replace(/\.git$/i, "").replace(/\/$/, "");
+    const match = text.match(/github\.com[:/]([^/]+\/[^/]+)$/i);
+    if (match) {
+        return match[1];
+    }
+    return path.basename(text) || text;
+}
+
+function runGit(args, cwd) {
+    return new Promise((resolve, reject) => {
+        childProcess.execFile("git", args, { cwd, maxBuffer: 1024 * 1024 * 8 }, (error, stdout, stderr) => {
+            if (error) {
+                reject(new Error((stderr || stdout || error.message).trim()));
+                return;
+            }
+
+            resolve({ stdout, stderr });
+        });
+    });
+}
+
+async function readJsonFromUrlOrFile(source) {
+    const text = String(source || "").trim();
+    if (!text) {
+        throw new Error("Empty package index URL.");
+    }
+
+    if (/^https?:\/\//i.test(text)) {
+        return fetchJson(text);
+    }
+
+    const filePath = text.startsWith("file://") ? vscode.Uri.parse(text).fsPath : text;
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function fetchJson(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, {
+            headers: {
+                "Accept": "application/json",
+                "User-Agent": "DreamShaderLang-VSCode"
+            }
+        }, (response) => {
+            if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                response.resume();
+                fetchJson(response.headers.location).then(resolve, reject);
+                return;
+            }
+
+            if (response.statusCode !== 200) {
+                response.resume();
+                reject(new Error(`HTTP ${response.statusCode} for ${url}`));
+                return;
+            }
+
+            let body = "";
+            response.setEncoding("utf8");
+            response.on("data", (chunk) => {
+                body += chunk;
+            });
+            response.on("end", () => {
+                try {
+                    resolve(JSON.parse(body));
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }).on("error", reject);
+    });
+}
+
+function normalizeRepositoryWebUrl(repository) {
+    const text = String(repository || "").trim().replace(/^git\+/i, "").replace(/\.git$/i, "");
+    const sshMatch = text.match(/^git@github\.com:([^/]+\/[^/]+)$/i);
+    if (sshMatch) {
+        return `https://github.com/${sshMatch[1]}`;
+    }
+    return text;
+}
+
+function createNonce() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let nonce = "";
+    for (let index = 0; index < 32; index += 1) {
+        nonce += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return nonce;
+}
+
+function formatError(error) {
+    return error && error.message ? error.message : String(error);
+}
+
 async function requestRecompile(scope) {
     const document = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
     const projectRoot = findProjectRoot(document ? document.uri.fsPath : "");
@@ -2980,6 +5155,11 @@ function resolveImportPath(currentFilePath, importSpecifier) {
             return rootCandidate;
         }
 
+        const packageCandidate = normalizeFsPath(path.join(getPackagesDirectory(configuredRoot), normalizedImport));
+        if (fs.existsSync(packageCandidate)) {
+            return packageCandidate;
+        }
+
         const builtinCandidate = normalizeFsPath(path.join(configuredRoot, "Plugins", "DreamShader", "Library", normalizedImport));
         if (fs.existsSync(builtinCandidate)) {
             return builtinCandidate;
@@ -2991,6 +5171,11 @@ function resolveImportPath(currentFilePath, importSpecifier) {
         const rootCandidate = normalizeFsPath(path.join(projectRoot, "DShader", normalizedImport));
         if (fs.existsSync(rootCandidate)) {
             return rootCandidate;
+        }
+
+        const packageCandidate = normalizeFsPath(path.join(getPackagesDirectory(projectRoot), normalizedImport));
+        if (fs.existsSync(packageCandidate)) {
+            return packageCandidate;
         }
 
         const builtinCandidate = normalizeFsPath(path.join(projectRoot, "Plugins", "DreamShader", "Library", normalizedImport));

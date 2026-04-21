@@ -18,10 +18,16 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 自动补全
 - 作用域感知变量补全
 - `Function` / `Namespace::Function` / `import` / `Path(...)` 联想
+- DreamShader Package import 联想
 - Go to Definition
+- Signature Help
+- Hover 类型/来源提示
+- Find References
 - 文档格式化
 - 本地语法诊断
 - Unreal 桥接诊断
+- GitHub Package 安装、更新、移除和商店浏览
+- 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
 
@@ -33,7 +39,10 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Namespace(Name="Texture") { Function Sample(...) { ... } }`
 - `import "Shared/Common.dsh";`
 - `import "Builtin/Texture.dsh";`
+- `import "@typedreammoon/dream-noise/Library/Noise.dsh";`
 - `Plugins/DreamShader/Library/**/*.dsh` 内置库导入
+- 当前内置库包含 `Texture`、`Math`、`Color`、`UV`、`Noise`、`SDF`、`Normal`、`PBR`、`PostProcess`
+- `DShader/Packages/**/*.dsh` package 导入
 - 内置纹理函数使用 `Texture::Sample2DRGB(...)` 这种命名空间形式
 
 ### 作用域补全
@@ -65,8 +74,22 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 - `DreamShaderLang: Recompile Current Source`
 - `DreamShaderLang: Recompile All DSM`
+- `DreamShaderLang: Install Package from GitHub`
+- `DreamShaderLang: Browse Package Store`：打开 VSCode 风格 Webview 商店面板
+- `DreamShaderLang: Update Installed Packages`
+- `DreamShaderLang: Remove Installed Package`
+- `DreamShaderLang: Open Packages Folder`
+- `DreamShaderLang: Add Package Store Index Source`
+- `DreamShaderLang: Remove Package Store Index Source`
+- `DreamShaderLang: Create Package Step by Step`
+- `DreamShaderLang: Create DreamShader Material`
+- `DreamShaderLang: Create DreamShader Header`
+- `DreamShaderLang: Create DreamShader Texture Sample`
+- `DreamShaderLang: Create DreamShader Noise Material`
 
-会把请求写给 Unreal，随后 Unreal 返回的生成/编译错误会镜像到 VSCode 诊断面板。
+Package 安装和更新需要本机可用 `git` 命令。
+
+会把请求写给 Unreal，随后 Unreal 返回的生成/编译错误会镜像到 VSCode 诊断面板。Unreal Parser 错误会尽量精确到真实 `.dsm/.dsh` 文件行列，包括 import 后的头文件位置。
 
 ## 安装
 
@@ -83,6 +106,17 @@ code --install-extension .\dreamshaderlang-language-support-1.0.0.vsix
 ```json
 "dreamshader.projectRoot": "I:/UnrealProject_Moon/Moon_Dev"
 ```
+
+Package store 配置：
+
+```json
+"dreamshader.packageStoreIndexUrls": [
+    "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json"
+],
+"dreamshader.enableGitHubPackageSearch": true
+```
+
+`dreamshader.packageStoreIndexUrl` 旧单源配置仍兼容，但推荐使用 `dreamshader.packageStoreIndexUrls` 列表。
 
 ## 相关文档
 

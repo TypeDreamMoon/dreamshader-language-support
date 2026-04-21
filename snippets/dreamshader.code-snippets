@@ -59,6 +59,14 @@
     ],
     "description": "Import a DreamShader header file"
   },
+  "DreamShader Import Package": {
+    "scope": "dreamshaderlang",
+    "prefix": "importpkg",
+    "body": [
+      "import \"@${1:scope}/${2:package}/Library/${3:Header}.dsh\";"
+    ],
+    "description": "Import a DreamShader package header file"
+  },
   "DreamShader ShaderFunction": {
     "scope": "dreamshaderlang",
     "prefix": "shaderfunction",

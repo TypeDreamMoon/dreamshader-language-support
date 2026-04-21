@@ -26,6 +26,7 @@
     "dreamshaderlang",
     "dreamshader",
     "shader",
+    "package",
     "unreal",
     "material",
     "dsm",
@@ -34,7 +35,19 @@
   "activationEvents": [
     "onLanguage:dreamshaderlang",
     "onCommand:dreamshader.recompileCurrent",
-    "onCommand:dreamshader.recompileAll"
+    "onCommand:dreamshader.recompileAll",
+    "onCommand:dreamshader.installPackageFromGitHub",
+    "onCommand:dreamshader.browsePackages",
+    "onCommand:dreamshader.updatePackages",
+    "onCommand:dreamshader.removePackage",
+    "onCommand:dreamshader.openPackagesFolder",
+    "onCommand:dreamshader.addPackageStoreIndex",
+    "onCommand:dreamshader.removePackageStoreIndex",
+    "onCommand:dreamshader.createPackage",
+    "onCommand:dreamshader.createMaterial",
+    "onCommand:dreamshader.createHeader",
+    "onCommand:dreamshader.createTextureSample",
+    "onCommand:dreamshader.createNoiseMaterial"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -46,6 +59,54 @@
       {
         "command": "dreamshader.recompileAll",
         "title": "DreamShaderLang: Recompile All DSM"
+      },
+      {
+        "command": "dreamshader.installPackageFromGitHub",
+        "title": "DreamShaderLang: Install Package from GitHub"
+      },
+      {
+        "command": "dreamshader.browsePackages",
+        "title": "DreamShaderLang: Browse Package Store"
+      },
+      {
+        "command": "dreamshader.updatePackages",
+        "title": "DreamShaderLang: Update Installed Packages"
+      },
+      {
+        "command": "dreamshader.removePackage",
+        "title": "DreamShaderLang: Remove Installed Package"
+      },
+      {
+        "command": "dreamshader.openPackagesFolder",
+        "title": "DreamShaderLang: Open Packages Folder"
+      },
+      {
+        "command": "dreamshader.addPackageStoreIndex",
+        "title": "DreamShaderLang: Add Package Store Index Source"
+      },
+      {
+        "command": "dreamshader.removePackageStoreIndex",
+        "title": "DreamShaderLang: Remove Package Store Index Source"
+      },
+      {
+        "command": "dreamshader.createPackage",
+        "title": "DreamShaderLang: Create Package Step by Step"
+      },
+      {
+        "command": "dreamshader.createMaterial",
+        "title": "DreamShaderLang: Create DreamShader Material"
+      },
+      {
+        "command": "dreamshader.createHeader",
+        "title": "DreamShaderLang: Create DreamShader Header"
+      },
+      {
+        "command": "dreamshader.createTextureSample",
+        "title": "DreamShaderLang: Create DreamShader Texture Sample"
+      },
+      {
+        "command": "dreamshader.createNoiseMaterial",
+        "title": "DreamShaderLang: Create DreamShader Noise Material"
       }
     ],
     "languages": [
@@ -86,6 +147,26 @@
           "type": "string",
           "default": "",
           "description": "Optional Unreal project root used for DreamShaderLang bridge files. Leave empty to auto-detect from the active .dsm/.dsh file or workspace."
+        },
+        "dreamshader.packageStoreIndexUrls": {
+          "type": "array",
+          "default": [
+            "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Package store index sources. Each source should be a packages.json URL or local file path."
+        },
+        "dreamshader.packageStoreIndexUrl": {
+          "type": "string",
+          "default": "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json",
+          "description": "Deprecated single package store index URL. Prefer dreamshader.packageStoreIndexUrls."
+        },
+        "dreamshader.enableGitHubPackageSearch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include public GitHub repositories tagged with dreamshader-package when browsing DreamShader packages."
         }
       }
     }
