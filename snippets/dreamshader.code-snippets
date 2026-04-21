@@ -18,7 +18,7 @@
       "",
       "\tOutputs = {",
       "\t\tfloat3 ${4:OutColor};",
-      "\t\tBaseColor = ${4:OutColor};",
+      "\t\tBase.BaseColor = ${4:OutColor};",
       "\t}",
       "",
       "\tCode = {",
@@ -130,6 +130,14 @@
       "\tDestination=\"${3:World}\")"
     ],
     "description": "Insert a UE.TransformVector call"
+  },
+  "DreamShader Output Node Binding": {
+    "scope": "dreamshaderlang",
+    "prefix": "ueoutputpin",
+    "body": [
+      "Expression(Class=\"${1:ThinTranslucentMaterialOutput}\").Pin[${2:0}] = ${3:float3(0.8, 0.9, 1.0)};"
+    ],
+    "description": "Insert an auxiliary material output node binding"
   }
 }
 

@@ -138,71 +138,192 @@ const HLSL_KEYWORD_ITEMS = [
     ["struct", "Structure declaration"]
 ];
 
+function createSettingItem(name, detail, insertText) {
+    return {
+        name,
+        detail,
+        insertText: insertText || `${name} = "$0";`
+    };
+}
+
+function createMaterialOutputItem(name, detail) {
+    return {
+        name,
+        qualifiedName: `Base.${name}`,
+        detail,
+        insertText: `Base.${name} = $0;`
+    };
+}
+
+function createUEBuiltinItem(name, snippet, detail, parameters, example) {
+    return {
+        name,
+        qualifiedName: `UE.${name}`,
+        snippet,
+        memberSnippet: snippet.replace(/^UE\./, ""),
+        detail,
+        parameters: parameters || [],
+        example: example || snippet
+    };
+}
+
 const SETTINGS_ITEMS = [
-    ["MaterialDomain", "Material domain such as Surface or PostProcess"],
-    ["Domain", "Alias of MaterialDomain"],
-    ["ShadingModel", "Shading model such as DefaultLit"],
-    ["BlendMode", "Blend mode such as Opaque or Translucent"],
-    ["RenderType", "Alias of BlendMode"],
-    ["TwoSided", "Render both sides of the mesh"],
-    ["Wireframe", "Enable wireframe rendering"],
-    ["DitheredLODTransition", "Enable dithered LOD transition"],
-    ["DitherOpacityMask", "Enable dithered opacity mask"],
-    ["AllowNegativeEmissiveColor", "Allow negative emissive values"],
-    ["CastDynamicShadowAsMasked", "Treat translucent material as masked for shadow casting"],
-    ["ResponsiveAA", "Enable responsive anti-aliasing"],
-    ["ScreenSpaceReflections", "Enable screen space reflections"],
-    ["ContactShadows", "Enable contact shadows"],
-    ["DisableDepthTest", "Disable depth testing"],
-    ["OutputTranslucentVelocity", "Write translucent velocity"],
-    ["TangentSpaceNormal", "Use tangent-space normal input"],
-    ["FullyRough", "Mark material as fully rough"],
-    ["IsSky", "Mark material as sky"],
-    ["ThinSurface", "Enable thin surface mode"],
-    ["HasPixelAnimation", "Mark material as animated at pixel level"],
-    ["OpacityMaskClipValue", "Set opacity mask clip value"],
-    ["NumCustomizedUVs", "Set the number of customized UV channels"],
-    ["Description", "Description text for a ShaderFunction material function asset"],
-    ["ExposeToLibrary", "Expose a ShaderFunction to the Unreal material function library"],
-    ["UserExposedCaption", "Custom node caption shown for a ShaderFunction"],
-    ["LibraryCategories", "Comma-separated categories for a ShaderFunction"]
+    createSettingItem("MaterialDomain", "Material domain such as Surface or PostProcess"),
+    createSettingItem("Domain", "Alias of MaterialDomain"),
+    createSettingItem("ShadingModel", "Shading model such as DefaultLit"),
+    createSettingItem("BlendMode", "Blend mode such as Opaque or Translucent"),
+    createSettingItem("RenderType", "Alias of BlendMode"),
+    createSettingItem("TwoSided", "Render both sides of the mesh"),
+    createSettingItem("Wireframe", "Enable wireframe rendering"),
+    createSettingItem("DitheredLODTransition", "Enable dithered LOD transition"),
+    createSettingItem("DitherOpacityMask", "Enable dithered opacity mask"),
+    createSettingItem("AllowNegativeEmissiveColor", "Allow negative emissive values"),
+    createSettingItem("CastDynamicShadowAsMasked", "Treat translucent material as masked for shadow casting"),
+    createSettingItem("ResponsiveAA", "Enable responsive anti-aliasing"),
+    createSettingItem("ScreenSpaceReflections", "Enable screen space reflections"),
+    createSettingItem("ContactShadows", "Enable contact shadows"),
+    createSettingItem("DisableDepthTest", "Disable depth testing"),
+    createSettingItem("OutputTranslucentVelocity", "Write translucent velocity"),
+    createSettingItem("TangentSpaceNormal", "Use tangent-space normal input"),
+    createSettingItem("FullyRough", "Mark material as fully rough"),
+    createSettingItem("IsSky", "Mark material as sky"),
+    createSettingItem("ThinSurface", "Enable thin surface mode"),
+    createSettingItem("HasPixelAnimation", "Mark material as animated at pixel level"),
+    createSettingItem("OpacityMaskClipValue", "Set opacity mask clip value"),
+    createSettingItem("NumCustomizedUVs", "Set the number of customized UV channels"),
+    createSettingItem("Description", "Description text for a ShaderFunction material function asset"),
+    createSettingItem("ExposeToLibrary", "Expose a ShaderFunction to the Unreal material function library"),
+    createSettingItem("UserExposedCaption", "Custom node caption shown for a ShaderFunction"),
+    createSettingItem("LibraryCategories", "Comma-separated categories for a ShaderFunction")
 ];
 
 const MATERIAL_OUTPUT_ITEMS = [
-    ["BaseColor", "Material base color output"],
-    ["EmissiveColor", "Material emissive output"],
-    ["Opacity", "Material opacity output"],
-    ["OpacityMask", "Material opacity mask output"],
-    ["Metallic", "Material metallic output"],
-    ["Specular", "Material specular output"],
-    ["Roughness", "Material roughness output"],
-    ["Normal", "Material normal output"],
-    ["AmbientOcclusion", "Material ambient occlusion output"],
-    ["AO", "Alias of AmbientOcclusion"],
-    ["Refraction", "Material refraction output"],
-    ["WorldPositionOffset", "World position offset output"],
-    ["WPO", "Alias of WorldPositionOffset"],
-    ["PixelDepthOffset", "Pixel depth offset output"],
-    ["PDO", "Alias of PixelDepthOffset"],
-    ["SubsurfaceColor", "Subsurface color output"],
-    ["ClearCoat", "Clear coat output"],
-    ["ClearCoatRoughness", "Clear coat roughness output"],
-    ["Anisotropy", "Anisotropy output"],
-    ["Tangent", "Tangent output"]
+    createMaterialOutputItem("BaseColor", "Material base color output"),
+    createMaterialOutputItem("EmissiveColor", "Material emissive output"),
+    createMaterialOutputItem("Opacity", "Material opacity output"),
+    createMaterialOutputItem("OpacityMask", "Material opacity mask output"),
+    createMaterialOutputItem("Metallic", "Material metallic output"),
+    createMaterialOutputItem("Specular", "Material specular output"),
+    createMaterialOutputItem("Roughness", "Material roughness output"),
+    createMaterialOutputItem("Normal", "Material normal output"),
+    createMaterialOutputItem("AmbientOcclusion", "Material ambient occlusion output"),
+    createMaterialOutputItem("AO", "Alias of AmbientOcclusion"),
+    createMaterialOutputItem("Refraction", "Material refraction output"),
+    createMaterialOutputItem("WorldPositionOffset", "World position offset output"),
+    createMaterialOutputItem("WPO", "Alias of WorldPositionOffset"),
+    createMaterialOutputItem("PixelDepthOffset", "Pixel depth offset output"),
+    createMaterialOutputItem("PDO", "Alias of PixelDepthOffset"),
+    createMaterialOutputItem("SubsurfaceColor", "Subsurface color output"),
+    createMaterialOutputItem("ClearCoat", "Clear coat output"),
+    createMaterialOutputItem("ClearCoatRoughness", "Clear coat roughness output"),
+    createMaterialOutputItem("Anisotropy", "Anisotropy output"),
+    createMaterialOutputItem("Tangent", "Tangent output")
+];
+
+const MATERIAL_OUTPUT_NAME_SET = new Set(MATERIAL_OUTPUT_ITEMS.map((item) => String(item.name || "").trim().toLowerCase()));
+
+const OUTPUT_HELPER_ITEMS = [
+    {
+        name: "Base",
+        snippet: "Base.$0",
+        detail: "Root material output namespace. Material properties must be assigned through Base.*."
+    },
+    {
+        name: "Expression(...).Pin[n]",
+        snippet: "Expression(Class=\"${1:ThinTranslucentMaterialOutput}\").Pin[${2:0}] = $0;",
+        detail: "Binds a value to an auxiliary material output node pin."
+    },
+    {
+        name: "ThinTranslucentMaterialOutput",
+        snippet: "Expression(Class=\"ThinTranslucentMaterialOutput\").Pin[${1:0}] = $0;",
+        detail: "Creates a ThinTranslucentMaterialOutput binding in Outputs."
+    },
+    {
+        name: "TangentOutput",
+        snippet: "Expression(Class=\"TangentOutput\").Pin[${1:0}] = $0;",
+        detail: "Creates a TangentOutput binding in Outputs."
+    }
 ];
 
 const UE_BUILTINS = [
-    ["TexCoord", "UE.TexCoord(Index=0)", "Creates a TextureCoordinate material expression."],
-    ["Time", "UE.Time(Period=4.0)", "Creates a Time material expression."],
-    ["Panner", "UE.Panner(Coordinate=UV, Time=UE.Time(), Speed=float2(0.1, 0.0))", "Creates a Panner material expression."],
-    ["WorldPosition", "UE.WorldPosition()", "Creates a WorldPosition material expression."],
-    ["ObjectPositionWS", "UE.ObjectPositionWS()", "Creates an ObjectPositionWS material expression."],
-    ["CameraVectorWS", "UE.CameraVectorWS()", "Creates a CameraVectorWS material expression."],
-    ["ScreenPosition", "UE.ScreenPosition()", "Creates a ScreenPosition material expression."],
-    ["VertexColor", "UE.VertexColor()", "Creates a VertexColor material expression."],
-    ["TransformVector", "UE.TransformVector(Input=NormalTS, Source=\"Tangent\", Destination=\"World\")", "Creates a TransformVector material expression."],
-    ["TransformPosition", "UE.TransformPosition(Input=WorldPos, Source=\"Local\", Destination=\"World\")", "Creates a TransformPosition material expression."],
-    ["Expression", "UE.Expression(Class=\"Sine\", OutputType=\"float1\", Input=UE.Time())", "Creates any reflected MaterialExpression class."]
+    createUEBuiltinItem(
+        "TexCoord",
+        "UE.TexCoord(Index=${1:0})",
+        "Creates a TextureCoordinate material expression.",
+        [
+            { qualifier: "in", type: "value", name: "Index" },
+            { qualifier: "in", type: "value", name: "UTiling" },
+            { qualifier: "in", type: "value", name: "VTiling" },
+            { qualifier: "in", type: "value", name: "UnMirrorU" },
+            { qualifier: "in", type: "value", name: "UnMirrorV" }
+        ],
+        "UE.TexCoord(Index=0)"
+    ),
+    createUEBuiltinItem(
+        "Time",
+        "UE.Time(Period=${1:4.0})",
+        "Creates a Time material expression.",
+        [
+            { qualifier: "in", type: "value", name: "Period" },
+            { qualifier: "in", type: "value", name: "IgnorePause" }
+        ],
+        "UE.Time(Period=4.0)"
+    ),
+    createUEBuiltinItem(
+        "Panner",
+        "UE.Panner(Coordinate=${1:UV}, Time=${2:UE.Time()}, Speed=${3:float2(0.1, 0.0)})",
+        "Creates a Panner material expression.",
+        [
+            { qualifier: "in", type: "value", name: "Coordinate" },
+            { qualifier: "in", type: "value", name: "Time" },
+            { qualifier: "in", type: "value", name: "Speed" },
+            { qualifier: "in", type: "value", name: "SpeedX" },
+            { qualifier: "in", type: "value", name: "SpeedY" },
+            { qualifier: "in", type: "value", name: "FractionalPart" }
+        ],
+        "UE.Panner(Coordinate=UV, Time=UE.Time(), Speed=float2(0.1, 0.0))"
+    ),
+    createUEBuiltinItem("WorldPosition", "UE.WorldPosition()", "Creates a WorldPosition material expression.", [], "UE.WorldPosition()"),
+    createUEBuiltinItem("ObjectPositionWS", "UE.ObjectPositionWS()", "Creates an ObjectPositionWS material expression.", [], "UE.ObjectPositionWS()"),
+    createUEBuiltinItem("CameraVectorWS", "UE.CameraVectorWS()", "Creates a CameraVectorWS material expression.", [], "UE.CameraVectorWS()"),
+    createUEBuiltinItem("ScreenPosition", "UE.ScreenPosition()", "Creates a ScreenPosition material expression.", [], "UE.ScreenPosition()"),
+    createUEBuiltinItem("VertexColor", "UE.VertexColor()", "Creates a VertexColor material expression.", [], "UE.VertexColor()"),
+    createUEBuiltinItem(
+        "TransformVector",
+        "UE.TransformVector(Input=${1:NormalTS}, Source=\"${2:Tangent}\", Destination=\"${3:World}\")",
+        "Creates a TransformVector material expression.",
+        [
+            { qualifier: "in", type: "value", name: "Input" },
+            { qualifier: "in", type: "value", name: "Source" },
+            { qualifier: "in", type: "value", name: "Destination" }
+        ],
+        "UE.TransformVector(Input=NormalTS, Source=\"Tangent\", Destination=\"World\")"
+    ),
+    createUEBuiltinItem(
+        "TransformPosition",
+        "UE.TransformPosition(Input=${1:WorldPos}, Source=\"${2:Local}\", Destination=\"${3:World}\")",
+        "Creates a TransformPosition material expression.",
+        [
+            { qualifier: "in", type: "value", name: "Input" },
+            { qualifier: "in", type: "value", name: "Source" },
+            { qualifier: "in", type: "value", name: "Destination" },
+            { qualifier: "in", type: "value", name: "PeriodicWorldTileSize" },
+            { qualifier: "in", type: "value", name: "FirstPersonInterpolationAlpha" }
+        ],
+        "UE.TransformPosition(Input=WorldPos, Source=\"Local\", Destination=\"World\")"
+    ),
+    createUEBuiltinItem(
+        "Expression",
+        "UE.Expression(Class=\"${1:Sine}\", OutputType=\"${2:float1}\", Input=${3:UE.Time()})",
+        "Creates any reflected MaterialExpression class.",
+        [
+            { qualifier: "in", type: "value", name: "Class" },
+            { qualifier: "in", type: "value", name: "OutputType" },
+            { qualifier: "in", type: "value", name: "Output" },
+            { qualifier: "in", type: "value", name: "OutputIndex" }
+        ],
+        "UE.Expression(Class=\"Sine\", OutputType=\"float1\", Input=UE.Time())"
+    )
 ];
 
 const DREAMSHADER_HELPER_ITEMS = [
@@ -219,7 +340,7 @@ const HOVER_DOCS = new Map([
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
     ["properties", "Declares user inputs or UE-generated property nodes."],
     ["settings", "Declares Unreal material or ShaderFunction settings."],
-    ["outputs", "Declares shader outputs or ShaderFunction result pins."],
+    ["outputs", "Declares shader outputs or ShaderFunction result pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
     ["code", "Inside `Shader` or `ShaderFunction`, `Code` is DreamShader graph code. Put complex flow logic inside `Function` blocks."],
     ["inputs", "ShaderFunction input pin list."],
     ["outputtype", "Required for generic `UE.Expression(...)` or reflected `UE.ClassName(...)` calls."],
@@ -228,6 +349,8 @@ const HOVER_DOCS = new Map([
     ["output", "Selects a named output from a multi-output expression or ShaderFunction call."],
     ["outputname", "Alias of `Output`."],
     ["outputindex", "Selects an output by zero-based output index."],
+    ["base", "Material output root namespace used in Shader Outputs bindings, for example `Base.BaseColor = ...`."],
+    ["pin", "Selects an auxiliary material output node pin by zero-based index, for example `Expression(Class=\"ThinTranslucentMaterialOutput\").Pin[0] = ...`."] ,
     ["path", "Resolves a texture default asset path. Use `Path(Game, \"/Textures/MyTexture\")` or `Path(\"/Game/Textures/MyTexture\")` inside texture property defaults."],
     ["in", "Function input parameter qualifier."],
     ["out", "Function output parameter qualifier. Callers pass a target variable explicitly, for example `ApplyTint(Color, Tint, Result)`."]
@@ -396,12 +519,20 @@ function createCompletionProvider() {
             const items = [];
 
             if (context.afterUEAccessor && context.inGraphLikeContext) {
-                for (const [name, snippet, detail] of UE_BUILTINS) {
-                    const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-                    item.insertText = new vscode.SnippetString(snippet.replace(/^UE\./, ""));
-                    item.detail = detail;
+                for (const builtin of UE_BUILTINS) {
+                    const item = new vscode.CompletionItem(builtin.name, vscode.CompletionItemKind.Function);
+                    item.insertText = new vscode.SnippetString(builtin.memberSnippet);
+                    item.detail = builtin.detail;
                     items.push(item);
                 }
+                return items;
+            }
+
+            if (context.afterOutputExpressionAccessor) {
+                const item = new vscode.CompletionItem("Pin", vscode.CompletionItemKind.Field);
+                item.insertText = new vscode.SnippetString("Pin[${1:0}] = $0;");
+                item.detail = "Auxiliary material output node pin binding";
+                items.push(item);
                 return items;
             }
 
@@ -436,19 +567,19 @@ function createHoverProvider() {
                 return new vscode.Hover(new vscode.MarkdownString(HOVER_DOCS.get(normalized)));
             }
 
-            const setting = SETTINGS_ITEMS.find(([name]) => name.toLowerCase() === normalized);
+            const setting = SETTINGS_ITEMS.find((item) => item.name.toLowerCase() === normalized);
             if (setting) {
-                return new vscode.Hover(new vscode.MarkdownString(`\`${setting[0]}\`\n\n${setting[1]}`));
+                return new vscode.Hover(new vscode.MarkdownString(`\`${setting.name}\`\n\n${setting.detail}`));
             }
 
-            const output = MATERIAL_OUTPUT_ITEMS.find(([name]) => name.toLowerCase() === normalized);
+            const output = MATERIAL_OUTPUT_ITEMS.find((item) => item.name.toLowerCase() === normalized);
             if (output) {
-                return new vscode.Hover(new vscode.MarkdownString(`\`${output[0]}\`\n\n${output[1]}`));
+                return new vscode.Hover(new vscode.MarkdownString(`\`${output.qualifiedName}\`\n\n${output.detail}`));
             }
 
-            const builtin = UE_BUILTINS.find(([name]) => name.toLowerCase() === normalized);
+            const builtin = UE_BUILTINS.find((item) => item.name.toLowerCase() === normalized);
             if (builtin) {
-                return new vscode.Hover(new vscode.MarkdownString(`\`UE.${builtin[0]}\`\n\n${builtin[2]}\n\nExample: \`${builtin[1]}\``));
+                return new vscode.Hover(new vscode.MarkdownString(`\`${builtin.qualifiedName}\`\n\n${builtin.detail}\n\nExample: \`${builtin.example}\``));
             }
 
             const context = analyzeDocument(document, position);
@@ -738,14 +869,14 @@ function getCallableSignatureHelpEntries(document, callee) {
         return signatures;
     }
 
-    const ueBuiltin = UE_BUILTINS.find(([name]) => normalizeSymbolKey(`UE.${name}`) === normalized || normalizeSymbolKey(name) === normalized);
+    const ueBuiltin = UE_BUILTINS.find((item) => normalizeSymbolKey(item.qualifiedName) === normalized || normalizeSymbolKey(item.name) === normalized);
     if (ueBuiltin) {
         return [{
             kind: "UE",
-            name: `UE.${ueBuiltin[0]}`,
-            inputs: parseSignatureFromSnippet(ueBuiltin[1]),
+            name: ueBuiltin.qualifiedName,
+            inputs: ueBuiltin.parameters,
             outputs: [],
-            detail: ueBuiltin[2]
+            detail: ueBuiltin.detail
         }];
     }
 
@@ -760,23 +891,6 @@ function getCallableSignatureHelpEntries(document, callee) {
     }
 
     return [];
-}
-
-function parseSignatureFromSnippet(snippet) {
-    const openIndex = snippet.indexOf("(");
-    const closeIndex = snippet.lastIndexOf(")");
-    if (openIndex === -1 || closeIndex === -1 || closeIndex <= openIndex) {
-        return [];
-    }
-
-    return splitTopLevelDelimitedWithOffsets(snippet.slice(openIndex + 1, closeIndex), 0, ",")
-        .map((segment) => {
-            const assignment = splitTopLevelAssignment(segment.text);
-            if (!assignment) {
-                return { qualifier: "in", type: "value", name: segment.text.trim() };
-            }
-            return { qualifier: "in", type: "value", name: assignment.left.trim() };
-        });
 }
 
 function buildSignatureInformation(signature) {
@@ -941,10 +1055,10 @@ function addSettingItems(items, context) {
         return;
     }
 
-    for (const [name, detail] of SETTINGS_ITEMS) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Property);
-        item.insertText = new vscode.SnippetString(`${name} = "$0";`);
-        item.detail = detail;
+    for (const setting of SETTINGS_ITEMS) {
+        const item = new vscode.CompletionItem(setting.name, vscode.CompletionItemKind.Property);
+        item.insertText = new vscode.SnippetString(setting.insertText);
+        item.detail = setting.detail;
         items.push(item);
     }
 }
@@ -954,9 +1068,17 @@ function addOutputItems(items, context) {
         return;
     }
 
-    for (const [name, detail] of MATERIAL_OUTPUT_ITEMS) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Field);
-        item.detail = detail;
+    for (const helper of OUTPUT_HELPER_ITEMS) {
+        const item = new vscode.CompletionItem(helper.name, vscode.CompletionItemKind.Module);
+        item.insertText = new vscode.SnippetString(helper.snippet);
+        item.detail = helper.detail;
+        items.push(item);
+    }
+
+    for (const output of MATERIAL_OUTPUT_ITEMS) {
+        const item = new vscode.CompletionItem(output.qualifiedName, vscode.CompletionItemKind.Field);
+        item.insertText = new vscode.SnippetString(output.insertText);
+        item.detail = output.detail;
         items.push(item);
     }
 }
@@ -971,10 +1093,10 @@ function addBuiltinItems(items, context) {
     ueRoot.detail = "DreamShader UE material expression namespace";
     items.push(ueRoot);
 
-    for (const [name, snippet, detail] of UE_BUILTINS) {
-        const item = new vscode.CompletionItem(`UE.${name}`, vscode.CompletionItemKind.Function);
-        item.insertText = new vscode.SnippetString(snippet);
-        item.detail = detail;
+    for (const builtin of UE_BUILTINS) {
+        const item = new vscode.CompletionItem(builtin.qualifiedName, vscode.CompletionItemKind.Function);
+        item.insertText = new vscode.SnippetString(builtin.snippet);
+        item.detail = builtin.detail;
         items.push(item);
     }
 }
@@ -1058,7 +1180,8 @@ function analyzeDocument(document, position) {
         inMaterialOutputs: currentSection === "Outputs" && currentBlock === "Shader",
         inGraphLikeContext: inGraphCode || currentSection === "Properties",
         inImportLine,
-        afterUEAccessor: /UE\.\w*$/.test(linePrefix)
+        afterUEAccessor: /UE\.\w*$/.test(linePrefix),
+        afterOutputExpressionAccessor: currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix)
     };
 }
 
@@ -1687,6 +1810,48 @@ function splitDeclarationTypeAndName(text) {
     };
 }
 
+function parseCodeDeclarationEntries(text, baseOffset) {
+    const segments = splitTopLevelDelimitedWithOffsets(text, baseOffset, ",");
+    if (segments.length === 0) {
+        return [];
+    }
+
+    const firstAssignment = splitTopLevelAssignment(segments[0].text);
+    const firstDeclaration = splitDeclarationTypeAndName(firstAssignment ? firstAssignment.left : segments[0].text);
+    if (!firstDeclaration) {
+        return [];
+    }
+
+    const entries = [{
+        type: firstDeclaration.type,
+        name: firstDeclaration.name,
+        valueText: firstAssignment ? firstAssignment.right : "",
+        valueOffset: firstAssignment ? segments[0].startOffset + segments[0].text.indexOf(firstAssignment.right) : -1,
+        startOffset: segments[0].startOffset,
+        endOffset: segments[0].endOffset
+    }];
+
+    for (let index = 1; index < segments.length; index += 1) {
+        const segment = segments[index];
+        const assignment = splitTopLevelAssignment(segment.text);
+        const nameText = assignment ? assignment.left.trim() : segment.text.trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(nameText)) {
+            return [];
+        }
+
+        entries.push({
+            type: firstDeclaration.type,
+            name: nameText,
+            valueText: assignment ? assignment.right : "",
+            valueOffset: assignment ? segment.startOffset + segment.text.indexOf(assignment.right) : -1,
+            startOffset: segment.startOffset,
+            endOffset: segment.endOffset
+        });
+    }
+
+    return entries;
+}
+
 function normalizeSymbolKey(name) {
     return String(name || "").trim().toLowerCase();
 }
@@ -1807,6 +1972,56 @@ function parseTypedDeclarationsFromSection(section, allowBindings = false) {
     }
 
     return { declarations, bindings, statements };
+}
+
+function parseOutputBindingTarget(text) {
+    const trimmed = String(text || "").trim();
+    const materialMatch = trimmed.match(/^Base\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)$/);
+    if (materialMatch) {
+        const propertyName = materialMatch[1];
+        if (!MATERIAL_OUTPUT_NAME_SET.has(normalizeSymbolKey(propertyName))) {
+            return {
+                kind: "invalid",
+                message: `Unknown material output 'Base.${propertyName}'.`
+            };
+        }
+
+        return {
+            kind: "material",
+            propertyName
+        };
+    }
+
+    const pinMatch = trimmed.match(/^(.*)\.\s*Pin\s*\[\s*(\d+)\s*\]$/);
+    if (pinMatch) {
+        const callText = pinMatch[1].trim();
+        const callExpression = parseCallExpressionText(callText, 0);
+        if (!callExpression || normalizeSymbolKey(callExpression.callee) !== "expression") {
+            return {
+                kind: "invalid",
+                message: "Auxiliary output nodes must use Expression(...).Pin[n]."
+            };
+        }
+
+        const classArgument = callExpression.arguments.find((argument) => argument.isNamed && normalizeSymbolKey(argument.name) === "class");
+        if (!classArgument || !classArgument.valueText.trim()) {
+            return {
+                kind: "invalid",
+                message: "Output node bindings must specify Expression(Class=\"...\").Pin[n]."
+            };
+        }
+
+        return {
+            kind: "outputNode",
+            pinIndex: Number(pinMatch[2]),
+            callExpression
+        };
+    }
+
+    return {
+        kind: "invalid",
+        message: "Material Outputs bindings must target Base.<Property> or Expression(...).Pin[n]."
+    };
 }
 
 function addCallableSignature(map, signature) {
@@ -2081,15 +2296,18 @@ function addLocalDeclarationEntries(entries, text, startOffset, cutoffOffset, de
     const visibleText = text.slice(startOffset, cutoffOffset);
     const statements = splitStatementsWithOffsets(visibleText, startOffset);
     for (const statement of statements) {
-        const assignment = splitTopLevelAssignment(statement.text);
-        const declaration = assignment
-            ? splitDeclarationTypeAndName(assignment.left)
-            : splitDeclarationTypeAndName(statement.text);
-        if (!declaration) {
+        const declarations = parseCodeDeclarationEntries(statement.text, statement.startOffset);
+        if (declarations.length === 0) {
             continue;
         }
 
-        addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} ${detailLabel}`);
+        for (const declaration of declarations) {
+            if (declaration.startOffset >= cutoffOffset) {
+                continue;
+            }
+
+            addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} ${detailLabel}`);
+        }
     }
 }
 
@@ -2101,18 +2319,15 @@ function addGraphCodeEntries(entries, codeSection, cutoffOffset, reachableCallab
     const visibleText = codeSection.bodyText.slice(0, Math.max(0, cutoffOffset - (codeSection.bodyOpenOffset + 1)));
     const statements = splitStatementsWithOffsets(visibleText, codeSection.bodyOpenOffset + 1);
     for (const statement of statements) {
-        const assignment = splitTopLevelAssignment(statement.text);
-        if (assignment) {
-            const declaration = splitDeclarationTypeAndName(assignment.left);
-            if (declaration) {
+        const declarations = parseCodeDeclarationEntries(statement.text, statement.startOffset);
+        if (declarations.length > 0) {
+            for (const declaration of declarations) {
+                if (declaration.startOffset >= cutoffOffset) {
+                    continue;
+                }
+
                 addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} Code local variable`);
             }
-            continue;
-        }
-
-        const declaration = splitDeclarationTypeAndName(statement.text);
-        if (declaration) {
-            addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} Code local variable`);
             continue;
         }
 
@@ -2352,19 +2567,19 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
         const propertiesSection = seenSections.get("Properties")?.[0];
         const outputsSection = seenSections.get("Outputs")?.[0];
         if (propertiesSection) {
-            diagnostics.push(...validateDeclarationSection(document, propertiesSection, symbols, "Properties", false));
+            diagnostics.push(...validateDeclarationSection(document, propertiesSection, symbols, "Properties", false, reachableCallables));
         }
         if (outputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", true));
+            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", true, reachableCallables));
         }
     } else if (block.kind === "ShaderFunction") {
         const inputsSection = seenSections.get("Inputs")?.[0];
         const outputsSection = seenSections.get("Outputs")?.[0];
         if (inputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, inputsSection, symbols, "Inputs", false));
+            diagnostics.push(...validateDeclarationSection(document, inputsSection, symbols, "Inputs", false, reachableCallables));
         }
         if (outputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false));
+            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
         }
 
     }
@@ -2382,7 +2597,7 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
     return diagnostics;
 }
 
-function validateDeclarationSection(document, section, symbols, sectionLabel, allowBindings) {
+function validateDeclarationSection(document, section, symbols, sectionLabel, allowBindings, reachableCallables = new Map()) {
     const diagnostics = [];
     const parsed = parseTypedDeclarationsFromSection(section, allowBindings);
     const localNames = new Map();
@@ -2463,7 +2678,23 @@ function validateDeclarationSection(document, section, symbols, sectionLabel, al
                 binding.startOffset,
                 binding.endOffset,
                 `Invalid ${sectionLabel} binding '${binding.text}'.`));
+            continue;
         }
+
+        if (allowBindings && sectionLabel === "Outputs") {
+            const targetInfo = parseOutputBindingTarget(binding.target);
+            if (!targetInfo || targetInfo.kind === "invalid") {
+                diagnostics.push(makeOffsetDiagnostic(
+                    document,
+                    binding.startOffset,
+                    binding.startOffset + binding.target.length,
+                    targetInfo?.message || `Invalid ${sectionLabel} binding target '${binding.target}'.`));
+                continue;
+            }
+        }
+
+        const valueOffset = binding.startOffset + binding.text.indexOf(binding.valueText);
+        diagnostics.push(...analyzeExpressionText(document, binding.valueText, valueOffset, symbols || new Map(), reachableCallables, "value"));
     }
 
     return diagnostics;
@@ -2506,52 +2737,39 @@ function analyzeCodeSection(document, section, symbols, reachableCallables) {
                 "Code statement is missing a trailing ';'."));
         }
 
-        const assignment = splitTopLevelAssignment(statement.text);
-        if (assignment) {
-            const declaration = splitDeclarationTypeAndName(assignment.left);
-            const rightOffset = statement.startOffset + statement.text.indexOf(assignment.right);
-            diagnostics.push(...analyzeExpressionText(document, assignment.right, rightOffset, symbols, reachableCallables, "value"));
-
-            if (declaration) {
+        const declarations = parseCodeDeclarationEntries(statement.text, statement.startOffset);
+        if (declarations.length > 0) {
+            for (const declaration of declarations) {
                 const resolvedType = resolveTypeInfo(declaration.type);
                 if (!resolvedType) {
                     diagnostics.push(makeOffsetDiagnostic(
                         document,
-                        statement.startOffset,
-                        statement.endOffset,
+                        declaration.startOffset,
+                        declaration.endOffset,
                         `Unsupported Code variable type '${declaration.type}' for '${declaration.name}'.`));
                     continue;
+                }
+
+                if (declaration.valueText) {
+                    diagnostics.push(...analyzeExpressionText(document, declaration.valueText, declaration.valueOffset, symbols, reachableCallables, "value"));
                 }
 
                 symbols.set(normalizeSymbolKey(declaration.name), {
                     name: declaration.name,
                     typeInfo: resolvedType
                 });
-            } else {
-                symbols.set(normalizeSymbolKey(assignment.left), {
-                    name: assignment.left,
-                    typeInfo: symbols.get(normalizeSymbolKey(assignment.left))?.typeInfo || null
-                });
             }
-
             continue;
         }
 
-        const declaration = splitDeclarationTypeAndName(statement.text);
-        if (declaration) {
-            const resolvedType = resolveTypeInfo(declaration.type);
-            if (!resolvedType) {
-                diagnostics.push(makeOffsetDiagnostic(
-                    document,
-                    statement.startOffset,
-                    statement.endOffset,
-                    `Unsupported Code variable type '${declaration.type}' for '${declaration.name}'.`));
-                continue;
-            }
+        const assignment = splitTopLevelAssignment(statement.text);
+        if (assignment) {
+            const rightOffset = statement.startOffset + statement.text.indexOf(assignment.right);
+            diagnostics.push(...analyzeExpressionText(document, assignment.right, rightOffset, symbols, reachableCallables, "value"));
 
-            symbols.set(normalizeSymbolKey(declaration.name), {
-                name: declaration.name,
-                typeInfo: resolvedType
+            symbols.set(normalizeSymbolKey(assignment.left), {
+                name: assignment.left,
+                typeInfo: symbols.get(normalizeSymbolKey(assignment.left))?.typeInfo || null
             });
             continue;
         }
@@ -3426,7 +3644,7 @@ Shader(Name="${shaderName}")
 
     Outputs = {
         vec3 Color;
-        BaseColor = Color;
+        Base.BaseColor = Color;
     }
 
     Code = {
@@ -3458,7 +3676,7 @@ Shader(Name="${shaderName}")
 
     Outputs = {
         vec3 Color;
-        EmissiveColor = Color;
+        Base.EmissiveColor = Color;
     }
 
     Code = {
@@ -3485,7 +3703,7 @@ Shader(Name="${shaderName}")
 
     Outputs = {
         vec3 Color;
-        EmissiveColor = Color;
+        Base.EmissiveColor = Color;
     }
 
     Code = {

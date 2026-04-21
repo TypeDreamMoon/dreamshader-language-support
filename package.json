@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm material files and .dsh shared headers.",
-  "version": "1.1.0",
+  "version": "1.2.2",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",

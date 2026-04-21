@@ -77,7 +77,10 @@
     },
     "materialOutputs": {
       "patterns": [
-        { "name": "variable.language.output.dreamshader", "match": "\\b(?:BaseColor|EmissiveColor|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|Anisotropy|Tangent)\\b(?=\\s*=)" }
+        { "name": "support.class.output-root.dreamshader", "match": "\\bBase\\b(?=\\s*\\.)" },
+        { "name": "variable.language.output.dreamshader", "match": "\\bBase\\s*\\.\\s*(?:BaseColor|EmissiveColor|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|Anisotropy|Tangent)\\b(?=\\s*=)" },
+        { "name": "support.function.output-node.dreamshader", "match": "\\bExpression\\b(?=\\s*\\()" },
+        { "name": "variable.parameter.output-pin.dreamshader", "match": "\\bPin\\b(?=\\s*\\[)" }
       ]
     },
     "ueCalls": {
@@ -100,7 +103,7 @@
     },
     "operators": {
       "patterns": [
-        { "name": "keyword.operator.dreamshader", "match": "(::|=|\\+|\\-|\\*|/|\\.|,|;)" }
+        { "name": "keyword.operator.dreamshader", "match": "(::|=|\\+|\\-|\\*|/|\\.|,|;|\\[|\\])" }
       ]
     }
   }

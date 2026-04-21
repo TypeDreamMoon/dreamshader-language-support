@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.0.0`
+- Version：`1.2.2`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -18,6 +18,9 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 自动补全
 - 作用域感知变量补全
 - `Function` / `Namespace::Function` / `import` / `Path(...)` 联想
+- `UE.*` 内置材质节点补全、Hover、Signature Help
+- `Expression(...).Pin[n]` 输出节点绑定补全与高亮
+- `Code` 区域支持 `float a, b, c = ...;` 这种逗号声明写法
 - DreamShader Package import 联想
 - Go to Definition
 - Signature Help
@@ -44,6 +47,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 当前内置库包含 `Texture`、`Math`、`Color`、`UV`、`Noise`、`SDF`、`Normal`、`PBR`、`PostProcess`
 - `DShader/Packages/**/*.dsh` package 导入
 - 内置纹理函数使用 `Texture::Sample2DRGB(...)` 这种命名空间形式
+- `Outputs` 区域支持 `Base.BaseColor = ...` 和 `Expression(...).Pin[n] = ...` 风格提示
 
 ### 作用域补全
 
@@ -96,7 +100,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.0.0.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.2.vsix
 ```
 
 ## 项目根目录
