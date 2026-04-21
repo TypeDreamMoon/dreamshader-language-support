@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm material files and .dsh shared headers.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -11,7 +11,7 @@
   "homepage": "https://dev.64hz.cn",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TypeDreamMoon"
+    "url": "https://github.com/TypeDreamMoon/dreamshader-language-support"
   },
   "license": "MIT",
   "copyright": "Copyright (c) 2026 TypeDreamMoon. All rights reserved.",
