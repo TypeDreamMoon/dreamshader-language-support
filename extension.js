@@ -146,6 +146,10 @@ function createSettingItem(name, detail, insertText) {
     };
 }
 
+function createAssetSettingItem(name, detail) {
+    return createSettingItem(name, detail, name + ' = Path("${1:/Game/Path/To/Asset.Asset}");');
+}
+
 function createMaterialOutputItem(name, detail) {
     return {
         name,
@@ -173,6 +177,8 @@ const SETTINGS_ITEMS = [
     createSettingItem("ShadingModel", "Shading model such as DefaultLit"),
     createSettingItem("BlendMode", "Blend mode such as Opaque or Translucent"),
     createSettingItem("RenderType", "Alias of BlendMode"),
+    createSettingItem("TranslucencyLightingMode", "Translucency lighting mode such as TLM_Surface, Surface ForwardShading, or Volumetric Directional"),
+    createSettingItem("LightingMode", "Alias of TranslucencyLightingMode"),
     createSettingItem("TwoSided", "Render both sides of the mesh"),
     createSettingItem("Wireframe", "Enable wireframe rendering"),
     createSettingItem("DitheredLODTransition", "Enable dithered LOD transition"),
@@ -191,6 +197,97 @@ const SETTINGS_ITEMS = [
     createSettingItem("HasPixelAnimation", "Mark material as animated at pixel level"),
     createSettingItem("OpacityMaskClipValue", "Set opacity mask clip value"),
     createSettingItem("NumCustomizedUVs", "Set the number of customized UV channels"),
+    createSettingItem("TranslucencyPass", "Translucency pass such as BeforeDOF or AfterDOF"),
+    createSettingItem("BlendableLocation", "Post-process blendable location such as Scene Color Before Bloom"),
+    createSettingItem("BlendablePriority", "Post-process blendable priority"),
+    createSettingItem("IsBlendable", "Whether the post-process material should blend with others"),
+    createSettingItem("OutputAlpha", "Whether the post-process material outputs alpha"),
+    createSettingItem("UserSceneTexture", "Name of the user scene texture output"),
+    createSettingItem("UserTextureDivisor", "User scene texture divisor, for example (X=2,Y=2)"),
+    createSettingItem("ResolutionRelativeToInput", "Reference user scene texture input name"),
+    createSettingItem("DisablePreExposureScale", "Disable pre-exposure scaling for post-process materials"),
+    createSettingItem("EnableStencilTest", "Enable stencil testing for post-process materials"),
+    createSettingItem("StencilCompare", "Stencil comparison mode such as Always or Equal"),
+    createSettingItem("StencilRefValue", "Stencil reference value"),
+    createSettingItem("RefractionMethod", "Refraction method such as Pixel Normal Offset or Index Of Refraction"),
+    createSettingItem("RefractionMode", "Alias of RefractionMethod"),
+    createSettingItem("RefractionCoverageMode", "Refraction coverage mode for Substrate"),
+    createSettingItem("RefractionDepthBias", "Refraction depth bias"),
+    createSettingItem("MaxWorldPositionOffsetDisplacement", "Maximum allowed world position offset displacement"),
+    createSettingItem("AlwaysEvaluateWorldPositionOffset", "Force World Position Offset evaluation even when primitives disable it"),
+    createSettingItem("FloatPrecisionMode", "Mobile float precision mode"),
+    createSettingItem("UseLightmapDirectionality", "Use lightmap directionality on mobile"),
+    createSettingItem("UseAlphaToCoverage", "Use alpha-to-coverage for masked mobile materials"),
+    createSettingItem("MobileSeparateTranslucency", "Alias of EnableMobileSeparateTranslucency"),
+    createSettingItem("EnableMobileSeparateTranslucency", "Enable mobile separate translucency"),
+    createSettingItem("ApplyFogging", "Apply fogging to translucent materials"),
+    createSettingItem("ApplyCloudFogging", "Apply cloud fogging to translucent materials"),
+    createSettingItem("ComputeFogPerPixel", "Compute fog per pixel for translucent materials"),
+    createSettingItem("AllowFrontLayerTranslucency", "Allow front layer translucency"),
+    createSettingItem("AllowLocalLightShadow", "Allow translucent materials to receive local light shadows"),
+    createSettingItem("LocalLightShadowQuality", "Quality of local light shadows received by translucent materials"),
+    createSettingItem("DirectionalLightShadowQuality", "Quality of directional light shadows received by translucent materials"),
+    createSettingItem("TranslucencyDirectionalLightingIntensity", "Directional lighting intensity for translucent materials"),
+    createSettingItem("TranslucentShadowDensityScale", "Translucent shadow density scale"),
+    createSettingItem("TranslucentSelfShadowDensityScale", "Translucent self-shadow density scale"),
+    createSettingItem("TranslucentSelfShadowSecondDensityScale", "Second translucent self-shadow density scale"),
+    createSettingItem("TranslucentSelfShadowSecondOpacity", "Second translucent self-shadow opacity"),
+    createSettingItem("TranslucentBackscatteringExponent", "Translucent backscattering exponent"),
+    createSettingItem("TranslucentMultipleScatteringExtinction", "Translucent multiple scattering extinction color"),
+    createSettingItem("TranslucentShadowStartOffset", "Translucent shadow start offset"),
+    createSettingItem("EnableTessellation", "Enable Nanite displacement tessellation"),
+    createSettingItem("EnableDisplacementFade", "Enable Nanite displacement fade"),
+    createSettingItem("NaniteOverrideMaterial.bEnableOverride", "Enable the Nanite override material"),
+    createAssetSettingItem("NaniteOverrideMaterial.OverrideMaterialEditor", "Nanite override material asset"),
+    createSettingItem("DisplacementScaling", "Nanite displacement scaling struct literal"),
+    createSettingItem("DisplacementFadeRange", "Nanite displacement fade range struct literal"),
+    createSettingItem("ForwardRenderUsePreintegratedGFForSimpleIBL", "Use preintegrated GF for simple IBL in forward shading"),
+    createSettingItem("UseHQForwardReflections", "Enable high quality forward reflections"),
+    createSettingItem("ForwardBlendsSkyLightCubemaps", "Blend skylight cubemaps in forward shading"),
+    createSettingItem("UsePlanarForwardReflections", "Enable planar reflections in forward shading"),
+    createAssetSettingItem("PhysMaterial", "Physical material asset reference"),
+    createAssetSettingItem("PhysMaterialMask", "Physical material mask asset reference"),
+    createAssetSettingItem("PhysicalMaterialMap[0]", "Physical material mask slot 0 asset reference"),
+    createAssetSettingItem("PhysicalMaterialMap[1]", "Physical material mask slot 1 asset reference"),
+    createAssetSettingItem("PhysicalMaterialMap[2]", "Physical material mask slot 2 asset reference"),
+    createAssetSettingItem("PhysicalMaterialMap[3]", "Physical material mask slot 3 asset reference"),
+    createSettingItem("UsedWithSkeletalMesh", "Compile usage for skeletal meshes"),
+    createSettingItem("UsedWithEditorCompositing", "Compile usage for editor compositing"),
+    createSettingItem("UsedWithParticleSprites", "Compile usage for particle sprites"),
+    createSettingItem("UsedWithBeamTrails", "Compile usage for beam trails"),
+    createSettingItem("UsedWithMeshParticles", "Compile usage for mesh particles"),
+    createSettingItem("UsedWithNiagaraSprites", "Compile usage for Niagara sprites"),
+    createSettingItem("UsedWithNiagaraRibbons", "Compile usage for Niagara ribbons"),
+    createSettingItem("UsedWithNiagaraMeshParticles", "Compile usage for Niagara mesh particles"),
+    createSettingItem("UsedWithGeometryCache", "Compile usage for geometry cache"),
+    createSettingItem("UsedWithStaticLighting", "Compile usage for static lighting"),
+    createSettingItem("UsedWithMorphTargets", "Compile usage for morph targets"),
+    createSettingItem("UsedWithSplineMeshes", "Compile usage for spline meshes"),
+    createSettingItem("UsedWithInstancedStaticMeshes", "Compile usage for instanced static meshes"),
+    createSettingItem("UsedWithGeometryCollections", "Compile usage for geometry collections"),
+    createSettingItem("UsedWithClothing", "Compile usage for clothing"),
+    createSettingItem("UsedWithWater", "Compile usage for water"),
+    createSettingItem("UsedWithHairStrands", "Compile usage for hair strands"),
+    createSettingItem("UsedWithLidarPointCloud", "Compile usage for LiDAR point clouds"),
+    createSettingItem("UsedWithVirtualHeightfieldMesh", "Compile usage for virtual heightfield meshes"),
+    createSettingItem("UsedWithNanite", "Compile usage for Nanite meshes"),
+    createSettingItem("UsedWithVoxels", "Compile usage for voxel meshes"),
+    createSettingItem("UsedWithVolumetricCloud", "Compile usage for volumetric clouds"),
+    createSettingItem("UsedWithHeterogeneousVolumes", "Compile usage for heterogeneous volumes"),
+    createSettingItem("AutomaticallySetUsageInEditor", "Automatically set usage flags in the editor"),
+    createSettingItem("LightmassSettings.EmissiveBoost", "Lightmass emissive boost"),
+    createSettingItem("LightmassSettings.DiffuseBoost", "Lightmass diffuse boost"),
+    createSettingItem("LightmassSettings.ExportResolutionScale", "Lightmass export resolution scale"),
+    createSettingItem("LightmassSettings.CastShadowAsMasked", "Lightmass cast-shadow-as-masked flag"),
+    createSettingItem("Lightmass.EmissiveBoost", "Alias of LightmassSettings.EmissiveBoost"),
+    createSettingItem("Lightmass.DiffuseBoost", "Alias of LightmassSettings.DiffuseBoost"),
+    createSettingItem("Lightmass.ExportResolutionScale", "Alias of LightmassSettings.ExportResolutionScale"),
+    createSettingItem("Lightmass.CastShadowAsMasked", "Alias of LightmassSettings.CastShadowAsMasked"),
+    createSettingItem("SubstrateRoughnessTracking", "Enable Substrate roughness tracking"),
+    createSettingItem("ForceCompatibleWithLightFunctionAtlas", "Compatible with the light function atlas"),
+    createSettingItem("RelaxRuntimeVirtualTextureRestrictions", "Relax runtime virtual texture output restrictions"),
+    createSettingItem("PixelDepthOffsetMode", "Pixel depth offset mode such as Legacy or Along Camera Vector"),
+    createAssetSettingItem("SubsurfaceProfile", "Subsurface profile asset reference"),
     createSettingItem("Description", "Description text for a ShaderFunction material function asset"),
     createSettingItem("ExposeToLibrary", "Expose a ShaderFunction to the Unreal material function library"),
     createSettingItem("UserExposedCaption", "Custom node caption shown for a ShaderFunction"),
@@ -327,8 +424,8 @@ const UE_BUILTINS = [
 ];
 
 const DREAMSHADER_HELPER_ITEMS = [
-    ["Path", "Path(${1:Game}, \"${2:/Textures/MyTexture}\")", "Resolves a Game or Engine texture asset for a texture parameter default."],
-    ["Path", "Path(\"${1:/Game/Textures/MyTexture}\")", "Resolves a fully qualified Unreal object path for a texture parameter default."]
+    ["Path", "Path(${1:Game}, \"${2:/Textures/MyTexture}\")", "Resolves a Game or Engine asset path for texture defaults and Settings object references."],
+    ["Path", "Path(\"${1:/Game/Textures/MyTexture.DefaultTexture}\")", "Resolves a fully qualified Unreal object path for texture defaults and Settings object references."]
 ];
 
 const HOVER_DOCS = new Map([
@@ -351,7 +448,7 @@ const HOVER_DOCS = new Map([
     ["outputindex", "Selects an output by zero-based output index."],
     ["base", "Material output root namespace used in Shader Outputs bindings, for example `Base.BaseColor = ...`."],
     ["pin", "Selects an auxiliary material output node pin by zero-based index, for example `Expression(Class=\"ThinTranslucentMaterialOutput\").Pin[0] = ...`."] ,
-    ["path", "Resolves a texture default asset path. Use `Path(Game, \"/Textures/MyTexture\")` or `Path(\"/Game/Textures/MyTexture\")` inside texture property defaults."],
+    ["path", "Resolves a texture or object asset path. Use `Path(Game, \"/Textures/MyTexture\")` or `Path(\"/Game/Folder/Asset.Asset\")`."],
     ["in", "Function input parameter qualifier."],
     ["out", "Function output parameter qualifier. Callers pass a target variable explicitly, for example `ApplyTint(Color, Tint, Result)`."]
 ]);
@@ -464,6 +561,9 @@ function activate(context) {
         vscode.commands.registerCommand("dreamshader.removePackage", async () => {
             await removePackageCommand();
         }),
+        vscode.commands.registerCommand("dreamshader.packageUninstall", async () => {
+            await removePackageCommand();
+        }),
         vscode.commands.registerCommand("dreamshader.openPackagesFolder", async () => {
             await openPackagesFolderCommand();
         }),
@@ -490,23 +590,42 @@ function activate(context) {
         })
     );
 
-    const watcher = vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/diagnostics.json");
-    watcher.onDidCreate(() => refreshBridgeDiagnostics(bridgeDiagnostics));
-    watcher.onDidChange(() => refreshBridgeDiagnostics(bridgeDiagnostics));
-    watcher.onDidDelete(() => refreshBridgeDiagnostics(bridgeDiagnostics));
-    context.subscriptions.push(watcher);
+    const bridgeWatcherState = {
+        rootsKey: "",
+        watchers: []
+    };
+    const refreshBridgeInfrastructure = () => {
+        updateBridgeDiagnosticWatchers(bridgeWatcherState, () => refreshBridgeDiagnostics(bridgeDiagnostics));
+        refreshBridgeDiagnostics(bridgeDiagnostics);
+    };
+    context.subscriptions.push({
+        dispose() {
+            for (const watcher of bridgeWatcherState.watchers) {
+                watcher.dispose();
+            }
+            bridgeWatcherState.watchers = [];
+            bridgeWatcherState.rootsKey = "";
+        }
+    });
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            refreshBridgeDiagnostics(bridgeDiagnostics);
+            refreshBridgeInfrastructure();
             refreshAllLocalDiagnostics(localDiagnostics);
         }),
-        vscode.workspace.onDidOpenTextDocument((document) => refreshLocalDiagnosticsForDocument(document, localDiagnostics)),
+        vscode.workspace.onDidOpenTextDocument((document) => {
+            refreshLocalDiagnosticsForDocument(document, localDiagnostics);
+            refreshBridgeInfrastructure();
+        }),
         vscode.workspace.onDidChangeTextDocument((event) => refreshLocalDiagnosticsForDocument(event.document, localDiagnostics)),
-        vscode.workspace.onDidCloseTextDocument((document) => localDiagnostics.delete(document.uri))
+        vscode.workspace.onDidCloseTextDocument((document) => {
+            localDiagnostics.delete(document.uri);
+            refreshBridgeInfrastructure();
+        }),
+        vscode.window.onDidChangeActiveTextEditor(() => refreshBridgeInfrastructure())
     );
 
-    refreshBridgeDiagnostics(bridgeDiagnostics);
+    refreshBridgeInfrastructure();
     refreshAllLocalDiagnostics(localDiagnostics);
 }
 
@@ -3431,7 +3550,7 @@ async function removePackageCommand() {
     }
 
     try {
-        const targetDirectory = getPackageInstallDirectory(projectRoot, picked.entry.name);
+        const targetDirectory = resolveInstalledPackageDirectory(projectRoot, picked.entry);
         if (fs.existsSync(targetDirectory)) {
             fs.rmSync(targetDirectory, { recursive: true, force: true });
         }
@@ -4891,6 +5010,24 @@ function getPackageInstallDirectory(projectRoot, packageName) {
     return installDirectory;
 }
 
+function resolveInstalledPackageDirectory(projectRoot, entry) {
+    if (!entry || !projectRoot) {
+        throw new Error("Installed package entry is invalid.");
+    }
+
+    const normalizedProjectRoot = path.resolve(projectRoot);
+    const recordedInstallPath = typeof entry.installPath === "string" ? entry.installPath.trim() : "";
+    if (recordedInstallPath) {
+        const resolvedFromLock = path.resolve(normalizedProjectRoot, recordedInstallPath);
+        const relativeToProject = path.relative(normalizedProjectRoot, resolvedFromLock);
+        if (!relativeToProject.startsWith("..") && !path.isAbsolute(relativeToProject)) {
+            return resolvedFromLock;
+        }
+    }
+
+    return getPackageInstallDirectory(projectRoot, entry.name);
+}
+
 function normalizePackageName(packageName) {
     return String(packageName || "").trim().replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
 }
@@ -5173,9 +5310,8 @@ async function refreshBridgeDiagnostics(collection) {
         diagnosticFiles.add(uri.fsPath);
     }
 
-    const configuredRoot = getConfiguredProjectRoot();
-    if (configuredRoot) {
-        diagnosticFiles.add(path.join(configuredRoot, "Saved", "DreamShader", "Bridge", "diagnostics.json"));
+    for (const projectRoot of collectKnownProjectRoots()) {
+        diagnosticFiles.add(getBridgeDiagnosticsFilePath(projectRoot));
     }
 
     for (const diagnosticFile of diagnosticFiles) {
@@ -5213,6 +5349,38 @@ async function refreshBridgeDiagnostics(collection) {
 
             collection.set(fileUri, diagnostics);
         }
+    }
+}
+
+function updateBridgeDiagnosticWatchers(state, onDidChange) {
+    if (!state) {
+        return;
+    }
+
+    const roots = collectKnownProjectRoots();
+    const rootsKey = roots.join("|");
+    if (state.rootsKey === rootsKey && Array.isArray(state.watchers) && state.watchers.length > 0) {
+        return;
+    }
+
+    for (const watcher of state.watchers || []) {
+        watcher.dispose();
+    }
+
+    state.watchers = [];
+    state.rootsKey = rootsKey;
+
+    const registerWatcher = (watcher) => {
+        watcher.onDidCreate(onDidChange);
+        watcher.onDidChange(onDidChange);
+        watcher.onDidDelete(onDidChange);
+        state.watchers.push(watcher);
+    };
+
+    registerWatcher(vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/diagnostics.json"));
+    for (const projectRoot of roots) {
+        registerWatcher(vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(projectRoot), "Saved/DreamShader/Bridge/diagnostics.json")));
     }
 }
 
@@ -5413,6 +5581,67 @@ function normalizeImportSpecifier(importSpecifier) {
     return normalized;
 }
 
+function getBridgeDiagnosticsFilePath(projectRoot) {
+    return path.join(projectRoot, "Saved", "DreamShader", "Bridge", "diagnostics.json");
+}
+
+function collectKnownProjectRoots(seedPath = "") {
+    const roots = new Set();
+    const configuredRoot = getConfiguredProjectRoot();
+    if (configuredRoot) {
+        roots.add(configuredRoot);
+    }
+
+    const candidatePaths = [];
+    if (seedPath) {
+        candidatePaths.push(seedPath);
+    }
+
+    const activeDocument = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
+    if (activeDocument) {
+        candidatePaths.push(activeDocument.uri.fsPath);
+    }
+
+    for (const document of vscode.workspace.textDocuments) {
+        if (document && typeof document.fileName === "string" && document.fileName) {
+            candidatePaths.push(document.fileName);
+        }
+    }
+
+    for (const folder of vscode.workspace.workspaceFolders || []) {
+        candidatePaths.push(folder.uri.fsPath);
+    }
+
+    for (const candidatePath of candidatePaths) {
+        const root = findProjectRootFromCandidate(candidatePath);
+        if (root) {
+            roots.add(root);
+        }
+    }
+
+    return Array.from(roots).sort();
+}
+
+function findProjectRootFromCandidate(candidatePath) {
+    if (!candidatePath) {
+        return "";
+    }
+
+    let resolvedCandidate = path.resolve(candidatePath);
+    try {
+        if (!fs.existsSync(resolvedCandidate)) {
+            return "";
+        }
+        if (fs.existsSync(resolvedCandidate) && fs.statSync(resolvedCandidate).isFile()) {
+            resolvedCandidate = path.dirname(resolvedCandidate);
+        }
+    } catch (_error) {
+        return "";
+    }
+
+    return findProjectRootFromDirectory(resolvedCandidate);
+}
+
 function getConfiguredProjectRoot() {
     const configuredRoot = vscode.workspace.getConfiguration("dreamshader").get("projectRoot", "");
     if (!configuredRoot) {
@@ -5428,20 +5657,8 @@ function findProjectRoot(seedPath) {
         return configuredRoot;
     }
 
-    const candidates = [];
-    if (seedPath) {
-        candidates.push(path.dirname(seedPath));
-    }
-
-    for (const folder of vscode.workspace.workspaceFolders || []) {
-        candidates.push(folder.uri.fsPath);
-    }
-
-    for (const candidate of candidates) {
-        const root = findProjectRootFromDirectory(candidate);
-        if (root) {
-            return root;
-        }
+    for (const root of collectKnownProjectRoots(seedPath)) {
+        return root;
     }
 
     return "";

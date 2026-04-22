@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.5
+
+- Expanded `Settings` completion coverage for PostProcess, Refraction, WorldPositionOffset, Mobile, Nanite, ForwardShading, PhysicalMaterial, Usage, Lightmass, Substrate, VirtualTexture, and PixelDepthOffset material categories
+- Updated `Path(...)` help text to reflect that it can be used for Settings object references such as physical materials and override assets
+
+## 1.2.4
+
+- Added `TranslucencyLightingMode` and `LightingMode` Settings completion entries
+- DreamShader material Settings now accept Unreal enum display labels such as `Surface ForwardShading` in addition to raw enum names like `TLM_SurfacePerPixelLighting`
+
+## 1.2.3
+
+- Fixed package uninstall so removal uses the recorded installed path instead of assuming every package lives at `DShader/Packages/<name>`
+- Added `dreamshader.packageUninstall` as a compatibility alias for older command naming
+- Fixed Unreal bridge diagnostics discovery and watching when VSCode is opened on `ProjectName/DShader` instead of the Unreal project root
+- Bridge diagnostics now auto-detect candidate Unreal project roots from open documents, active editors, and workspace folders
+
 ## 1.2.2
 
 - Added editor-side support for comma-separated Code declarations such as `float i, d, s, t = UE.Time(), f = t + 1.0;`
