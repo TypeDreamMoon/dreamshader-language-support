@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.9
+
+- Added a dedicated `DreamShader Bridge` explorer view that lists Unreal bridge diagnostics by project, source file, and individual issue
+- Enriched VSCode bridge diagnostics with material compile metadata such as stage, asset path, shader platform, quality level, and raw detail text
+- Added a `Refresh Bridge Diagnostics` command and view title actions so bridge state can be refreshed, recompiled, or cleaned without leaving the diagnostics window
+
+## 1.2.8
+
+- Added a `Clean Generated Shaders` command that asks Unreal to delete `Intermediate/DreamShader/GeneratedShaders` and queue a full DreamShader recompile
+- Added VSCode command palette, editor title, and editor context-menu entries for generated shader cleanup
+
+## 1.2.7
+
+- Added local cycle diagnostics for recursive DreamShader Function graphs, including SelfContained recursion reachable through imports
+- Modernized the VSCode UX with contextual status bar details, inline CodeLens recompile actions, and editor title/context actions
+- Added new extension settings for toggling the DreamShader status bar item and CodeLens actions
+
+## 1.2.6
+
+- Added editor support for `Function SelfContained Name(...) { ... }` and `Function Inline Name(...) { ... }`
+- Updated completion, hover, snippets, and syntax highlighting for SelfContained shared functions
+
 ## 1.2.5
 
 - Expanded `Settings` completion coverage for PostProcess, Refraction, WorldPositionOffset, Mobile, Nanite, ForwardShading, PhysicalMaterial, Usage, Lightmass, Substrate, VirtualTexture, and PixelDepthOffset material categories

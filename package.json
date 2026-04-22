@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm material files and .dsh shared headers.",
-  "version": "1.2.5",
+  "version": "1.2.9",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -34,8 +34,11 @@
   ],
   "activationEvents": [
     "onLanguage:dreamshaderlang",
+    "onView:dreamshader.bridgeDiagnostics",
     "onCommand:dreamshader.recompileCurrent",
     "onCommand:dreamshader.recompileAll",
+    "onCommand:dreamshader.refreshBridgeDiagnostics",
+    "onCommand:dreamshader.cleanGeneratedShaders",
     "onCommand:dreamshader.installPackageFromGitHub",
     "onCommand:dreamshader.browsePackages",
     "onCommand:dreamshader.updatePackages",
@@ -60,6 +63,14 @@
       {
         "command": "dreamshader.recompileAll",
         "title": "DreamShaderLang: Recompile All DSM"
+      },
+      {
+        "command": "dreamshader.cleanGeneratedShaders",
+        "title": "DreamShaderLang: Clean Generated Shaders"
+      },
+      {
+        "command": "dreamshader.refreshBridgeDiagnostics",
+        "title": "DreamShaderLang: Refresh Bridge Diagnostics"
       },
       {
         "command": "dreamshader.installPackageFromGitHub",
@@ -172,8 +183,74 @@
           "type": "boolean",
           "default": true,
           "description": "Include public GitHub repositories tagged with dreamshader-package when browsing DreamShader packages."
+        },
+        "dreamshader.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the DreamShaderLang status bar item for the active .dsm/.dsh document."
+        },
+        "dreamshader.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show DreamShaderLang CodeLens actions such as Recompile Current / Recompile All above Shader blocks."
         }
       }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "dreamshader.bridgeDiagnostics",
+          "name": "DreamShader Bridge"
+        }
+      ]
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "dreamshader.recompileCurrent",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dreamshader.browsePackages",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dreamshader.cleanGeneratedShaders",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "dreamshader.recompileCurrent",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dreamshader.cleanGeneratedShaders",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dreamshader.refreshBridgeDiagnostics",
+          "when": "view == dreamshader.bridgeDiagnostics",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dreamshader.recompileAll",
+          "when": "view == dreamshader.bridgeDiagnostics",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dreamshader.cleanGeneratedShaders",
+          "when": "view == dreamshader.bridgeDiagnostics",
+          "group": "navigation@3"
+        }
+      ]
     }
   },
   "scripts": {

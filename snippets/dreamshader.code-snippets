@@ -38,6 +38,16 @@
     ],
     "description": "Create a reusable DreamShader Function block"
   },
+  "DreamShader SelfContained Function": {
+    "scope": "dreamshaderlang",
+    "prefix": "selfcontained",
+    "body": [
+      "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {",
+      "\t${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);",
+      "}"
+    ],
+    "description": "Create a SelfContained DreamShader Function block"
+  },
   "DreamShader Namespace": {
     "scope": "dreamshaderlang",
     "prefix": "namespace",

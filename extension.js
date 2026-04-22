@@ -35,6 +35,11 @@ const QUALIFIER_ITEMS = [
     ["out", "Function output parameter"]
 ];
 
+const FUNCTION_MODIFIER_ITEMS = [
+    ["SelfContained", "Embed this Function and its DreamShader dependencies into generated Custom nodes instead of relying on external includes."],
+    ["Inline", "Alias of `SelfContained` for DreamShader Function declarations."]
+];
+
 const GRAPH_TYPE_ITEMS = [
     ["float", "Scalar value"],
     ["float1", "Scalar value"],
@@ -431,6 +436,8 @@ const DREAMSHADER_HELPER_ITEMS = [
 const HOVER_DOCS = new Map([
     ["shader", "Top-level DreamShader material declaration. DreamShader material implementation files use `.dsm`."],
     ["function", "Reusable shared function block. Define with `Function Name(in float Value, out vec3 Result) { ... }` and call with explicit out variables like `Name(Value, Result);`."],
+    ["selfcontained", "Function modifier that embeds the Function and its DreamShader dependency closure directly into generated Custom nodes. Use `Function SelfContained Name(...) { ... }`."],
+    ["inline", "Alias of `SelfContained` in DreamShader Function declarations."],
     ["namespace", "Groups shared Function blocks. Define with `Namespace(Name=\"Texture\") { ... }` and call with `Texture::Sample(...)`."],
     ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
     ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
@@ -523,14 +530,28 @@ const IGNORED_IDENTIFIER_NAMES = new Set([
 function activate(context) {
     const bridgeDiagnostics = vscode.languages.createDiagnosticCollection(BRIDGE_DIAGNOSTIC_COLLECTION_NAME);
     const localDiagnostics = vscode.languages.createDiagnosticCollection(LOCAL_DIAGNOSTIC_COLLECTION_NAME);
+    const bridgeDiagnosticsState = createEmptyBridgeDiagnosticsState();
+    const bridgeDiagnosticsTreeProvider = createBridgeDiagnosticsTreeProvider(bridgeDiagnosticsState);
 
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBar.command = "dreamshader.recompileCurrent";
-    statusBar.text = "$(refresh) DreamShaderLang";
-    statusBar.tooltip = "Request Unreal Editor to recompile the current DreamShaderLang source.";
-    statusBar.show();
+    const codeLensChangeEmitter = new vscode.EventEmitter();
+    const refreshEditorUi = () => {
+        updateDreamShaderStatusBar(statusBar, bridgeDiagnosticsState);
+        codeLensChangeEmitter.fire();
+        bridgeDiagnosticsTreeProvider.refresh();
+    };
 
-    context.subscriptions.push(bridgeDiagnostics, localDiagnostics, statusBar);
+    context.subscriptions.push(
+        bridgeDiagnostics,
+        localDiagnostics,
+        statusBar,
+        codeLensChangeEmitter,
+        bridgeDiagnosticsTreeProvider,
+        vscode.window.createTreeView("dreamshader.bridgeDiagnostics", {
+            treeDataProvider: bridgeDiagnosticsTreeProvider,
+            showCollapseAll: true
+        })
+    );
 
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider({ language: LANGUAGE_ID }, createCompletionProvider(), ".", "\"", "/"),
@@ -539,15 +560,26 @@ function activate(context) {
         vscode.languages.registerDocumentSymbolProvider({ language: LANGUAGE_ID }, createDocumentSymbolProvider()),
         vscode.languages.registerDefinitionProvider({ language: LANGUAGE_ID }, createDefinitionProvider()),
         vscode.languages.registerReferenceProvider({ language: LANGUAGE_ID }, createReferenceProvider()),
-        vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider())
+        vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider()),
+        vscode.languages.registerCodeLensProvider({ language: LANGUAGE_ID }, createCodeLensProvider(codeLensChangeEmitter))
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand("dreamshader.recompileCurrent", async () => {
-            await requestRecompile("file");
+        vscode.commands.registerCommand("dreamshader.recompileCurrent", async (targetUri) => {
+            await requestRecompile("file", targetUri);
         }),
         vscode.commands.registerCommand("dreamshader.recompileAll", async () => {
             await requestRecompile("all");
+        }),
+        vscode.commands.registerCommand("dreamshader.refreshBridgeDiagnostics", async () => {
+            await refreshBridgeInfrastructure();
+            refreshEditorUi();
+        }),
+        vscode.commands.registerCommand("dreamshader.cleanGeneratedShaders", async () => {
+            await requestCleanGeneratedShaders();
+        }),
+        vscode.commands.registerCommand("dreamshader.openBridgeDiagnosticLocation", async (diagnosticEntry) => {
+            await openBridgeDiagnosticLocation(diagnosticEntry);
         }),
         vscode.commands.registerCommand("dreamshader.installPackageFromGitHub", async () => {
             await installPackageFromGitHubCommand();
@@ -594,9 +626,14 @@ function activate(context) {
         rootsKey: "",
         watchers: []
     };
-    const refreshBridgeInfrastructure = () => {
-        updateBridgeDiagnosticWatchers(bridgeWatcherState, () => refreshBridgeDiagnostics(bridgeDiagnostics));
-        refreshBridgeDiagnostics(bridgeDiagnostics);
+    const handleBridgeDiagnosticsChanged = () => {
+        void refreshBridgeDiagnostics(bridgeDiagnostics, bridgeDiagnosticsState).then(() => {
+            refreshEditorUi();
+        });
+    };
+    const refreshBridgeInfrastructure = async () => {
+        updateBridgeDiagnosticWatchers(bridgeWatcherState, handleBridgeDiagnosticsChanged);
+        await refreshBridgeDiagnostics(bridgeDiagnostics, bridgeDiagnosticsState);
     };
     context.subscriptions.push({
         dispose() {
@@ -610,26 +647,123 @@ function activate(context) {
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
-            refreshBridgeInfrastructure();
+            void refreshBridgeInfrastructure();
             refreshAllLocalDiagnostics(localDiagnostics);
+            refreshEditorUi();
         }),
         vscode.workspace.onDidOpenTextDocument((document) => {
             refreshLocalDiagnosticsForDocument(document, localDiagnostics);
-            refreshBridgeInfrastructure();
+            void refreshBridgeInfrastructure();
+            refreshEditorUi();
         }),
-        vscode.workspace.onDidChangeTextDocument((event) => refreshLocalDiagnosticsForDocument(event.document, localDiagnostics)),
+        vscode.workspace.onDidChangeTextDocument((event) => {
+            refreshLocalDiagnosticsForDocument(event.document, localDiagnostics);
+            if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document === event.document) {
+                refreshEditorUi();
+            } else if (isDreamShaderDocument(event.document)) {
+                codeLensChangeEmitter.fire();
+            }
+        }),
         vscode.workspace.onDidCloseTextDocument((document) => {
             localDiagnostics.delete(document.uri);
-            refreshBridgeInfrastructure();
+            void refreshBridgeInfrastructure();
+            refreshEditorUi();
         }),
-        vscode.window.onDidChangeActiveTextEditor(() => refreshBridgeInfrastructure())
+        vscode.window.onDidChangeActiveTextEditor(() => {
+            void refreshBridgeInfrastructure();
+            refreshEditorUi();
+        }),
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (!event.affectsConfiguration("dreamshader")) {
+                return;
+            }
+
+            void refreshBridgeInfrastructure();
+            refreshAllLocalDiagnostics(localDiagnostics);
+            refreshEditorUi();
+        })
     );
 
-    refreshBridgeInfrastructure();
+    void refreshBridgeInfrastructure();
     refreshAllLocalDiagnostics(localDiagnostics);
+    refreshEditorUi();
 }
 
 function deactivate() {}
+
+function updateDreamShaderStatusBar(statusBar, bridgeDiagnosticsState) {
+    const enabled = vscode.workspace.getConfiguration("dreamshader").get("showStatusBar", true);
+    const activeDocument = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
+    if (!enabled || !activeDocument || !isDreamShaderDocument(activeDocument)) {
+        statusBar.hide();
+        return;
+    }
+
+    const projectRoot = findProjectRoot(activeDocument.uri.fsPath);
+    const projectLabel = projectRoot ? path.basename(projectRoot) : "Project";
+    const summary = getBridgeDiagnosticsSummaryForProject(bridgeDiagnosticsState, projectRoot);
+    const summaryText = summary.total > 0
+        ? ` $(error) ${summary.error}${summary.warning > 0 ? ` $(warning) ${summary.warning}` : ""}`
+        : "";
+    statusBar.command = "dreamshader.recompileCurrent";
+    statusBar.text = `$(refresh) DreamShader ${projectLabel}${summaryText}`;
+    statusBar.tooltip = new vscode.MarkdownString([
+        "DreamShaderLang",
+        "",
+        `Project: \`${projectRoot || "Not detected"}\``,
+        `File: \`${path.basename(activeDocument.fileName)}\``,
+        `Bridge: ${summary.total > 0 ? `${formatBridgeDiagnosticCountSummary(summary)} in view` : "No active bridge diagnostics"}`,
+        "",
+        "Click to request Unreal Editor to recompile the current source."
+    ].join("\n"));
+    statusBar.show();
+}
+
+function createCodeLensProvider(changeEmitter) {
+    return {
+        onDidChangeCodeLenses: changeEmitter.event,
+        provideCodeLenses(document) {
+            if (!isDreamShaderDocument(document) || !vscode.workspace.getConfiguration("dreamshader").get("enableCodeLens", true)) {
+                return [];
+            }
+
+            const text = document.getText();
+            const lenses = [];
+            const topLevelBlocks = [
+                ...parseNamedLegacyBlocks(text, "Shader"),
+                ...parseNamedLegacyBlocks(text, "ShaderFunction")
+            ].sort((left, right) => left.startOffset - right.startOffset);
+
+            for (const block of topLevelBlocks) {
+                const position = document.positionAt(block.startOffset);
+                const range = new vscode.Range(position, position);
+                lenses.push(new vscode.CodeLens(range, {
+                    title: "Recompile Current",
+                    command: "dreamshader.recompileCurrent",
+                    arguments: [document.uri]
+                }));
+                lenses.push(new vscode.CodeLens(range, {
+                    title: "Recompile All",
+                    command: "dreamshader.recompileAll"
+                }));
+            }
+
+            if (topLevelBlocks.length === 0) {
+                const definitions = parseFunctionDefinitionsFromText(text).filter((definition) => definition.kind === "Function");
+                if (definitions.length > 0) {
+                    const position = document.positionAt(definitions[0].startOffset);
+                    const range = new vscode.Range(position, position);
+                    lenses.push(new vscode.CodeLens(range, {
+                        title: "Recompile All",
+                        command: "dreamshader.recompileAll"
+                    }));
+                }
+            }
+
+            return lenses;
+        }
+    };
+}
 
 function createCompletionProvider() {
     return {
@@ -1089,6 +1223,7 @@ function addKeywordItems(items, context) {
     const keywordEntries = [
         ["Shader", "Shader(Name=\"Materials/${1:MyMaterial}\")\n{\n    $0\n}"],
         ["Function", "Function ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
+        ["Function SelfContained", "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
         ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\")\n{\n    Inputs = {\n        $2\n    }\n\n    Outputs = {\n        $3\n    }\n\n    Code = {\n        $0\n    }\n}"]
@@ -1480,12 +1615,37 @@ function parseFunctionDefinitionsFromText(text) {
             continue;
         }
 
-        const nameStart = cursor;
-        cursor += 1;
-        while (cursor < text.length && isIdentifierPart(text[cursor])) {
+        let selfContained = false;
+        let nameStart = cursor;
+        let localName = "";
+        while (true) {
+            const tokenStart = cursor;
             cursor += 1;
+            while (cursor < text.length && isIdentifierPart(text[cursor])) {
+                cursor += 1;
+            }
+
+            const token = text.slice(tokenStart, cursor);
+            const normalizedToken = token.toLowerCase();
+            if (normalizedToken === "selfcontained" || normalizedToken === "inline") {
+                selfContained = true;
+                cursor = skipWhitespace(text, cursor);
+                if (!isIdentifierStart(text[cursor])) {
+                    localName = "";
+                    break;
+                }
+                nameStart = cursor;
+                continue;
+            }
+
+            nameStart = tokenStart;
+            localName = token;
+            break;
         }
-        const localName = text.slice(nameStart, cursor);
+
+        if (!localName) {
+            continue;
+        }
 
         cursor = skipWhitespace(text, cursor);
         if (text[cursor] !== "(") {
@@ -1517,6 +1677,7 @@ function parseFunctionDefinitionsFromText(text) {
             name,
             localName,
             namespaceName,
+            selfContained,
             nameRangeLength: localName.length,
             startOffset: index,
             nameOffset: nameStart,
@@ -2179,6 +2340,7 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
             name: definition.name,
             inputs: parameters.inputs,
             outputs: parameters.outputs,
+            detail: definition.selfContained ? "SelfContained DreamShader Function" : "DreamShader Function",
             fsPath: normalizedPath,
             nameOffset: definition.nameOffset
         });
@@ -2212,6 +2374,255 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
             // Ignore unreadable imports here; diagnostics handle reporting separately.
         }
     }
+}
+
+function collectReachableFunctionDefinitions(document) {
+    const results = [];
+    const visited = new Set();
+    collectReachableFunctionDefinitionsFromFile(document.fileName, document.getText(), results, visited);
+    return results;
+}
+
+function collectReachableFunctionDefinitionsFromFile(fsPath, text, results, visited) {
+    const normalizedPath = normalizeFsPath(fsPath);
+    if (visited.has(normalizedPath)) {
+        return;
+    }
+    visited.add(normalizedPath);
+
+    for (const definition of parseFunctionDefinitionsFromText(text)) {
+        if (definition.kind !== "Function") {
+            continue;
+        }
+
+        results.push({
+            ...definition,
+            fsPath: normalizedPath,
+            bodyText: definition.bodyOpenOffset >= 0 && definition.bodyCloseOffset >= definition.bodyOpenOffset
+                ? text.slice(definition.bodyOpenOffset + 1, definition.bodyCloseOffset)
+                : ""
+        });
+    }
+
+    for (const importStatement of parseImportStatements(text)) {
+        const resolvedPath = resolveImportPath(normalizedPath, importStatement.path);
+        if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+            continue;
+        }
+
+        try {
+            const importedText = fs.readFileSync(resolvedPath, "utf8");
+            collectReachableFunctionDefinitionsFromFile(resolvedPath, importedText, results, visited);
+        } catch (_error) {
+            // Ignore unreadable imports here; diagnostics handle reporting separately.
+        }
+    }
+}
+
+function collectDreamShaderFunctionCallNames(text) {
+    const names = [];
+    const seen = new Set();
+    let index = 0;
+    let inString = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    while (index < text.length) {
+        const char = text[index];
+        const next = index + 1 < text.length ? text[index + 1] : "\0";
+
+        if (inLineComment) {
+            if (char === "\n") {
+                inLineComment = false;
+            }
+            index += 1;
+            continue;
+        }
+
+        if (inBlockComment) {
+            if (char === "*" && next === "/") {
+                inBlockComment = false;
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+
+        if (inString) {
+            if (char === "\\") {
+                index += 2;
+            } else {
+                if (char === "\"") {
+                    inString = false;
+                }
+                index += 1;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            index += 1;
+            continue;
+        }
+
+        if (char === "/" && next === "/") {
+            inLineComment = true;
+            index += 2;
+            continue;
+        }
+
+        if (char === "/" && next === "*") {
+            inBlockComment = true;
+            index += 2;
+            continue;
+        }
+
+        const identifier = readQualifiedIdentifier(text, index);
+        if (!identifier) {
+            index += 1;
+            continue;
+        }
+
+        const afterIdentifier = skipWhitespace(text, identifier.end);
+        if (text[afterIdentifier] === "(") {
+            const normalizedName = normalizeSymbolKey(identifier.name);
+            if (!normalizedName.startsWith("ue.") && !isConstructorName(identifier.name) && !seen.has(normalizedName)) {
+                seen.add(normalizedName);
+                names.push(identifier.name);
+            }
+            index = afterIdentifier + 1;
+            continue;
+        }
+
+        index = identifier.end;
+    }
+
+    return names;
+}
+
+function computeFunctionCycleDiagnostics(document, text) {
+    const diagnostics = [];
+    const currentPath = normalizeFsPath(document.fileName);
+    const definitions = collectReachableFunctionDefinitions(document);
+    if (definitions.length === 0) {
+        return diagnostics;
+    }
+
+    const definitionsByName = new Map();
+    for (const definition of definitions) {
+        const key = normalizeSymbolKey(definition.name);
+        if (!definitionsByName.has(key)) {
+            definitionsByName.set(key, []);
+        }
+        definitionsByName.get(key).push(definition);
+    }
+
+    const dependencies = new Map();
+    for (const definition of definitions) {
+        const localDependencies = [];
+        const seenDependencies = new Set();
+        for (const callName of collectDreamShaderFunctionCallNames(definition.bodyText)) {
+            const matches = definitionsByName.get(normalizeSymbolKey(callName)) || [];
+            for (const match of matches) {
+                const dependencyKey = `${match.fsPath}:${match.nameOffset}`;
+                if (!seenDependencies.has(dependencyKey)) {
+                    seenDependencies.add(dependencyKey);
+                    localDependencies.push(match);
+                }
+            }
+        }
+        dependencies.set(definition, localDependencies);
+    }
+
+    const visitState = new Map();
+    const visitStack = [];
+    const emittedDiagnostics = new Set();
+
+    const emitCycleDiagnostic = (cycle) => {
+        if (!Array.isArray(cycle) || cycle.length === 0) {
+            return;
+        }
+
+        const uniqueCycle = cycle.slice(0, -1);
+        const cyclePath = cycle.map((entry) => entry.name).join(" -> ");
+        const hasSelfContained = uniqueCycle.some((entry) => entry.selfContained);
+        const message = hasSelfContained
+            ? `SelfContained DreamShader Function cycle detected: ${cyclePath}. HLSL Custom nodes cannot compile recursive DreamShader functions.`
+            : `DreamShader Function cycle detected: ${cyclePath}. HLSL cannot compile recursive DreamShader functions.`;
+
+        let emittedInCurrentDocument = false;
+        for (const definition of uniqueCycle) {
+            if (definition.fsPath !== currentPath) {
+                continue;
+            }
+
+            emittedInCurrentDocument = true;
+            const diagnosticKey = `${definition.fsPath}:${definition.nameOffset}:${message}`;
+            if (emittedDiagnostics.has(diagnosticKey)) {
+                continue;
+            }
+            emittedDiagnostics.add(diagnosticKey);
+            diagnostics.push(makeFunctionDiagnostic(document, definition, message));
+        }
+
+        if (emittedInCurrentDocument) {
+            return;
+        }
+
+        const diagnosticKey = `import:${message}`;
+        if (emittedDiagnostics.has(diagnosticKey)) {
+            return;
+        }
+        emittedDiagnostics.add(diagnosticKey);
+
+        const importStatements = parseImportStatements(text);
+        if (importStatements.length > 0) {
+            const importStatement = importStatements[0];
+            diagnostics.push(makeOffsetDiagnostic(
+                document,
+                importStatement.startOffset,
+                importStatement.endOffset,
+                `Imported ${message}`));
+        } else {
+            diagnostics.push(new vscode.Diagnostic(
+                new vscode.Range(0, 0, 0, 1),
+                `Imported ${message}`,
+                vscode.DiagnosticSeverity.Error));
+        }
+    };
+
+    const visit = (definition) => {
+        const state = visitState.get(definition) || "unvisited";
+        if (state === "visited") {
+            return;
+        }
+
+        if (state === "visiting") {
+            const cycleStart = visitStack.findIndex((entry) => entry === definition);
+            if (cycleStart >= 0) {
+                emitCycleDiagnostic([...visitStack.slice(cycleStart), definition]);
+            }
+            return;
+        }
+
+        visitState.set(definition, "visiting");
+        visitStack.push(definition);
+
+        for (const dependency of dependencies.get(definition) || []) {
+            visit(dependency);
+        }
+
+        visitStack.pop();
+        visitState.set(definition, "visited");
+    };
+
+    for (const definition of definitions) {
+        visit(definition);
+    }
+
+    return diagnostics;
 }
 
 function collectReachableFunctionDefinitions(document) {
@@ -2570,6 +2981,7 @@ function computeLocalDiagnostics(document) {
         diagnostics.push(...computeFunctionSignatureDiagnostics(document, text, definition));
     }
 
+    diagnostics.push(...computeFunctionCycleDiagnostics(document, text));
     diagnostics.push(...computeDetailedBlockDiagnostics(document, text, reachableCallables));
     diagnostics.push(...computeBraceDiagnostics(document, text));
     return diagnostics;
@@ -5256,8 +5668,14 @@ function formatError(error) {
     return error && error.message ? error.message : String(error);
 }
 
-async function requestRecompile(scope) {
-    const document = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
+async function requestRecompile(scope, targetUri) {
+    let document = undefined;
+    if (targetUri instanceof vscode.Uri) {
+        document = vscode.workspace.textDocuments.find((entry) => entry.uri.toString() === targetUri.toString()) || await vscode.workspace.openTextDocument(targetUri);
+    } else {
+        document = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
+    }
+
     const projectRoot = findProjectRoot(document ? document.uri.fsPath : "");
     if (!projectRoot) {
         vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
@@ -5301,8 +5719,469 @@ async function requestRecompile(scope) {
     }
 }
 
-async function refreshBridgeDiagnostics(collection) {
+async function requestCleanGeneratedShaders() {
+    const document = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document : undefined;
+    const projectRoot = findProjectRoot(document ? document.uri.fsPath : "");
+    if (!projectRoot) {
+        vscode.window.showWarningMessage("DreamShader could not locate the Unreal project root.");
+        return;
+    }
+
+    const requestDirectory = path.join(projectRoot, "Saved", "DreamShader", "Bridge", "Requests");
+    fs.mkdirSync(requestDirectory, { recursive: true });
+
+    const payload = {
+        action: "cleanGeneratedShaders"
+    };
+
+    const requestPath = path.join(requestDirectory, `request-${Date.now()}-${Math.floor(Math.random() * 100000)}.json`);
+    fs.writeFileSync(requestPath, JSON.stringify(payload, null, 2), "utf8");
+
+    vscode.window.setStatusBarMessage("DreamShader requested generated shader cleanup and a full Unreal recompile.", 3000);
+}
+
+function createEmptyBridgeDiagnosticsState() {
+    return {
+        updatedAtUtc: "",
+        diagnosticsFileCount: 0,
+        hasAnyBridgeFile: false,
+        totals: createBridgeDiagnosticCounts(),
+        projectEntries: [],
+        metaEntries: []
+    };
+}
+
+function createBridgeDiagnosticCounts() {
+    return {
+        error: 0,
+        warning: 0,
+        information: 0,
+        hint: 0,
+        total: 0
+    };
+}
+
+function resetBridgeDiagnosticsState(state) {
+    if (!state) {
+        return;
+    }
+
+    state.updatedAtUtc = "";
+    state.diagnosticsFileCount = 0;
+    state.hasAnyBridgeFile = false;
+    state.totals = createBridgeDiagnosticCounts();
+    state.projectEntries = [];
+    state.metaEntries = [];
+}
+
+function normalizeBridgeDiagnosticSeverity(severity) {
+    if (typeof severity !== "string") {
+        return "error";
+    }
+
+    switch (severity.trim().toLowerCase()) {
+        case "warning":
+            return "warning";
+        case "information":
+        case "info":
+            return "information";
+        case "hint":
+            return "hint";
+        default:
+            return "error";
+    }
+}
+
+function addBridgeDiagnosticCount(counts, severity) {
+    if (!counts) {
+        return;
+    }
+
+    const key = normalizeBridgeDiagnosticSeverity(severity);
+    counts[key] = (counts[key] || 0) + 1;
+    counts.total = (counts.total || 0) + 1;
+}
+
+function getBridgeDiagnosticSeverityWeight(severity) {
+    switch (normalizeBridgeDiagnosticSeverity(severity)) {
+        case "error":
+            return 0;
+        case "warning":
+            return 1;
+        case "information":
+            return 2;
+        case "hint":
+            return 3;
+        default:
+            return 4;
+    }
+}
+
+function formatBridgeDiagnosticCountSummary(counts) {
+    if (!counts || !counts.total) {
+        return "0 issues";
+    }
+
+    const parts = [];
+    if (counts.error) {
+        parts.push(`${counts.error} error${counts.error === 1 ? "" : "s"}`);
+    }
+    if (counts.warning) {
+        parts.push(`${counts.warning} warning${counts.warning === 1 ? "" : "s"}`);
+    }
+    if (counts.information) {
+        parts.push(`${counts.information} info`);
+    }
+    if (counts.hint) {
+        parts.push(`${counts.hint} hint${counts.hint === 1 ? "" : "s"}`);
+    }
+    return parts.join(", ");
+}
+
+function getBridgeDiagnosticThemeIcon(severity) {
+    switch (normalizeBridgeDiagnosticSeverity(severity)) {
+        case "warning":
+            return new vscode.ThemeIcon("warning");
+        case "information":
+            return new vscode.ThemeIcon("info");
+        case "hint":
+            return new vscode.ThemeIcon("lightbulb");
+        default:
+            return new vscode.ThemeIcon("error");
+    }
+}
+
+function getBridgeDiagnosticsSummaryForProject(state, projectRoot) {
+    if (state && projectRoot) {
+        const normalizedProjectRoot = normalizeFsPath(projectRoot);
+        const matchingProject = (state.projectEntries || []).find((entry) => entry.projectRoot === normalizedProjectRoot);
+        if (matchingProject) {
+            return matchingProject.counts;
+        }
+    }
+
+    return state && state.totals ? state.totals : createBridgeDiagnosticCounts();
+}
+
+function createBridgeDiagnosticsTreeProvider(state) {
+    const changeEmitter = new vscode.EventEmitter();
+    return {
+        onDidChangeTreeData: changeEmitter.event,
+        refresh() {
+            changeEmitter.fire();
+        },
+        getTreeItem(element) {
+            return buildBridgeDiagnosticsTreeItem(element);
+        },
+        getChildren(element) {
+            if (!element) {
+                const rootEntries = [
+                    ...(state.metaEntries || []),
+                    ...(state.projectEntries || [])
+                ];
+                return rootEntries.length > 0 ? rootEntries : [createBridgeDiagnosticsPlaceholder(state)];
+            }
+
+            if (element.type === "project") {
+                return element.fileEntries || [];
+            }
+
+            if (element.type === "file") {
+                return element.diagnosticEntries || [];
+            }
+
+            return [];
+        },
+        dispose() {
+            changeEmitter.dispose();
+        }
+    };
+}
+
+function createBridgeDiagnosticsPlaceholder(state) {
+    return {
+        type: "placeholder",
+        label: state && state.hasAnyBridgeFile ? "No bridge diagnostics" : "Waiting for Unreal bridge diagnostics",
+        description: state && state.hasAnyBridgeFile ? "Bridge is clean" : "No diagnostics file detected yet",
+        tooltip: state && state.hasAnyBridgeFile
+            ? "DreamShader bridge diagnostics are currently clean."
+            : "Compile a DreamShader material in Unreal to populate Saved/DreamShader/Bridge/diagnostics.json."
+    };
+}
+
+function buildBridgeDiagnosticsTreeItem(element) {
+    if (!element) {
+        return new vscode.TreeItem("Bridge Diagnostics");
+    }
+
+    switch (element.type) {
+        case "project": {
+            const collapsibleState = (element.fileEntries || []).length <= 1
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.Collapsed;
+            const item = new vscode.TreeItem(element.label, collapsibleState);
+            item.iconPath = new vscode.ThemeIcon("folder-library");
+            item.description = formatBridgeDiagnosticCountSummary(element.counts);
+            item.tooltip = new vscode.MarkdownString([
+                `**${element.label}**`,
+                "",
+                `Project Root: \`${element.projectRoot || "Unknown"}\``,
+                `Diagnostics File: \`${element.diagnosticsFilePath}\``,
+                `Issues: ${formatBridgeDiagnosticCountSummary(element.counts)}`,
+                element.updatedAtUtc ? `Updated: \`${element.updatedAtUtc}\`` : ""
+            ].filter(Boolean).join("\n"));
+            return item;
+        }
+        case "file": {
+            const collapsibleState = (element.diagnosticEntries || []).length <= 3
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.Collapsed;
+            const item = new vscode.TreeItem(element.label, collapsibleState);
+            item.resourceUri = vscode.Uri.file(element.filePath);
+            item.description = element.relativeDirectory
+                ? `${element.relativeDirectory} • ${formatBridgeDiagnosticCountSummary(element.counts)}`
+                : formatBridgeDiagnosticCountSummary(element.counts);
+            item.tooltip = new vscode.MarkdownString([
+                `**${element.label}**`,
+                "",
+                `Path: \`${element.filePath}\``,
+                `Project: \`${element.projectLabel}\``,
+                `Issues: ${formatBridgeDiagnosticCountSummary(element.counts)}`
+            ].join("\n"));
+            item.command = {
+                command: "dreamshader.openBridgeDiagnosticLocation",
+                title: "Open DreamShader Source",
+                arguments: [{
+                    filePath: element.filePath,
+                    line: element.primaryLine,
+                    column: element.primaryColumn
+                }]
+            };
+            return item;
+        }
+        case "diagnostic": {
+            const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
+            item.iconPath = getBridgeDiagnosticThemeIcon(element.severity);
+            item.description = formatBridgeDiagnosticEntryDescription(element);
+            item.tooltip = createBridgeDiagnosticEntryTooltip(element);
+            item.command = {
+                command: "dreamshader.openBridgeDiagnosticLocation",
+                title: "Open Bridge Diagnostic",
+                arguments: [element]
+            };
+            return item;
+        }
+        case "meta": {
+            const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
+            item.iconPath = getBridgeDiagnosticThemeIcon(element.severity);
+            item.description = element.description || "";
+            item.tooltip = new vscode.MarkdownString([
+                `**${element.label}**`,
+                "",
+                element.filePath ? `File: \`${element.filePath}\`` : "",
+                element.detail || ""
+            ].filter(Boolean).join("\n"));
+            if (element.filePath) {
+                item.command = {
+                    command: "dreamshader.openBridgeDiagnosticLocation",
+                    title: "Open Bridge File",
+                    arguments: [element]
+                };
+            }
+            return item;
+        }
+        default: {
+            const item = new vscode.TreeItem(element.label || "Bridge Diagnostics", vscode.TreeItemCollapsibleState.None);
+            item.iconPath = new vscode.ThemeIcon("info");
+            item.description = element.description || "";
+            item.tooltip = element.tooltip || "";
+            return item;
+        }
+    }
+}
+
+function formatBridgeDiagnosticEntryDescription(entry) {
+    const parts = [];
+    if (entry.shaderPlatform) {
+        parts.push(entry.shaderPlatform);
+    }
+    if (entry.qualityLevel) {
+        parts.push(entry.qualityLevel);
+    }
+    if (entry.stage) {
+        parts.push(entry.stage);
+    }
+    if (Number.isFinite(entry.line)) {
+        parts.push(`L${entry.line}`);
+    }
+    return parts.join(" • ");
+}
+
+function createBridgeDiagnosticEntryTooltip(entry) {
+    return new vscode.MarkdownString([
+        `**${entry.label}**`,
+        "",
+        `File: \`${entry.filePath}\``,
+        `Line: \`${entry.line}\`, Column: \`${entry.column}\``,
+        entry.assetPath ? `Asset: \`${entry.assetPath}\`` : "",
+        entry.shaderPlatform ? `Platform: \`${entry.shaderPlatform}\`` : "",
+        entry.qualityLevel ? `Quality: \`${entry.qualityLevel}\`` : "",
+        entry.code ? `Code: \`${entry.code}\`` : "",
+        entry.source ? `Source: \`${entry.source}\`` : "",
+        entry.detail ? "" : "",
+        entry.detail || ""
+    ].filter(Boolean).join("\n"));
+}
+
+function createBridgeDiagnosticProjectEntry(projectRoot, diagnosticsFilePath) {
+    const normalizedProjectRoot = projectRoot ? normalizeFsPath(projectRoot) : "";
+    return {
+        type: "project",
+        key: normalizedProjectRoot || diagnosticsFilePath,
+        label: normalizedProjectRoot ? path.basename(normalizedProjectRoot) : path.basename(path.dirname(path.dirname(path.dirname(diagnosticsFilePath)))),
+        projectRoot: normalizedProjectRoot,
+        diagnosticsFilePath: normalizeFsPath(diagnosticsFilePath),
+        updatedAtUtc: "",
+        counts: createBridgeDiagnosticCounts(),
+        fileMap: new Map(),
+        fileEntries: []
+    };
+}
+
+function createBridgeDiagnosticFileEntry(projectEntry, filePath) {
+    const relativePath = projectEntry.projectRoot
+        ? normalizeFsPath(path.relative(projectEntry.projectRoot, filePath))
+        : normalizeFsPath(filePath);
+    const relativeDirectory = normalizeFsPath(path.dirname(relativePath)).replace(/^\.$/, "");
+    return {
+        type: "file",
+        key: `${projectEntry.key}|${filePath}`,
+        label: path.basename(filePath),
+        filePath,
+        projectLabel: projectEntry.label,
+        relativePath,
+        relativeDirectory,
+        counts: createBridgeDiagnosticCounts(),
+        diagnosticEntries: [],
+        primaryLine: 1,
+        primaryColumn: 1
+    };
+}
+
+function createBridgeDiagnosticMetaEntry(label, description, filePath, detail, severity = "warning") {
+    return {
+        type: "meta",
+        label,
+        description,
+        filePath: filePath ? normalizeFsPath(filePath) : "",
+        detail: detail || "",
+        severity
+    };
+}
+
+function resolveBridgeDiagnosticFilePath(inputPath, projectRoot) {
+    if (typeof inputPath !== "string" || !inputPath.trim()) {
+        return "";
+    }
+
+    const trimmedPath = inputPath.trim();
+    const resolvedPath = path.isAbsolute(trimmedPath)
+        ? trimmedPath
+        : (projectRoot ? path.join(projectRoot, trimmedPath) : trimmedPath);
+    return normalizeFsPath(path.resolve(resolvedPath));
+}
+
+function normalizeBridgeDiagnosticEntry(diagnostic, filePath, projectEntry) {
+    const line = Math.max(1, Number.isFinite(diagnostic.line) ? Number(diagnostic.line) : 1);
+    const column = Math.max(1, Number.isFinite(diagnostic.column) ? Number(diagnostic.column) : 1);
+    const severity = normalizeBridgeDiagnosticSeverity(diagnostic.severity);
+    const message = typeof diagnostic.message === "string" && diagnostic.message.trim()
+        ? diagnostic.message.trim()
+        : "DreamShader error";
+    return {
+        type: "diagnostic",
+        key: `${filePath}:${line}:${column}:${severity}:${message}`,
+        label: message,
+        message,
+        filePath,
+        projectLabel: projectEntry.label,
+        line,
+        column,
+        severity,
+        detail: typeof diagnostic.detail === "string" ? diagnostic.detail.trim() : "",
+        stage: typeof diagnostic.stage === "string" ? diagnostic.stage.trim() : "",
+        assetPath: typeof diagnostic.assetPath === "string" ? diagnostic.assetPath.trim() : "",
+        shaderPlatform: typeof diagnostic.shaderPlatform === "string" ? diagnostic.shaderPlatform.trim() : "",
+        qualityLevel: typeof diagnostic.qualityLevel === "string" ? diagnostic.qualityLevel.trim() : "",
+        code: typeof diagnostic.code === "string" ? diagnostic.code.trim() : "",
+        source: typeof diagnostic.source === "string" && diagnostic.source.trim() ? diagnostic.source.trim() : "DreamShader"
+    };
+}
+
+function createVsCodeBridgeDiagnostic(entry) {
+    const line = Math.max(0, entry.line - 1);
+    const column = Math.max(0, entry.column - 1);
+    const range = new vscode.Range(line, column, line, column + 1);
+    const vscodeDiagnostic = new vscode.Diagnostic(range, entry.message, mapSeverity(entry.severity));
+    vscodeDiagnostic.source = entry.source;
+    if (entry.code) {
+        vscodeDiagnostic.code = entry.code;
+    }
+
+    const location = new vscode.Location(vscode.Uri.file(entry.filePath), range);
+    const relatedInformation = [];
+    if (entry.assetPath) {
+        relatedInformation.push(new vscode.DiagnosticRelatedInformation(location, `Material: ${entry.assetPath}`));
+    }
+    const metadataParts = [];
+    if (entry.shaderPlatform) {
+        metadataParts.push(`Platform: ${entry.shaderPlatform}`);
+    }
+    if (entry.qualityLevel) {
+        metadataParts.push(`Quality: ${entry.qualityLevel}`);
+    }
+    if (entry.stage) {
+        metadataParts.push(`Stage: ${entry.stage}`);
+    }
+    if (metadataParts.length > 0) {
+        relatedInformation.push(new vscode.DiagnosticRelatedInformation(location, metadataParts.join(" | ")));
+    }
+    if (entry.detail && entry.detail !== entry.message) {
+        relatedInformation.push(new vscode.DiagnosticRelatedInformation(location, entry.detail));
+    }
+    if (relatedInformation.length > 0) {
+        vscodeDiagnostic.relatedInformation = relatedInformation;
+    }
+
+    return vscodeDiagnostic;
+}
+
+async function openBridgeDiagnosticLocation(diagnosticEntry) {
+    if (!diagnosticEntry || (typeof diagnosticEntry !== "object")) {
+        return;
+    }
+
+    const targetPath = typeof diagnosticEntry.filePath === "string" && diagnosticEntry.filePath
+        ? diagnosticEntry.filePath
+        : "";
+    if (!targetPath || !fs.existsSync(targetPath)) {
+        vscode.window.showWarningMessage("DreamShader could not find the diagnostic target on disk.");
+        return;
+    }
+
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(targetPath));
+    const editor = await vscode.window.showTextDocument(document, { preview: false });
+    const line = Math.max(0, Number.isFinite(diagnosticEntry.line) ? Number(diagnosticEntry.line) - 1 : 0);
+    const column = Math.max(0, Number.isFinite(diagnosticEntry.column) ? Number(diagnosticEntry.column) - 1 : 0);
+    const position = new vscode.Position(line, column);
+    const range = new vscode.Range(position, position);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+}
+
+async function refreshBridgeDiagnostics(collection, state) {
     collection.clear();
+    resetBridgeDiagnosticsState(state);
 
     const diagnosticFiles = new Set();
     const workspaceMatches = await vscode.workspace.findFiles("**/Saved/DreamShader/Bridge/diagnostics.json");
@@ -5314,20 +6193,51 @@ async function refreshBridgeDiagnostics(collection) {
         diagnosticFiles.add(getBridgeDiagnosticsFilePath(projectRoot));
     }
 
-    for (const diagnosticFile of diagnosticFiles) {
+    const diagnosticsByFileUri = new Map();
+    const projectEntriesByKey = new Map();
+    for (const diagnosticFile of Array.from(diagnosticFiles).sort((left, right) => left.localeCompare(right))) {
         if (!fs.existsSync(diagnosticFile)) {
             continue;
+        }
+
+        state.hasAnyBridgeFile = true;
+        state.diagnosticsFileCount += 1;
+        const projectRoot = findProjectRootFromCandidate(diagnosticFile);
+        const projectKey = normalizeFsPath(projectRoot || diagnosticFile);
+        let projectEntry = projectEntriesByKey.get(projectKey);
+        if (!projectEntry) {
+            projectEntry = createBridgeDiagnosticProjectEntry(projectRoot, diagnosticFile);
+            projectEntriesByKey.set(projectKey, projectEntry);
         }
 
         let parsed;
         try {
             parsed = JSON.parse(fs.readFileSync(diagnosticFile, "utf8"));
-        } catch (_error) {
+        } catch (error) {
+            state.metaEntries.push(createBridgeDiagnosticMetaEntry(
+                "Bridge diagnostics parse error",
+                path.basename(diagnosticFile),
+                diagnosticFile,
+                error && error.message ? error.message : "Failed to parse diagnostics.json",
+                "warning"));
             continue;
         }
 
         if (!parsed || !Array.isArray(parsed.files)) {
+            state.metaEntries.push(createBridgeDiagnosticMetaEntry(
+                "Bridge diagnostics format error",
+                path.basename(diagnosticFile),
+                diagnosticFile,
+                "Expected a JSON object with a files array.",
+                "warning"));
             continue;
+        }
+
+        if (typeof parsed.updatedAtUtc === "string" && parsed.updatedAtUtc) {
+            projectEntry.updatedAtUtc = parsed.updatedAtUtc;
+            if (!state.updatedAtUtc || parsed.updatedAtUtc > state.updatedAtUtc) {
+                state.updatedAtUtc = parsed.updatedAtUtc;
+            }
         }
 
         for (const fileEntry of parsed.files) {
@@ -5335,21 +6245,105 @@ async function refreshBridgeDiagnostics(collection) {
                 continue;
             }
 
-            const fileUri = vscode.Uri.file(fileEntry.path);
-            const diagnostics = [];
-            for (const diagnostic of fileEntry.diagnostics) {
-                const message = typeof diagnostic.message === "string" ? diagnostic.message : "DreamShader error";
-                const line = Math.max(0, Number.isFinite(diagnostic.line) ? Number(diagnostic.line) - 1 : 0);
-                const column = Math.max(0, Number.isFinite(diagnostic.column) ? Number(diagnostic.column) - 1 : 0);
-                const range = new vscode.Range(line, column, line, column + 1);
-                const vscodeDiagnostic = new vscode.Diagnostic(range, message, mapSeverity(diagnostic.severity));
-                vscodeDiagnostic.source = typeof diagnostic.source === "string" ? diagnostic.source : "DreamShader";
-                diagnostics.push(vscodeDiagnostic);
+            const filePath = resolveBridgeDiagnosticFilePath(fileEntry.path, projectRoot);
+            if (!filePath) {
+                continue;
             }
 
-            collection.set(fileUri, diagnostics);
+            let fileDiagnosticsEntry = projectEntry.fileMap.get(filePath);
+            if (!fileDiagnosticsEntry) {
+                fileDiagnosticsEntry = createBridgeDiagnosticFileEntry(projectEntry, filePath);
+                projectEntry.fileMap.set(filePath, fileDiagnosticsEntry);
+            }
+
+            let diagnostics = diagnosticsByFileUri.get(filePath);
+            if (!diagnostics) {
+                diagnostics = [];
+                diagnosticsByFileUri.set(filePath, diagnostics);
+            }
+
+            for (const diagnostic of fileEntry.diagnostics) {
+                const entry = normalizeBridgeDiagnosticEntry(diagnostic, filePath, projectEntry);
+                diagnostics.push(createVsCodeBridgeDiagnostic(entry));
+                fileDiagnosticsEntry.diagnosticEntries.push(entry);
+                if (fileDiagnosticsEntry.diagnosticEntries.length === 1) {
+                    fileDiagnosticsEntry.primaryLine = entry.line;
+                    fileDiagnosticsEntry.primaryColumn = entry.column;
+                }
+                addBridgeDiagnosticCount(fileDiagnosticsEntry.counts, entry.severity);
+                addBridgeDiagnosticCount(projectEntry.counts, entry.severity);
+                addBridgeDiagnosticCount(state.totals, entry.severity);
+            }
         }
     }
+
+    for (const [filePath, diagnostics] of diagnosticsByFileUri.entries()) {
+        collection.set(vscode.Uri.file(filePath), diagnostics);
+    }
+
+    state.projectEntries = Array.from(projectEntriesByKey.values())
+        .map((projectEntry) => {
+            projectEntry.fileEntries = Array.from(projectEntry.fileMap.values())
+                .filter((fileEntry) => fileEntry.diagnosticEntries.length > 0)
+                .sort((left, right) => {
+                    const severityDifference = getBridgeDiagnosticSeverityWeightFromCounts(left.counts) - getBridgeDiagnosticSeverityWeightFromCounts(right.counts);
+                    if (severityDifference !== 0) {
+                        return severityDifference;
+                    }
+                    return left.relativePath.localeCompare(right.relativePath);
+                });
+            delete projectEntry.fileMap;
+            for (const fileEntry of projectEntry.fileEntries) {
+                fileEntry.diagnosticEntries.sort((left, right) => {
+                    const severityDifference = getBridgeDiagnosticSeverityWeight(left.severity) - getBridgeDiagnosticSeverityWeight(right.severity);
+                    if (severityDifference !== 0) {
+                        return severityDifference;
+                    }
+                    if (left.line !== right.line) {
+                        return left.line - right.line;
+                    }
+                    if (left.column !== right.column) {
+                        return left.column - right.column;
+                    }
+                    return left.label.localeCompare(right.label);
+                });
+            }
+            return projectEntry;
+        })
+        .filter((projectEntry) => projectEntry.fileEntries.length > 0)
+        .sort((left, right) => {
+            const severityDifference = getBridgeDiagnosticSeverityWeightFromCounts(left.counts) - getBridgeDiagnosticSeverityWeightFromCounts(right.counts);
+            if (severityDifference !== 0) {
+                return severityDifference;
+            }
+            return left.label.localeCompare(right.label);
+        });
+    state.metaEntries.sort((left, right) => {
+        const severityDifference = getBridgeDiagnosticSeverityWeight(left.severity) - getBridgeDiagnosticSeverityWeight(right.severity);
+        if (severityDifference !== 0) {
+            return severityDifference;
+        }
+        return left.label.localeCompare(right.label);
+    });
+}
+
+function getBridgeDiagnosticSeverityWeightFromCounts(counts) {
+    if (!counts) {
+        return 4;
+    }
+    if (counts.error > 0) {
+        return 0;
+    }
+    if (counts.warning > 0) {
+        return 1;
+    }
+    if (counts.information > 0) {
+        return 2;
+    }
+    if (counts.hint > 0) {
+        return 3;
+    }
+    return 4;
 }
 
 function updateBridgeDiagnosticWatchers(state, onDidChange) {

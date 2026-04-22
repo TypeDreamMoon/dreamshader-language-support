@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.5`
+- Version：`1.2.9`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -24,7 +24,11 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Settings` 中的对象引用支持 `Path(...)` 风格资产路径
 - `Expression(...).Pin[n]` 输出节点绑定补全与高亮
 - `Code` 区域支持 `float a, b, c = ...;` 这种逗号声明写法
+- `Function SelfContained Foo(...) { ... }` / `Function Inline Foo(...) { ... }` 语法支持
+- 本地递归/循环依赖诊断，包含 `SelfContained` 函数调用环
 - 只打开 `ProjectName/DShader` 工作区时，仍可自动读取 `ProjectName/Saved/DreamShader/Bridge/diagnostics.json`
+- 更现代的 VSCode 交互：状态栏项目名提示、CodeLens 重编入口、编辑器标题栏快速操作、Bridge 诊断总览窗口
+- 支持一键清理 `Intermediate/DreamShader/GeneratedShaders` 并触发全量重编
 - DreamShader Package import 联想
 - Go to Definition
 - Signature Help
@@ -43,6 +47,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `.dsm`：材质实现
 - `.dsh`：共享头文件
 - `Function Name(in ..., out ...) { ... }`
+- `Function SelfContained Name(in ..., out ...) { ... }`
 - `Namespace(Name="Texture") { Function Sample(...) { ... } }`
 - `import "Shared/Common.dsh";`
 - `import "Builtin/Texture.dsh";`
@@ -99,12 +104,20 @@ Package 安装和更新需要本机可用 `git` 命令。
 
 会把请求写给 Unreal，随后 Unreal 返回的生成/编译错误会镜像到 VSCode 诊断面板。Unreal Parser 错误会尽量精确到真实 `.dsm/.dsh` 文件行列，包括 import 后的头文件位置。
 
+同时会在 Explorer 侧边栏提供 `DreamShader Bridge` 视图，按项目 / 文件 / 具体错误分组显示 Unreal Bridge 返回的问题。材质编译错误会附带更多上下文，例如：
+
+- 所属材质资源路径
+- Shader Platform
+- Quality Level
+- Bridge 阶段（生成 / 材质编译）
+- 原始 detail 文本
+
 ## 安装
 
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.5.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.9.vsix
 ```
 
 ## 项目根目录
