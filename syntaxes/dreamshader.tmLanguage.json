@@ -43,10 +43,25 @@
     },
     "keywords": {
       "patterns": [
-        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Function|Namespace|ShaderFunction|import|SelfContained|Inline)\\b" },
-        { "name": "entity.name.function.definition.dreamshader", "match": "(?<=\\bFunction\\s)[A-Za-z_][A-Za-z0-9_]*\\b" },
-        { "name": "entity.name.function.definition.dreamshader", "match": "(?<=\\bFunction\\s+SelfContained\\s)[A-Za-z_][A-Za-z0-9_]*\\b" },
-        { "name": "entity.name.function.definition.dreamshader", "match": "(?<=\\bFunction\\s+Inline\\s)[A-Za-z_][A-Za-z0-9_]*\\b" },
+        {
+          "name": "meta.function.definition.dreamshader",
+          "begin": "\\b(Function)\\b(?:\\s+(SelfContained|Inline))?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.dreamshader" },
+            "2": { "name": "storage.modifier.function.dreamshader" },
+            "3": { "name": "entity.name.function.definition.dreamshader" }
+          },
+          "end": "(?=\\{)|$",
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#types" },
+            { "include": "#shaderKeywords" },
+            { "include": "#operators" }
+          ]
+        },
+        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|ShaderFunction|import)\\b" },
+        { "name": "storage.modifier.function.dreamshader", "match": "\\b(?:SelfContained|Inline)\\b" },
         { "name": "entity.name.namespace.definition.dreamshader", "match": "(?<=\\bNamespace\\s*\\(\\s*Name\\s*=\\s*\")[A-Za-z_][A-Za-z0-9_]*\\b" },
         { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time)\\b(?=\\s*=)" }
       ]
