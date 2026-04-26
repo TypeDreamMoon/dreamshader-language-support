@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.13
+
+- Added a GitHub Actions release workflow that packages the VSCode extension after pushes to `main`
+- The workflow reads `package.json`, creates or reuses the matching `vX.Y.Z` tag, and uploads the generated VSIX to a GitHub Release
+- Added workflow dispatch support for manually rebuilding a release package
+
 ## 1.2.12
 
 - Moved the `DreamShader Bridge` diagnostics view from Explorer into a dedicated bottom Panel container
