@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.12
+
+- Moved the `DreamShader Bridge` diagnostics view from Explorer into a dedicated bottom Panel container
+- Added a `Show Bridge Panel` command, status bar bridge focus action, and CodeLens bridge shortcut
+- Refined Bridge diagnostics tree icons, context values, and item context actions for a clearer issue browsing workflow
+- Polished Package Store Webview controls with a cleaner layout, stats, focus states, card hover states, and more consistent buttons
+
 ## 1.2.11
 
 - Renamed Shader and ShaderFunction graph authoring support from `Code = { ... }` to `Graph = { ... }`

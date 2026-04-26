@@ -566,6 +566,11 @@ function activate(context) {
     );
 
     context.subscriptions.push(
+        vscode.commands.registerCommand("dreamshader.showBridgeDiagnostics", async () => {
+            await refreshBridgeInfrastructure();
+            refreshEditorUi();
+            await vscode.commands.executeCommand("dreamshader.bridgeDiagnostics.focus");
+        }),
         vscode.commands.registerCommand("dreamshader.recompileCurrent", async (targetUri) => {
             await requestRecompile("file", targetUri);
         }),
@@ -703,19 +708,22 @@ function updateDreamShaderStatusBar(statusBar, bridgeDiagnosticsState) {
     const projectRoot = findProjectRoot(activeDocument.uri.fsPath);
     const projectLabel = projectRoot ? path.basename(projectRoot) : "Project";
     const summary = getBridgeDiagnosticsSummaryForProject(bridgeDiagnosticsState, projectRoot);
-    const summaryText = summary.total > 0
-        ? ` $(error) ${summary.error}${summary.warning > 0 ? ` $(warning) ${summary.warning}` : ""}`
-        : "";
-    statusBar.command = "dreamshader.recompileCurrent";
-    statusBar.text = `$(refresh) DreamShader ${projectLabel}${summaryText}`;
+    const summaryText = summary.total > 0 ? ` ${formatBridgeDiagnosticCountSummary(summary)}` : " Bridge clean";
+    statusBar.command = {
+        command: "dreamshader.showBridgeDiagnostics",
+        title: "Show DreamShader Bridge Panel"
+    };
+    statusBar.text = summary.total > 0
+        ? `$(warning) DreamShader ${projectLabel}:${summaryText}`
+        : `$(check) DreamShader ${projectLabel}`;
     statusBar.tooltip = new vscode.MarkdownString([
-        "DreamShaderLang",
+        "**DreamShaderLang**",
         "",
         `Project: \`${projectRoot || "Not detected"}\``,
         `File: \`${path.basename(activeDocument.fileName)}\``,
-        `Bridge: ${summary.total > 0 ? `${formatBridgeDiagnosticCountSummary(summary)} in view` : "No active bridge diagnostics"}`,
+        `Bridge: ${summary.total > 0 ? formatBridgeDiagnosticCountSummary(summary) : "No active bridge diagnostics"}`,
         "",
-        "Click to request Unreal Editor to recompile the current source."
+        "Click to open the DreamShader Bridge panel."
     ].join("\n"));
     statusBar.show();
 }
@@ -739,13 +747,17 @@ function createCodeLensProvider(changeEmitter) {
                 const position = document.positionAt(block.startOffset);
                 const range = new vscode.Range(position, position);
                 lenses.push(new vscode.CodeLens(range, {
-                    title: "Recompile Current",
+                    title: "$(play) Recompile Current",
                     command: "dreamshader.recompileCurrent",
                     arguments: [document.uri]
                 }));
                 lenses.push(new vscode.CodeLens(range, {
-                    title: "Recompile All",
+                    title: "$(refresh) Recompile All",
                     command: "dreamshader.recompileAll"
+                }));
+                lenses.push(new vscode.CodeLens(range, {
+                    title: "$(pulse) Bridge",
+                    command: "dreamshader.showBridgeDiagnostics"
                 }));
             }
 
@@ -755,7 +767,7 @@ function createCodeLensProvider(changeEmitter) {
                     const position = document.positionAt(definitions[0].startOffset);
                     const range = new vscode.Range(position, position);
                     lenses.push(new vscode.CodeLens(range, {
-                        title: "Recompile All",
+                        title: "$(refresh) Recompile All",
                         command: "dreamshader.recompileAll"
                     }));
                 }
@@ -4164,12 +4176,15 @@ async function updatePackagesCommand() {
         return;
     }
 
-    const confirmation = await vscode.window.showQuickPick(["Update all packages", "Cancel"], {
+    const confirmation = await vscode.window.showQuickPick([
+        { label: "$(cloud-download) Update all packages", description: `${installed.length} package(s)`, value: "update" },
+        { label: "$(circle-slash) Cancel", value: "cancel" }
+    ], {
         title: "Update DreamShader Packages",
         placeHolder: `${installed.length} package(s) will be reinstalled from their Git repositories.`
     });
 
-    if (confirmation !== "Update all packages") {
+    if (!confirmation || confirmation.value !== "update") {
         return;
     }
 
@@ -4217,7 +4232,7 @@ async function removePackageCommand() {
     }
 
     const picked = await vscode.window.showQuickPick(installed.map((entry) => ({
-        label: entry.name,
+        label: `$(package) ${entry.name}`,
         description: entry.version || "",
         detail: entry.description || entry.repository || "",
         entry
@@ -4230,12 +4245,15 @@ async function removePackageCommand() {
         return;
     }
 
-    const confirmation = await vscode.window.showQuickPick(["Remove package", "Cancel"], {
+    const confirmation = await vscode.window.showQuickPick([
+        { label: "$(trash) Remove package", description: picked.entry.name, value: "remove" },
+        { label: "$(circle-slash) Cancel", value: "cancel" }
+    ], {
         title: `Remove ${picked.entry.name}?`,
         placeHolder: "This deletes the package folder under DShader/Packages."
     });
 
-    if (confirmation !== "Remove package") {
+    if (!confirmation || confirmation.value !== "remove") {
         return;
     }
 
@@ -4288,7 +4306,11 @@ async function removePackageStoreIndexCommand() {
         return;
     }
 
-    const picked = await vscode.window.showQuickPick(sources, {
+    const picked = await vscode.window.showQuickPick(sources.map((source) => ({
+        label: "$(link) Package index source",
+        description: source,
+        source
+    })), {
         title: "Remove DreamShader Package Store Source",
         placeHolder: "Select an index source to remove"
     });
@@ -4297,7 +4319,7 @@ async function removePackageStoreIndexCommand() {
         return;
     }
 
-    await removePackageIndexSource(picked);
+    await removePackageIndexSource(picked.source);
     vscode.window.showInformationMessage("DreamShader package store source removed.");
 }
 
@@ -4339,11 +4361,14 @@ async function createDreamShaderTemplateCommand(kind) {
     }
 
     if (fs.existsSync(targetPath)) {
-        const replace = await vscode.window.showQuickPick(["Replace existing file", "Cancel"], {
+        const replace = await vscode.window.showQuickPick([
+            { label: "$(replace) Replace existing file", description: path.basename(targetPath), value: "replace" },
+            { label: "$(circle-slash) Cancel", value: "cancel" }
+        ], {
             title: `DreamShader file already exists`,
             placeHolder: targetPath
         });
-        if (replace !== "Replace existing file") {
+        if (!replace || replace.value !== "replace") {
             return;
         }
     }
@@ -4595,12 +4620,12 @@ async function createPackageCommand() {
 
     const targetPick = await vscode.window.showQuickPick([
         {
-            label: "Create in current project DShader/Packages",
+            label: "$(folder-library) Create in current project DShader/Packages",
             description: "Recommended",
             target: "project"
         },
         {
-            label: "Choose another parent folder",
+            label: "$(folder-opened) Choose another parent folder",
             description: "Creates the package folder under the selected parent folder",
             target: "custom"
         }
@@ -4630,8 +4655,8 @@ async function createPackageCommand() {
     }
 
     const examplePick = await vscode.window.showQuickPick([
-        { label: "Create example material", picked: true, value: true },
-        { label: "No example material", value: false }
+        { label: "$(file-code) Create example material", description: "Recommended", picked: true, value: true },
+        { label: "$(circle-slash) No example material", value: false }
     ], {
         title: "Create DreamShader Package - Examples"
     });
@@ -4640,11 +4665,14 @@ async function createPackageCommand() {
     }
 
     if (fs.existsSync(targetDirectory)) {
-        const replace = await vscode.window.showQuickPick(["Replace existing folder", "Cancel"], {
+        const replace = await vscode.window.showQuickPick([
+            { label: "$(replace) Replace existing folder", description: path.basename(targetDirectory), value: "replace" },
+            { label: "$(circle-slash) Cancel", value: "cancel" }
+        ], {
             title: `Package folder already exists`,
             placeHolder: targetDirectory
         });
-        if (replace !== "Replace existing folder") {
+        if (!replace || replace.value !== "replace") {
             return;
         }
         fs.rmSync(targetDirectory, { recursive: true, force: true });
@@ -4943,6 +4971,9 @@ function renderPackageStoreHtml(webview, state) {
             --focus: var(--vscode-focusBorder);
             --badge: var(--vscode-badge-background);
             --badge-fg: var(--vscode-badge-foreground);
+            --list-hover: var(--vscode-list-hoverBackground);
+            --success: var(--vscode-testing-iconPassed);
+            --warning: var(--vscode-editorWarning-foreground);
         }
         * { box-sizing: border-box; }
         body {
@@ -4951,76 +4982,135 @@ function renderPackageStoreHtml(webview, state) {
             color: var(--fg);
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
+            line-height: 1.45;
         }
         .shell {
             min-height: 100vh;
             display: grid;
-            grid-template-columns: 300px minmax(0, 1fr);
+            grid-template-columns: 320px minmax(0, 1fr);
         }
         aside {
             border-right: 1px solid var(--border);
-            background:
-                radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--focus) 20%, transparent), transparent 36%),
-                var(--panel);
-            padding: 20px;
+            background: var(--panel);
+            padding: 18px;
         }
         main {
-            padding: 22px 26px;
+            padding: 20px 24px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--input);
+            color: var(--fg);
+            font-weight: 700;
         }
         h1 {
-            margin: 0 0 6px;
-            font-size: 24px;
-            letter-spacing: -0.02em;
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: 0;
         }
         h2 {
             margin: 24px 0 10px;
             font-size: 13px;
             text-transform: uppercase;
             color: var(--muted);
-            letter-spacing: 0.08em;
+            letter-spacing: 0;
         }
         .subtitle {
             color: var(--muted);
-            line-height: 1.45;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin: 16px 0 4px;
+        }
+        .stat {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--input);
+            padding: 9px;
+            min-width: 0;
+        }
+        .stat strong {
+            display: block;
+            font-size: 18px;
+            line-height: 1.1;
+        }
+        .stat span {
+            color: var(--muted);
+            font-size: 11px;
         }
         .toolbar {
             display: flex;
             gap: 10px;
             align-items: center;
-            margin: 18px 0 20px;
+            margin: 0 0 16px;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: color-mix(in srgb, var(--panel) 70%, var(--bg));
         }
         .search {
             flex: 1;
             min-width: 240px;
-            padding: 9px 11px;
+            min-height: 34px;
+            padding: 8px 10px;
             color: var(--input-fg);
             background: var(--input);
             border: 1px solid var(--border);
+            border-radius: 4px;
             outline: none;
         }
         .search:focus { border-color: var(--focus); }
         button {
-            border: 0;
+            border: 1px solid transparent;
             color: var(--button-fg);
             background: var(--button);
-            padding: 8px 12px;
+            min-height: 32px;
+            padding: 6px 12px;
             cursor: pointer;
-            border-radius: 2px;
+            border-radius: 4px;
             font: inherit;
+            white-space: nowrap;
         }
         button:hover { background: var(--button-hover); }
+        button:focus-visible {
+            outline: 1px solid var(--focus);
+            outline-offset: 2px;
+        }
+        button:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
         button.secondary {
             color: var(--fg);
             background: transparent;
             border: 1px solid var(--border);
+        }
+        button.secondary:hover {
+            background: var(--list-hover);
         }
         .source-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 8px;
             align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: color-mix(in srgb, var(--input) 70%, transparent);
         }
         .source-url {
             overflow: hidden;
@@ -5040,8 +5130,10 @@ function renderPackageStoreHtml(webview, state) {
             color: var(--input-fg);
             background: var(--input);
             border: 1px solid var(--border);
+            border-radius: 4px;
             outline: none;
         }
+        .source-input:focus { border-color: var(--focus); }
         .cards {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -5056,6 +5148,11 @@ function renderPackageStoreHtml(webview, state) {
             display: flex;
             flex-direction: column;
             gap: 10px;
+            transition: border-color 120ms ease, background 120ms ease;
+        }
+        .card:hover {
+            border-color: color-mix(in srgb, var(--focus) 70%, var(--border));
+            background: color-mix(in srgb, var(--panel) 58%, var(--bg));
         }
         .card-title {
             display: flex;
@@ -5104,14 +5201,19 @@ function renderPackageStoreHtml(webview, state) {
             gap: 8px;
             margin-top: 2px;
         }
+        .actions button {
+            flex: 1 1 112px;
+        }
         .status {
             margin: 0 0 14px;
             color: var(--muted);
+            min-height: 20px;
         }
         .status.error { color: var(--vscode-errorForeground); }
         .empty {
             padding: 34px;
             border: 1px dashed var(--border);
+            border-radius: 6px;
             color: var(--muted);
             text-align: center;
         }
@@ -5122,14 +5224,23 @@ function renderPackageStoreHtml(webview, state) {
             .shell { grid-template-columns: 1fr; }
             aside { border-right: 0; border-bottom: 1px solid var(--border); }
             .toolbar { flex-direction: column; align-items: stretch; }
+            .stats { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="shell">
         <aside>
-            <h1>DreamShader Store</h1>
+            <div class="brand">
+                <div class="brand-mark">DS</div>
+                <h1>Package Store</h1>
+            </div>
             <div class="subtitle">Browse GitHub-hosted DreamShader packages, install shared <code>.dsh</code> libraries, and manage package index sources.</div>
+            <div class="stats">
+                <div class="stat"><strong>${(state.entries || []).length}</strong><span>Packages</span></div>
+                <div class="stat"><strong>${(state.installed || []).length}</strong><span>Installed</span></div>
+                <div class="stat"><strong>${(state.sources || []).length}</strong><span>Sources</span></div>
+            </div>
 
             <h2>Index Sources</h2>
             <div id="sources"></div>
@@ -5305,11 +5416,14 @@ async function installPackageFromRepository(projectRoot, repositorySpecifier, op
 
         if (fs.existsSync(installDirectory) && !options.forceReplace) {
             if (options.askBeforeReplace) {
-                const choice = await vscode.window.showQuickPick(["Replace existing package", "Cancel"], {
+                const choice = await vscode.window.showQuickPick([
+                    { label: "$(replace) Replace existing package", description: manifest.name, value: "replace" },
+                    { label: "$(circle-slash) Cancel", value: "cancel" }
+                ], {
                     title: `Package ${manifest.name} is already installed`,
                     placeHolder: installDirectory
                 });
-                if (choice !== "Replace existing package") {
+                if (!choice || choice.value !== "replace") {
                     throw new Error("Install cancelled.");
                 }
             } else {
@@ -5358,11 +5472,14 @@ async function installPackageFromLocalDirectory(projectRoot, sourceDirectory, op
 
     if (fs.existsSync(installDirectory) && !options.forceReplace) {
         if (options.askBeforeReplace) {
-            const choice = await vscode.window.showQuickPick(["Replace existing package", "Cancel"], {
+            const choice = await vscode.window.showQuickPick([
+                { label: "$(replace) Replace existing package", description: manifest.name, value: "replace" },
+                { label: "$(circle-slash) Cancel", value: "cancel" }
+            ], {
                 title: `Package ${manifest.name} is already installed`,
                 placeHolder: installDirectory
             });
-            if (choice !== "Replace existing package") {
+            if (!choice || choice.value !== "replace") {
                 throw new Error("Install cancelled.");
             }
         } else {
@@ -6129,6 +6246,22 @@ function getBridgeDiagnosticThemeIcon(severity) {
     }
 }
 
+function getBridgeDiagnosticSummaryThemeIcon(counts) {
+    if (!counts || !counts.total) {
+        return new vscode.ThemeIcon("check");
+    }
+    if (counts.error) {
+        return new vscode.ThemeIcon("error");
+    }
+    if (counts.warning) {
+        return new vscode.ThemeIcon("warning");
+    }
+    if (counts.information) {
+        return new vscode.ThemeIcon("info");
+    }
+    return new vscode.ThemeIcon("lightbulb");
+}
+
 function getBridgeDiagnosticsSummaryForProject(state, projectRoot) {
     if (state && projectRoot) {
         const normalizedProjectRoot = normalizeFsPath(projectRoot);
@@ -6179,8 +6312,8 @@ function createBridgeDiagnosticsTreeProvider(state) {
 function createBridgeDiagnosticsPlaceholder(state) {
     return {
         type: "placeholder",
-        label: state && state.hasAnyBridgeFile ? "No bridge diagnostics" : "Waiting for Unreal bridge diagnostics",
-        description: state && state.hasAnyBridgeFile ? "Bridge is clean" : "No diagnostics file detected yet",
+        label: state && state.hasAnyBridgeFile ? "Bridge is clean" : "Waiting for Unreal bridge diagnostics",
+        description: state && state.hasAnyBridgeFile ? "No active issues" : "No diagnostics file detected yet",
         tooltip: state && state.hasAnyBridgeFile
             ? "DreamShader bridge diagnostics are currently clean."
             : "Compile a DreamShader material in Unreal to populate Saved/DreamShader/Bridge/diagnostics.json."
@@ -6198,7 +6331,8 @@ function buildBridgeDiagnosticsTreeItem(element) {
                 ? vscode.TreeItemCollapsibleState.Expanded
                 : vscode.TreeItemCollapsibleState.Collapsed;
             const item = new vscode.TreeItem(element.label, collapsibleState);
-            item.iconPath = new vscode.ThemeIcon("folder-library");
+            item.iconPath = getBridgeDiagnosticSummaryThemeIcon(element.counts);
+            item.contextValue = "dreamshaderBridgeProject";
             item.description = formatBridgeDiagnosticCountSummary(element.counts);
             item.tooltip = new vscode.MarkdownString([
                 `**${element.label}**`,
@@ -6216,6 +6350,8 @@ function buildBridgeDiagnosticsTreeItem(element) {
                 : vscode.TreeItemCollapsibleState.Collapsed;
             const item = new vscode.TreeItem(element.label, collapsibleState);
             item.resourceUri = vscode.Uri.file(element.filePath);
+            item.iconPath = getBridgeDiagnosticSummaryThemeIcon(element.counts);
+            item.contextValue = "dreamshaderBridgeFile";
             item.description = element.relativeDirectory
                 ? `${element.relativeDirectory} • ${formatBridgeDiagnosticCountSummary(element.counts)}`
                 : formatBridgeDiagnosticCountSummary(element.counts);
@@ -6240,6 +6376,7 @@ function buildBridgeDiagnosticsTreeItem(element) {
         case "diagnostic": {
             const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
             item.iconPath = getBridgeDiagnosticThemeIcon(element.severity);
+            item.contextValue = "dreamshaderBridgeDiagnostic";
             item.description = formatBridgeDiagnosticEntryDescription(element);
             item.tooltip = createBridgeDiagnosticEntryTooltip(element);
             item.command = {
@@ -6252,6 +6389,7 @@ function buildBridgeDiagnosticsTreeItem(element) {
         case "meta": {
             const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
             item.iconPath = getBridgeDiagnosticThemeIcon(element.severity);
+            item.contextValue = "dreamshaderBridgeMeta";
             item.description = element.description || "";
             item.tooltip = new vscode.MarkdownString([
                 `**${element.label}**`,
@@ -6270,7 +6408,9 @@ function buildBridgeDiagnosticsTreeItem(element) {
         }
         default: {
             const item = new vscode.TreeItem(element.label || "Bridge Diagnostics", vscode.TreeItemCollapsibleState.None);
-            item.iconPath = new vscode.ThemeIcon("info");
+            item.iconPath = element.type === "placeholder" && element.label === "Bridge is clean"
+                ? new vscode.ThemeIcon("check")
+                : new vscode.ThemeIcon("info");
             item.description = element.description || "";
             item.tooltip = element.tooltip || "";
             return item;
