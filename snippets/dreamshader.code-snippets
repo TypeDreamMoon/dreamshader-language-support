@@ -21,7 +21,7 @@
       "\t\tBase.BaseColor = ${4:OutColor};",
       "\t}",
       "",
-      "\tCode = {",
+      "\tGraph = {",
       "\t\t${4:OutColor} = ${3:InTint};",
       "\t}",
       "}"
@@ -91,22 +91,22 @@
       "\t\t${4:float} ${5:Result};",
       "\t}",
       "",
-      "\tCode = {",
+      "\tGraph = {",
       "\t\t${5:Result} = ${3:Value};",
       "\t}",
       "}"
     ],
     "description": "Create a DreamShader MaterialFunction asset"
   },
-  "DreamShader Code Block": {
+  "DreamShader Graph Block": {
     "scope": "dreamshaderlang",
-    "prefix": "codeblock",
+    "prefix": "graphblock",
     "body": [
-      "Code = {",
+      "Graph = {",
       "\t$0",
       "}"
     ],
-    "description": "Create a Code block"
+    "description": "Create a Graph block"
   },
   "DreamShader UE Panner": {
     "scope": "dreamshaderlang",

@@ -19,7 +19,7 @@ const LEGACY_SECTION_NAMES = [
     "Properties",
     "Settings",
     "Outputs",
-    "Code",
+    "Graph",
     "Inputs"
 ];
 
@@ -445,7 +445,8 @@ const HOVER_DOCS = new Map([
     ["properties", "Declares user inputs or UE-generated property nodes."],
     ["settings", "Declares Unreal material or ShaderFunction settings."],
     ["outputs", "Declares shader outputs or ShaderFunction result pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
-    ["code", "Inside `Shader` or `ShaderFunction`, `Code` is DreamShader graph code. Put complex flow logic inside `Function` blocks."],
+    ["graph", "Inside `Shader` or `ShaderFunction`, `Graph` is DreamShader graph code. It supports basic `if` / `else`; put loops and complex flow logic inside `Function` blocks."],
+    ["code", "`Code` is kept for Function helper code only. Use `Graph = { ... }` inside `Shader` or `ShaderFunction`."],
     ["inputs", "ShaderFunction input pin list."],
     ["outputtype", "Required for generic `UE.Expression(...)` or reflected `UE.ClassName(...)` calls."],
     ["resulttype", "Alias of `OutputType` for generic MaterialExpression calls."],
@@ -461,8 +462,8 @@ const HOVER_DOCS = new Map([
 ]);
 
 const BLOCK_SECTION_RULES = new Map([
-    ["Shader", new Set(["Properties", "Settings", "Outputs", "Code"])],
-    ["ShaderFunction", new Set(["Inputs", "Outputs", "Settings", "Code"])]
+    ["Shader", new Set(["Properties", "Settings", "Outputs", "Graph"])],
+    ["ShaderFunction", new Set(["Inputs", "Outputs", "Settings", "Graph"])]
 ]);
 
 const SCALAR_TYPE_NAMES = new Set([
@@ -1226,7 +1227,7 @@ function addKeywordItems(items, context) {
         ["Function SelfContained", "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
-        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\")\n{\n    Inputs = {\n        $2\n    }\n\n    Outputs = {\n        $3\n    }\n\n    Code = {\n        $0\n    }\n}"]
+        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\")\n{\n    Inputs = {\n        $2\n    }\n\n    Outputs = {\n        $3\n    }\n\n    Graph = {\n        $0\n    }\n}"]
     ];
 
     if (context.inFunctionBody || context.inFunctionSignature || context.currentSection) {
@@ -1411,7 +1412,7 @@ function analyzeDocument(document, position) {
     const inFunctionSignature = Boolean(currentFunction && offset > currentFunction.paramOpenOffset && offset < currentFunction.paramCloseOffset);
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
     const inRawHlslContext = inFunctionBody;
-    const inGraphCode = currentSection === "Code";
+    const inGraphCode = currentSection === "Graph";
     const inImportLine = /^\s*import\b/i.test(linePrefix.trimStart());
 
     return {
@@ -1452,7 +1453,7 @@ function findCurrentLegacyTopLevelBlock(prefix) {
 }
 
 function findCurrentLegacySection(prefix) {
-    const sectionRegex = /\b(Properties|Settings|Outputs|Code|Inputs)\s*=\s*\{/g;
+    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Inputs)\s*=\s*\{/g;
     let current = "";
     for (const match of prefix.matchAll(sectionRegex)) {
         current = match[1];
@@ -2016,6 +2017,146 @@ function splitStatementsWithOffsets(text, baseOffset) {
         ...segment,
         terminated: segment.terminated !== false
     }));
+}
+
+function findGraphIfStatementEnd(text, ifIndex) {
+    if (!matchKeywordAt(text, ifIndex, "if")) {
+        return -1;
+    }
+
+    let cursor = skipWhitespace(text, ifIndex + 2);
+    if (text[cursor] !== "(") {
+        return -1;
+    }
+
+    const conditionClose = findMatchingDelimiter(text, cursor, "(", ")");
+    if (conditionClose === -1) {
+        return -1;
+    }
+
+    cursor = skipWhitespace(text, conditionClose + 1);
+    if (text[cursor] !== "{") {
+        return -1;
+    }
+
+    const bodyClose = findMatchingDelimiter(text, cursor, "{", "}");
+    if (bodyClose === -1) {
+        return -1;
+    }
+
+    cursor = skipWhitespace(text, bodyClose + 1);
+    if (!matchKeywordAt(text, cursor, "else")) {
+        return bodyClose + 1;
+    }
+
+    cursor = skipWhitespace(text, cursor + 4);
+    if (matchKeywordAt(text, cursor, "if")) {
+        return findGraphIfStatementEnd(text, cursor);
+    }
+
+    if (text[cursor] !== "{") {
+        return -1;
+    }
+
+    const elseClose = findMatchingDelimiter(text, cursor, "{", "}");
+    return elseClose === -1 ? -1 : elseClose + 1;
+}
+
+function splitGraphStatementsWithOffsets(text, baseOffset) {
+    const normalizedText = stripCommentsPreserveLayout(text);
+    const statements = [];
+    let startIndex = 0;
+    let parenDepth = 0;
+    let braceDepth = 0;
+    let bracketDepth = 0;
+    let inString = false;
+
+    const pushStatement = (endIndex, terminated) => {
+        const raw = normalizedText.slice(startIndex, endIndex);
+        const trimmedStartDelta = raw.search(/\S|$/);
+        const trimmedEndDelta = raw.length - raw.trimEnd().length;
+        const trimmed = raw.trim();
+        if (trimmed) {
+            statements.push({
+                text: trimmed,
+                startOffset: baseOffset + startIndex + trimmedStartDelta,
+                endOffset: baseOffset + endIndex - trimmedEndDelta,
+                terminated
+            });
+        }
+    };
+
+    for (let index = 0; index < normalizedText.length; index += 1) {
+        const char = normalizedText[index];
+
+        if (inString) {
+            if (char === "\\") {
+                index += 1;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            continue;
+        }
+
+        if (parenDepth === 0 && braceDepth === 0 && bracketDepth === 0 && matchKeywordAt(normalizedText, index, "if")) {
+            const ifEndIndex = findGraphIfStatementEnd(normalizedText, index);
+            if (ifEndIndex !== -1) {
+                pushStatement(ifEndIndex, true);
+                startIndex = ifEndIndex;
+                index = ifEndIndex - 1;
+                continue;
+            }
+        }
+
+        if (char === "(") {
+            parenDepth += 1;
+            continue;
+        }
+        if (char === ")") {
+            parenDepth = Math.max(0, parenDepth - 1);
+            continue;
+        }
+        if (char === "{") {
+            braceDepth += 1;
+            continue;
+        }
+        if (char === "}") {
+            braceDepth = Math.max(0, braceDepth - 1);
+            continue;
+        }
+        if (char === "[") {
+            bracketDepth += 1;
+            continue;
+        }
+        if (char === "]") {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+            continue;
+        }
+
+        if (char === ";" && parenDepth === 0 && braceDepth === 0 && bracketDepth === 0) {
+            pushStatement(index, true);
+            startIndex = index + 1;
+        }
+    }
+
+    const trailingRaw = normalizedText.slice(startIndex);
+    if (trailingRaw.trim()) {
+        const trimmedStartDelta = trailingRaw.search(/\S|$/);
+        const trimmedEndDelta = trailingRaw.length - trailingRaw.trimEnd().length;
+        statements.push({
+            text: trailingRaw.trim(),
+            startOffset: baseOffset + startIndex + trimmedStartDelta,
+            endOffset: baseOffset + normalizedText.length - trimmedEndDelta,
+            terminated: false
+        });
+    }
+
+    return statements;
 }
 
 function splitTopLevelAssignment(text) {
@@ -2761,7 +2902,7 @@ function collectVisibleIdentifierEntries(context) {
         return Array.from(entries.values());
     }
 
-    if (currentSectionInfo.name === "Code") {
+    if (currentSectionInfo.name === "Graph") {
         addSectionDeclarationEntries(
             entries,
             sectionMap.get(primaryDeclarationSectionName),
@@ -2847,7 +2988,7 @@ function addGraphCodeEntries(entries, codeSection, cutoffOffset, reachableCallab
     }
 
     const visibleText = codeSection.bodyText.slice(0, Math.max(0, cutoffOffset - (codeSection.bodyOpenOffset + 1)));
-    const statements = splitStatementsWithOffsets(visibleText, codeSection.bodyOpenOffset + 1);
+    const statements = splitGraphStatementsWithOffsets(visibleText, codeSection.bodyOpenOffset + 1);
     for (const statement of statements) {
         const declarations = parseCodeDeclarationEntries(statement.text, statement.startOffset);
         if (declarations.length > 0) {
@@ -2856,7 +2997,7 @@ function addGraphCodeEntries(entries, codeSection, cutoffOffset, reachableCallab
                     continue;
                 }
 
-                addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} Code local variable`);
+                addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} Graph local variable`);
             }
             continue;
         }
@@ -2878,7 +3019,7 @@ function addGraphCodeEntries(entries, codeSection, cutoffOffset, reachableCallab
                 continue;
             }
 
-            addVisibleIdentifierEntry(entries, argument.valueText, `${signature.outputs[index].type} Code out variable`);
+            addVisibleIdentifierEntry(entries, argument.valueText, `${signature.outputs[index].type} Graph out variable`);
         }
     }
 }
@@ -3120,7 +3261,7 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
         diagnostics.push(...validateSettingsSection(document, settingsSection));
     }
 
-    const codeSection = seenSections.get("Code")?.[0];
+    const codeSection = seenSections.get("Graph")?.[0];
     if (codeSection) {
         diagnostics.push(...analyzeCodeSection(document, codeSection, symbols, reachableCallables));
     }
@@ -3256,16 +3397,153 @@ function validateSettingsSection(document, section) {
 }
 
 function analyzeCodeSection(document, section, symbols, reachableCallables) {
+    return analyzeGraphStatements(document, section.bodyText, section.bodyOpenOffset + 1, symbols, reachableCallables);
+}
+
+function isGraphIfStatementText(text) {
+    const leadingWhitespace = text.search(/\S/);
+    return leadingWhitespace >= 0 && matchKeywordAt(text, leadingWhitespace, "if");
+}
+
+function trimTextWithOffset(text, baseOffset) {
+    const leading = text.search(/\S|$/);
+    const trailing = text.length - text.trimEnd().length;
+    return {
+        text: text.trim(),
+        offset: baseOffset + leading,
+        endOffset: baseOffset + text.length - trailing
+    };
+}
+
+function parseGraphIfStatementText(text, baseOffset) {
+    let cursor = skipWhitespace(text, 0);
+    if (!matchKeywordAt(text, cursor, "if")) {
+        return null;
+    }
+
+    cursor = skipWhitespace(text, cursor + 2);
+    if (text[cursor] !== "(") {
+        return { error: "Graph if statement is missing a condition block.", startOffset: baseOffset + cursor, endOffset: baseOffset + Math.min(text.length, cursor + 1) };
+    }
+
+    const conditionOpen = cursor;
+    const conditionClose = findMatchingDelimiter(text, conditionOpen, "(", ")");
+    if (conditionClose === -1) {
+        return { error: "Graph if statement has an unterminated condition block.", startOffset: baseOffset + conditionOpen, endOffset: baseOffset + text.length };
+    }
+
+    const condition = trimTextWithOffset(text.slice(conditionOpen + 1, conditionClose), baseOffset + conditionOpen + 1);
+    cursor = skipWhitespace(text, conditionClose + 1);
+    if (text[cursor] !== "{") {
+        return { error: "Graph if statement is missing a '{ ... }' body.", startOffset: baseOffset + cursor, endOffset: baseOffset + Math.min(text.length, cursor + 1) };
+    }
+
+    const thenOpen = cursor;
+    const thenClose = findMatchingDelimiter(text, thenOpen, "{", "}");
+    if (thenClose === -1) {
+        return { error: "Graph if statement has an unterminated body block.", startOffset: baseOffset + thenOpen, endOffset: baseOffset + text.length };
+    }
+
+    const parsed = {
+        conditionText: condition.text,
+        conditionOffset: condition.offset,
+        thenText: text.slice(thenOpen + 1, thenClose),
+        thenOffset: baseOffset + thenOpen + 1,
+        elseText: "",
+        elseOffset: -1
+    };
+
+    cursor = skipWhitespace(text, thenClose + 1);
+    if (matchKeywordAt(text, cursor, "else")) {
+        cursor = skipWhitespace(text, cursor + 4);
+        if (matchKeywordAt(text, cursor, "if")) {
+            parsed.elseText = text.slice(cursor);
+            parsed.elseOffset = baseOffset + cursor;
+            return parsed;
+        }
+
+        if (text[cursor] !== "{") {
+            return { error: "Graph else statement is missing a '{ ... }' body.", startOffset: baseOffset + cursor, endOffset: baseOffset + Math.min(text.length, cursor + 1) };
+        }
+
+        const elseOpen = cursor;
+        const elseClose = findMatchingDelimiter(text, elseOpen, "{", "}");
+        if (elseClose === -1) {
+            return { error: "Graph else statement has an unterminated body block.", startOffset: baseOffset + elseOpen, endOffset: baseOffset + text.length };
+        }
+
+        parsed.elseText = text.slice(elseOpen + 1, elseClose);
+        parsed.elseOffset = baseOffset + elseOpen + 1;
+        cursor = skipWhitespace(text, elseClose + 1);
+    }
+
+    if (text.slice(cursor).trim()) {
+        return { error: `Unexpected text after Graph if statement: '${text.slice(cursor).trim()}'.`, startOffset: baseOffset + cursor, endOffset: baseOffset + text.length };
+    }
+
+    return parsed;
+}
+
+function analyzeGraphIfStatement(document, statement, symbols, reachableCallables) {
     const diagnostics = [];
-    const statements = splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
+    const parsed = parseGraphIfStatementText(statement.text, statement.startOffset);
+    if (!parsed || parsed.error) {
+        diagnostics.push(makeOffsetDiagnostic(
+            document,
+            parsed?.startOffset ?? statement.startOffset,
+            parsed?.endOffset ?? statement.endOffset,
+            parsed?.error || `Invalid Graph if statement '${statement.text}'.`));
+        return diagnostics;
+    }
+
+    if (!parsed.conditionText) {
+        diagnostics.push(makeOffsetDiagnostic(
+            document,
+            statement.startOffset,
+            statement.endOffset,
+            "Graph if condition is empty."));
+    } else {
+        diagnostics.push(...analyzeExpressionText(document, parsed.conditionText, parsed.conditionOffset, symbols, reachableCallables, "value"));
+    }
+
+    const thenSymbols = new Map(symbols);
+    diagnostics.push(...analyzeGraphStatements(document, parsed.thenText, parsed.thenOffset, thenSymbols, reachableCallables));
+
+    const elseSymbols = new Map(symbols);
+    if (parsed.elseText) {
+        diagnostics.push(...analyzeGraphStatements(document, parsed.elseText, parsed.elseOffset, elseSymbols, reachableCallables));
+    }
+
+    for (const [key, value] of thenSymbols.entries()) {
+        if (!symbols.has(key)) {
+            symbols.set(key, value);
+        }
+    }
+    for (const [key, value] of elseSymbols.entries()) {
+        if (!symbols.has(key)) {
+            symbols.set(key, value);
+        }
+    }
+
+    return diagnostics;
+}
+
+function analyzeGraphStatements(document, bodyText, baseOffset, symbols, reachableCallables) {
+    const diagnostics = [];
+    const statements = splitGraphStatementsWithOffsets(bodyText, baseOffset);
 
     for (const statement of statements) {
+        if (isGraphIfStatementText(statement.text)) {
+            diagnostics.push(...analyzeGraphIfStatement(document, statement, symbols, reachableCallables));
+            continue;
+        }
+
         if (!statement.terminated) {
             diagnostics.push(makeOffsetDiagnostic(
                 document,
                 statement.startOffset,
                 statement.endOffset,
-                "Code statement is missing a trailing ';'."));
+                "Graph statement is missing a trailing ';'."));
         }
 
         const declarations = parseCodeDeclarationEntries(statement.text, statement.startOffset);
@@ -3277,7 +3555,7 @@ function analyzeCodeSection(document, section, symbols, reachableCallables) {
                         document,
                         declaration.startOffset,
                         declaration.endOffset,
-                        `Unsupported Code variable type '${declaration.type}' for '${declaration.name}'.`));
+                        `Unsupported Graph variable type '${declaration.type}' for '${declaration.name}'.`));
                     continue;
                 }
 
@@ -3311,7 +3589,7 @@ function analyzeCodeSection(document, section, symbols, reachableCallables) {
                 document,
                 statement.startOffset,
                 statement.endOffset,
-                `Code statement '${statement.text}' must use assignment syntax or a standalone Function call.`));
+                `Graph statement '${statement.text}' must use assignment syntax, if/else syntax, or a standalone Function call.`));
             continue;
         }
 
@@ -3331,7 +3609,7 @@ function analyzeStandaloneFunctionCall(document, callExpression, symbols, reacha
             document,
             callExpression.calleeOffset,
             callExpression.calleeOffset + callExpression.callee.length,
-            `Standalone Code call '${callExpression.callee}(...)' is unsupported. Only DreamShader Function calls may use statement syntax.`));
+            `Standalone Graph call '${callExpression.callee}(...)' is unsupported. Only DreamShader Function calls may use statement syntax.`));
         return diagnostics;
     }
 
@@ -4178,7 +4456,7 @@ Shader(Name="${shaderName}")
         Base.BaseColor = Color;
     }
 
-    Code = {
+    Graph = {
         vec2 uv = UE.TexCoord(Index=0);
         vec3 sampledColor;
         Texture::Sample2DRGB(InTexture, uv, sampledColor);
@@ -4210,7 +4488,7 @@ Shader(Name="${shaderName}")
         Base.EmissiveColor = Color;
     }
 
-    Code = {
+    Graph = {
         vec2 uv = UE.TexCoord(Index=0) * Scale;
         float noiseValue;
         Noise::FBM2D(uv, 5.0, noiseValue);
@@ -4237,7 +4515,7 @@ Shader(Name="${shaderName}")
         Base.EmissiveColor = Color;
     }
 
-    Code = {
+    Graph = {
         Color = InColor;
     }
 }
@@ -4454,7 +4732,7 @@ import "${manifest.name}/${manifest.dreamshader.entry}";
 ## Example
 
 \`\`\`c
-Code = {
+Graph = {
     float3 color = float3(1.0, 0.5, 0.25);
     float3 result;
     ${namespaceName}::Identity(color, result);
@@ -4522,7 +4800,7 @@ Shader(Name="DreamShaderExamples/M_${namespaceName}Preview")
         Base.EmissiveColor = Res;
     }
 
-    Code = {
+    Graph = {
         ${namespaceName}::Identity(InColor, Res);
     }
 }

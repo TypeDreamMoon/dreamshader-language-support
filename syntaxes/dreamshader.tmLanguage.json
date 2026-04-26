@@ -74,7 +74,7 @@
     },
     "sections": {
       "patterns": [
-        { "name": "entity.name.section.dreamshader", "match": "\\b(?:Properties|Settings|Outputs|Code|Inputs)\\b(?=\\s*=\\s*\\{)" }
+        { "name": "entity.name.section.dreamshader", "match": "\\b(?:Properties|Settings|Outputs|Graph|Inputs)\\b(?=\\s*=\\s*\\{)" }
       ]
     },
     "types": {

@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.9`
+- Version：`1.2.11`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -13,6 +13,8 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 支持内容
 
+- `Shader` / `ShaderFunction` 使用 `Graph = { ... }` 作为图构建区块
+- `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
 - 自动补全
@@ -23,7 +25,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Settings` 补全扩展到 PostProcess / Refraction / Mobile / Nanite / Usage / Lightmass / VirtualTexture 等常见材质分类
 - `Settings` 中的对象引用支持 `Path(...)` 风格资产路径
 - `Expression(...).Pin[n]` 输出节点绑定补全与高亮
-- `Code` 区域支持 `float a, b, c = ...;` 这种逗号声明写法
+- `Graph` 区域支持 `float a, b, c = ...;` 这种逗号声明写法
 - `Function SelfContained Foo(...) { ... }` / `Function Inline Foo(...) { ... }` 语法支持
 - 本地递归/循环依赖诊断，包含 `SelfContained` 函数调用环
 - 只打开 `ProjectName/DShader` 工作区时，仍可自动读取 `ProjectName/Saved/DreamShader/Bridge/diagnostics.json`
@@ -41,6 +43,13 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.11 更新
+
+- `Code = { ... }` 语言服务入口更新为 `Graph = { ... }`
+- `Graph` 中的基础 `if` / `else` 可以参与本地诊断和可见变量收集
+- 创建材质、材质函数、纹理采样、噪声材质和 package 示例时默认生成 `Graph`
+- snippets、语法高亮、hover 和错误提示统一使用 `Graph` 文案
 
 ### 语法模型
 
@@ -63,7 +72,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 扩展会尽量按当前位置收集可见符号：
 
 - `Function` 体只补当前函数参数和局部变量
-- `Shader` / `ShaderFunction` 的 `Code` 只补当前 block 可见输入、输出和局部变量
+- `Shader` / `ShaderFunction` 的 `Graph` 只补当前 block 可见输入、输出和局部变量
 - 不再把无关 `Properties` 泄露到不该出现的函数体里
 
 ### 本地诊断
@@ -73,7 +82,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 未解析 `import`
 - 重复函数 / 命名空间函数
 - `Function` 参数声明错误
-- `Code` 中非法语句
+- `Graph` 中非法语句
 - 未知标识符 / 未知函数
 - `out` 参数写法错误
 - `Path(...)` 纹理默认值写法错误
@@ -117,7 +126,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.9.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.11.vsix
 ```
 
 ## 项目根目录

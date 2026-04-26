@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.11
+
+- Renamed Shader and ShaderFunction graph authoring support from `Code = { ... }` to `Graph = { ... }`
+- Added local parsing and diagnostics for basic `Graph` `if` / `else` statements
+- Updated visible-symbol collection so declarations and Function out targets inside Graph branches participate in completion
+- Updated snippets, built-in file templates, hover text, syntax highlighting, and diagnostics to use `Graph` terminology
+
+## 1.2.10
+
+- Updated DreamShaderLang function definition support for the modern `in` / `out` signature model
+- Improved completion and diagnostics around Function definitions and calls
+
 ## 1.2.9
 
 - Added a dedicated `DreamShader Bridge` explorer view that lists Unreal bridge diagnostics by project, source file, and individual issue
