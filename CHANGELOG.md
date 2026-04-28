@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.17
+
+- Added `Root="Plugins.*"` completion and hover compatibility for the same project content plugin targets as `Root="Plugin.*"`
+- Updated extension packaging metadata for the 1.2.17 release
+
 ## 1.2.16
 
 - Added `Root="Plugin.*"` value completion from project plugins that contain a `Content` directory

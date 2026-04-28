@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($VsixPath)) {
-    $VsixPath = Join-Path $PSScriptRoot "dreamshaderlang-language-support-1.2.16.vsix"
+    $VsixPath = Join-Path $PSScriptRoot "dreamshaderlang-language-support-1.2.17.vsix"
 }
 
 if (-not (Test-Path -LiteralPath $VsixPath)) {

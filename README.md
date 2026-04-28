@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.16`
+- Version：`1.2.17`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -44,6 +44,11 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.17 更新
+
+- `Root="Plugins."` 作为兼容写法也支持项目内容插件名补全
+- `Plugin.MoonToon` 与 `Plugins.MoonToon` 都会解析到同一个项目插件内容根
 
 ### 1.2.16 更新
 
@@ -156,7 +161,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.16.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.17.vsix
 ```
 
 ## 项目根目录

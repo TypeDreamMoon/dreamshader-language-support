@@ -442,7 +442,7 @@ const HOVER_DOCS = new Map([
     ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
     ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
-    ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for the project plugin content root `[Project]/Plugins/PluginName/Content`."],
+    ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for the project plugin content root `[Project]/Plugins/PluginName/Content`. `Plugins.PluginName` is also accepted as a compatibility alias."],
     ["properties", "Declares user inputs or UE-generated property nodes."],
     ["settings", "Declares Unreal material or ShaderFunction settings."],
     ["outputs", "Declares shader outputs or ShaderFunction result pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
@@ -1289,7 +1289,7 @@ function addTopLevelAttributeItems(items, context) {
         ]
         : [
             ["Name", "Name=\"${1:Materials/MyMaterial}\"", "Required generated asset path relative to Root."],
-            ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName; plugin roots map to [Project]/Plugins/PluginName/Content."]
+            ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName; Plugins.PluginName is also accepted."]
         ];
 
     for (const [name, snippet, detail] of attributes) {
@@ -1532,7 +1532,7 @@ function getRootPluginValueCompletionInfo(text, offset) {
     }
 
     const valuePrefix = rootMatch[1];
-    const pluginPrefixMatch = /^Plugin\.([^"]*)$/i.exec(valuePrefix);
+    const pluginPrefixMatch = /^Plugins?\.([^"]*)$/i.exec(valuePrefix);
     if (!pluginPrefixMatch) {
         return undefined;
     }
