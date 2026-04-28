@@ -442,7 +442,7 @@ const HOVER_DOCS = new Map([
     ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
     ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
-    ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for a content plugin root."],
+    ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for the project plugin content root `[Project]/Plugins/PluginName/Content`."],
     ["properties", "Declares user inputs or UE-generated property nodes."],
     ["settings", "Declares Unreal material or ShaderFunction settings."],
     ["outputs", "Declares shader outputs or ShaderFunction result pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
@@ -784,6 +784,11 @@ function createCompletionProvider() {
         provideCompletionItems(document, position) {
             const context = analyzeDocument(document, position);
             const items = [];
+
+            addRootPluginValueItems(items, document, context);
+            if (context.inRootPluginValue) {
+                return items;
+            }
 
             if (context.afterUEAccessor && context.inGraphLikeContext) {
                 for (const builtin of UE_BUILTINS) {
@@ -1284,13 +1289,34 @@ function addTopLevelAttributeItems(items, context) {
         ]
         : [
             ["Name", "Name=\"${1:Materials/MyMaterial}\"", "Required generated asset path relative to Root."],
-            ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName."]
+            ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName; plugin roots map to [Project]/Plugins/PluginName/Content."]
         ];
 
     for (const [name, snippet, detail] of attributes) {
         const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Property);
         item.insertText = new vscode.SnippetString(snippet);
         item.detail = detail;
+        items.push(item);
+    }
+}
+
+function addRootPluginValueItems(items, document, context) {
+    if (!context.inRootPluginValue || !context.rootPluginValueInfo) {
+        return;
+    }
+
+    const projectRoot = findProjectRoot(document.uri.fsPath);
+    const pluginNames = collectProjectContentPluginNames(projectRoot);
+    const range = new vscode.Range(
+        document.positionAt(context.rootPluginValueInfo.replaceStartOffset),
+        document.positionAt(context.rootPluginValueInfo.replaceEndOffset));
+
+    for (const pluginName of pluginNames) {
+        const item = new vscode.CompletionItem(pluginName, vscode.CompletionItemKind.Module);
+        item.insertText = pluginName;
+        item.range = range;
+        item.detail = "Project content plugin";
+        item.documentation = new vscode.MarkdownString(`Maps to \`[Project]/Plugins/${pluginName}/Content\`.`);
         items.push(item);
     }
 }
@@ -1446,6 +1472,7 @@ function analyzeDocument(document, position) {
     const currentSection = currentSectionInfo ? currentSectionInfo.name : "";
     const currentFunction = findInnermostFunctionDefinition(text, offset);
     const topLevelAttributeKind = getTopLevelAttributeKindAtOffset(text, offset);
+    const rootPluginValueInfo = getRootPluginValueCompletionInfo(text, offset);
     const inFunctionSignature = Boolean(currentFunction && offset > currentFunction.paramOpenOffset && offset < currentFunction.paramCloseOffset);
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
     const inRawHlslContext = inFunctionBody;
@@ -1462,6 +1489,7 @@ function analyzeDocument(document, position) {
         currentLegacyBlock,
         currentSectionInfo,
         topLevelAttributeKind,
+        rootPluginValueInfo,
         linePrefix,
         inFunctionSignature,
         inFunctionBody,
@@ -1473,9 +1501,47 @@ function analyzeDocument(document, position) {
         inMaterialOutputs: currentSection === "Outputs" && currentBlock === "Shader",
         inGraphLikeContext: inGraphCode || currentSection === "Properties",
         inTopLevelAttributeList: Boolean(topLevelAttributeKind),
+        inRootPluginValue: Boolean(rootPluginValueInfo),
         inImportLine,
         afterUEAccessor: /UE\.\w*$/.test(linePrefix),
         afterOutputExpressionAccessor: currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix)
+    };
+}
+
+function getRootPluginValueCompletionInfo(text, offset) {
+    const prefix = text.slice(0, offset);
+    const matches = Array.from(prefix.matchAll(/\b(ShaderFunction|Shader)\s*\(/g));
+    if (matches.length === 0) {
+        return undefined;
+    }
+
+    const match = matches[matches.length - 1];
+    const openIndex = text.indexOf("(", match.index);
+    if (openIndex === -1 || openIndex >= offset) {
+        return undefined;
+    }
+
+    const tail = text.slice(openIndex + 1, offset);
+    if (tail.includes(")") || tail.includes("{")) {
+        return undefined;
+    }
+
+    const rootMatch = /(?:^|[,\s])Root\s*=\s*"([^"]*)$/i.exec(tail);
+    if (!rootMatch) {
+        return undefined;
+    }
+
+    const valuePrefix = rootMatch[1];
+    const pluginPrefixMatch = /^Plugin\.([^"]*)$/i.exec(valuePrefix);
+    if (!pluginPrefixMatch) {
+        return undefined;
+    }
+
+    const typedPluginName = pluginPrefixMatch[1];
+    return {
+        typedPluginName,
+        replaceStartOffset: offset - typedPluginName.length,
+        replaceEndOffset: offset
     };
 }
 
@@ -7109,6 +7175,50 @@ function getConfiguredProjectRoot() {
     }
 
     return fs.existsSync(configuredRoot) ? normalizeFsPath(configuredRoot) : "";
+}
+
+function collectProjectContentPluginNames(projectRoot) {
+    if (!projectRoot) {
+        return [];
+    }
+
+    const pluginsDirectory = path.join(projectRoot, "Plugins");
+    const pluginNames = new Set();
+    collectProjectContentPluginNamesFromDirectory(pluginsDirectory, pluginNames, 0);
+    return Array.from(pluginNames).sort((left, right) => left.localeCompare(right));
+}
+
+function collectProjectContentPluginNamesFromDirectory(directory, pluginNames, depth) {
+    if (depth > 3) {
+        return;
+    }
+
+    let entries;
+    try {
+        entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch (_error) {
+        return;
+    }
+
+    const hasDescriptor = entries.some((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".uplugin"));
+    const hasContentDirectory = entries.some((entry) => entry.isDirectory() && entry.name.toLowerCase() === "content");
+    if (hasDescriptor && hasContentDirectory) {
+        pluginNames.add(path.basename(directory));
+        return;
+    }
+
+    for (const entry of entries) {
+        if (!entry.isDirectory()) {
+            continue;
+        }
+
+        const lowerName = entry.name.toLowerCase();
+        if (lowerName === "content" || lowerName === "binaries" || lowerName === "intermediate" || lowerName === "saved") {
+            continue;
+        }
+
+        collectProjectContentPluginNamesFromDirectory(path.join(directory, entry.name), pluginNames, depth + 1);
+    }
 }
 
 function findProjectRoot(seedPath) {

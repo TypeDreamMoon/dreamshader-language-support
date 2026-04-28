@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.16
+
+- Added `Root="Plugin.*"` value completion from project plugins that contain a `Content` directory
+- Updated extension packaging metadata for the 1.2.16 release
+
+## 1.2.15
+
+- Clarified `Root="Plugin.PluginName"` documentation as a project content plugin target under `[Project]/Plugins/PluginName/Content`
+- Updated extension packaging metadata for the 1.2.15 release
+
 ## 1.2.14
 
 - Added completion, hover, snippet, and syntax-highlighting support for the `Root` top-level attribute on `Shader` and `ShaderFunction`
