@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.14
+
+- Added completion, hover, snippet, and syntax-highlighting support for the `Root` top-level attribute on `Shader` and `ShaderFunction`
+- Updated Shader and ShaderFunction block detection so `Name` can appear after other attributes such as `Root`
+- Updated extension packaging metadata for the 1.2.14 release
+
 ## 1.2.13
 
 - Added a GitHub Actions release workflow that packages the VSCode extension after pushes to `main`

@@ -442,6 +442,7 @@ const HOVER_DOCS = new Map([
     ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
     ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
+    ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for a content plugin root."],
     ["properties", "Declares user inputs or UE-generated property nodes."],
     ["settings", "Declares Unreal material or ShaderFunction settings."],
     ["outputs", "Declares shader outputs or ShaderFunction result pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
@@ -803,6 +804,7 @@ function createCompletionProvider() {
             }
 
             addKeywordItems(items, context);
+            addTopLevelAttributeItems(items, context);
             addImportItems(items, context);
             addTypeItems(items, context);
             addQualifierItems(items, context);
@@ -1234,15 +1236,15 @@ function createFormattingProvider() {
 
 function addKeywordItems(items, context) {
     const keywordEntries = [
-        ["Shader", "Shader(Name=\"Materials/${1:MyMaterial}\")\n{\n    $0\n}"],
+        ["Shader", "Shader(Name=\"Materials/${1:MyMaterial}\", Root=\"${2:Game}\")\n{\n    $0\n}"],
         ["Function", "Function ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Function SelfContained", "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
-        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\")\n{\n    Inputs = {\n        $2\n    }\n\n    Outputs = {\n        $3\n    }\n\n    Graph = {\n        $0\n    }\n}"]
+        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Inputs = {\n        $3\n    }\n\n    Outputs = {\n        $4\n    }\n\n    Graph = {\n        $0\n    }\n}"]
     ];
 
-    if (context.inFunctionBody || context.inFunctionSignature || context.currentSection) {
+    if (context.inTopLevelAttributeList || context.inFunctionBody || context.inFunctionSignature || context.currentSection) {
         return;
     }
 
@@ -1267,6 +1269,28 @@ function addKeywordItems(items, context) {
 
         const item = new vscode.CompletionItem(sectionName, vscode.CompletionItemKind.Module);
         item.insertText = new vscode.SnippetString(`${sectionName} = {\n    $0\n}`);
+        items.push(item);
+    }
+}
+
+function addTopLevelAttributeItems(items, context) {
+    if (!context.inTopLevelAttributeList) {
+        return;
+    }
+
+    const attributes = context.topLevelAttributeKind === "Namespace"
+        ? [
+            ["Name", "Name=\"${1:Common}\"", "Required Namespace name."]
+        ]
+        : [
+            ["Name", "Name=\"${1:Materials/MyMaterial}\"", "Required generated asset path relative to Root."],
+            ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName."]
+        ];
+
+    for (const [name, snippet, detail] of attributes) {
+        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Property);
+        item.insertText = new vscode.SnippetString(snippet);
+        item.detail = detail;
         items.push(item);
     }
 }
@@ -1421,6 +1445,7 @@ function analyzeDocument(document, position) {
     const currentBlock = currentLegacyBlock ? currentLegacyBlock.kind : "";
     const currentSection = currentSectionInfo ? currentSectionInfo.name : "";
     const currentFunction = findInnermostFunctionDefinition(text, offset);
+    const topLevelAttributeKind = getTopLevelAttributeKindAtOffset(text, offset);
     const inFunctionSignature = Boolean(currentFunction && offset > currentFunction.paramOpenOffset && offset < currentFunction.paramCloseOffset);
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
     const inRawHlslContext = inFunctionBody;
@@ -1436,6 +1461,7 @@ function analyzeDocument(document, position) {
         currentFunction,
         currentLegacyBlock,
         currentSectionInfo,
+        topLevelAttributeKind,
         linePrefix,
         inFunctionSignature,
         inFunctionBody,
@@ -1446,10 +1472,27 @@ function analyzeDocument(document, position) {
         inOutputs: currentSection === "Outputs",
         inMaterialOutputs: currentSection === "Outputs" && currentBlock === "Shader",
         inGraphLikeContext: inGraphCode || currentSection === "Properties",
+        inTopLevelAttributeList: Boolean(topLevelAttributeKind),
         inImportLine,
         afterUEAccessor: /UE\.\w*$/.test(linePrefix),
         afterOutputExpressionAccessor: currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix)
     };
+}
+
+function getTopLevelAttributeKindAtOffset(text, offset) {
+    const prefix = text.slice(0, offset);
+    const matches = Array.from(prefix.matchAll(/\b(ShaderFunction|Shader|Namespace)\s*\(/g));
+    if (matches.length === 0) {
+        return "";
+    }
+
+    const match = matches[matches.length - 1];
+    const tail = text.slice(match.index + match[0].length, offset);
+    if (tail.includes(")") || tail.includes("{")) {
+        return "";
+    }
+
+    return match[1];
 }
 
 function findCurrentLegacyTopLevelBlock(prefix) {
@@ -1476,9 +1519,7 @@ function findCurrentLegacySection(prefix) {
 function parseTopLevelBlocks(text) {
     const blocks = [];
 
-    for (const match of text.matchAll(/\bShader\s*\(\s*Name\s*=\s*"([^"]+)"/g)) {
-        blocks.push(makeSimpleBlock("Shader", match[1], match.index, text, "{", "}"));
-    }
+    blocks.push(...parseNamedLegacyBlocks(text, "Shader"));
 
     for (const namespaceBlock of parseNamespaceBlocks(text)) {
         blocks.push(namespaceBlock);
@@ -1493,9 +1534,7 @@ function parseTopLevelBlocks(text) {
         });
     }
 
-    for (const match of text.matchAll(/\bShaderFunction\s*\(\s*Name\s*=\s*"([^"]+)"/g)) {
-        blocks.push(makeSimpleBlock("ShaderFunction", match[1], match.index, text, "{", "}"));
-    }
+    blocks.push(...parseNamedLegacyBlocks(text, "ShaderFunction"));
 
     return blocks.filter(Boolean).sort((a, b) => a.startOffset - b.startOffset);
 }
@@ -1727,24 +1766,33 @@ function parseImportStatements(text) {
 }
 
 function parseNamedLegacyBlocks(text, kind) {
-    let regex;
-    if (kind === "Shader") {
-        regex = /\bShader\s*\(\s*Name\s*=\s*"([^"]+)"/g;
-
-    } else if (kind === "ShaderFunction") {
-        regex = /\bShaderFunction\s*\(\s*Name\s*=\s*"([^"]+)"/g;
-    } else {
+    if (kind !== "Shader" && kind !== "ShaderFunction") {
         return [];
     }
 
     const blocks = [];
+    const regex = new RegExp(`\\b${kind}\\s*\\(`, "g");
     for (const match of text.matchAll(regex)) {
-        const block = makeSimpleBlock(kind, match[1], match.index, text, "{", "}");
+        const openIndex = text.indexOf("(", match.index);
+        const closeIndex = findMatchingDelimiter(text, openIndex, "(", ")");
+        const attributeText = closeIndex === -1 ? text.slice(openIndex + 1) : text.slice(openIndex + 1, closeIndex);
+        const name = extractStringAttribute(attributeText, "Name");
+        if (!name) {
+            continue;
+        }
+
+        const block = makeSimpleBlock(kind, name, match.index, text, "{", "}");
         if (block) {
             blocks.push(block);
         }
     }
     return blocks;
+}
+
+function extractStringAttribute(attributeText, attributeName) {
+    const regex = new RegExp(`\\b${attributeName}\\s*=\\s*"([^"]*)"`, "i");
+    const match = regex.exec(attributeText);
+    return match ? match[1] : "";
 }
 
 function skipTrivia(text, index, endIndex = text.length) {

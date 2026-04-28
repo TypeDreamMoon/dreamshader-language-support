@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.13`
+- Version：`1.2.14`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -14,6 +14,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 ## 支持内容
 
 - `Shader` / `ShaderFunction` 使用 `Graph = { ... }` 作为图构建区块
+- `Shader` / `ShaderFunction` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
@@ -43,6 +44,12 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.14 更新
+
+- 新增 `Root` 顶层属性支持，用于 `Shader` / `ShaderFunction` 生成资产根路径
+- `Root` 支持补全、Hover、snippets 和语法高亮
+- `Shader(Root="...", Name="...")` 这种属性顺序现在也能被 CodeLens 和本地结构分析识别
 
 ### 1.2.13 更新
 
@@ -139,7 +146,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.13.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.14.vsix
 ```
 
 ## 项目根目录
