@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.20
+
+- Added Semantic Tokens for DreamShaderLang symbols, types, parameters, material outputs, and UE builtin calls
+- Added parameter inlay hints for DreamShader Function, ShaderFunction, VirtualFunction, and UE builtin calls
+- Added clickable document links for resolved `import` headers and folding ranges for top-level blocks and legacy sections
+- Improved document symbols with nested section declarations for a richer Outline view
+- Updated `import "Header.dsh"` parsing to accept optional trailing semicolons
+- Removed the duplicate `dreamshader.packageUninstall` command alias and cleaned ignored historical VSIX build artifacts
+
 ## 1.2.19
 
 - Added codicon thumbnails to DreamShader command contributions so editor title, view title, and context-menu shortcuts render as compact icon actions

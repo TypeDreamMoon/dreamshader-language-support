@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.19`
+- Version：`1.2.20`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -19,8 +19,12 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
+- Semantic Tokens 语义高亮，能区分类型、函数、参数、变量、材质输出和 UE 内置调用
 - 自动补全
 - 作用域感知变量补全
+- 函数调用参数 Inlay Hints
+- `import` 路径可点击跳转
+- `Shader` / `ShaderFunction` / `VirtualFunction` / `Function` / `Namespace` 和区块折叠
 - `Function` / `Namespace::Function` / `import` / `Path(...)` 联想
 - `UE.*` 内置材质节点补全、Hover、Signature Help
 - `Settings` 支持 `TranslucencyLightingMode` / `LightingMode`
@@ -45,6 +49,14 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.20 更新
+
+- 新增 Semantic Tokens 语义高亮，让类型、函数、参数、变量、材质输出和 UE 内置调用有更明确的编辑器语义
+- 新增函数调用参数 Inlay Hints，`Graph` 中调用 `Function` / `ShaderFunction` / `VirtualFunction` / `UE.*` 时会显示参数名
+- 新增 `import` 文档链接和结构折叠，头文件可直接点击打开，Outline 也会显示区块内声明
+- `import "Header.dsh"` 现在兼容不写末尾分号
+- 清理旧的 `dreamshader.packageUninstall` 重复命令，统一使用 `DreamShaderLang: Remove Installed Package`
 
 ### 1.2.19 更新
 
@@ -174,7 +186,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.18.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.20.vsix
 ```
 
 ## 项目根目录

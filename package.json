@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm material files and .dsh shared headers.",
-  "version": "1.2.19",
+  "version": "1.2.20",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -45,7 +45,6 @@
     "onCommand:dreamshader.browsePackages",
     "onCommand:dreamshader.updatePackages",
     "onCommand:dreamshader.removePackage",
-    "onCommand:dreamshader.packageUninstall",
     "onCommand:dreamshader.openPackagesFolder",
     "onCommand:dreamshader.addPackageStoreIndex",
     "onCommand:dreamshader.removePackageStoreIndex",
@@ -106,11 +105,6 @@
       {
         "command": "dreamshader.removePackage",
         "title": "DreamShaderLang: Remove Installed Package",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "dreamshader.packageUninstall",
-        "title": "DreamShaderLang: Package Uninstall",
         "icon": "$(trash)"
       },
       {

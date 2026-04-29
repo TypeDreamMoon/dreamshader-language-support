@@ -14,6 +14,25 @@ const INDENT = "    ";
 const PACKAGE_MANIFEST_NAME = "dreamshader.package.json";
 const PACKAGE_LOCK_NAME = "dreamshader.lock.json";
 const DEFAULT_PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json";
+const SEMANTIC_TOKEN_TYPES = [
+    "namespace",
+    "class",
+    "function",
+    "method",
+    "variable",
+    "parameter",
+    "property",
+    "type",
+    "keyword",
+    "modifier"
+];
+const SEMANTIC_TOKEN_MODIFIERS = [
+    "declaration",
+    "definition",
+    "readonly",
+    "defaultLibrary"
+];
+const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS);
 
 const LEGACY_SECTION_NAMES = [
     "Properties",
@@ -572,6 +591,10 @@ function activate(context) {
         vscode.languages.registerHoverProvider({ language: LANGUAGE_ID }, createHoverProvider()),
         vscode.languages.registerSignatureHelpProvider({ language: LANGUAGE_ID }, createSignatureHelpProvider(), "(", ","),
         vscode.languages.registerDocumentSymbolProvider({ language: LANGUAGE_ID }, createDocumentSymbolProvider()),
+        vscode.languages.registerDocumentSemanticTokensProvider({ language: LANGUAGE_ID }, createSemanticTokensProvider(), SEMANTIC_TOKEN_LEGEND),
+        vscode.languages.registerInlayHintsProvider({ language: LANGUAGE_ID }, createInlayHintsProvider()),
+        vscode.languages.registerFoldingRangeProvider({ language: LANGUAGE_ID }, createFoldingRangeProvider()),
+        vscode.languages.registerDocumentLinkProvider({ language: LANGUAGE_ID }, createDocumentLinkProvider()),
         vscode.languages.registerDefinitionProvider({ language: LANGUAGE_ID }, createDefinitionProvider()),
         vscode.languages.registerReferenceProvider({ language: LANGUAGE_ID }, createReferenceProvider()),
         vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider()),
@@ -610,9 +633,6 @@ function activate(context) {
             await updatePackagesCommand();
         }),
         vscode.commands.registerCommand("dreamshader.removePackage", async () => {
-            await removePackageCommand();
-        }),
-        vscode.commands.registerCommand("dreamshader.packageUninstall", async () => {
             await removePackageCommand();
         }),
         vscode.commands.registerCommand("dreamshader.openPackagesFolder", async () => {
@@ -791,6 +811,458 @@ function createCodeLensProvider(changeEmitter) {
     };
 }
 
+function createSemanticTokensProvider() {
+    return {
+        provideDocumentSemanticTokens(document) {
+            const builder = new vscode.SemanticTokensBuilder(SEMANTIC_TOKEN_LEGEND);
+            if (!isDreamShaderDocument(document)) {
+                return builder.build();
+            }
+
+            const text = document.getText();
+            const tokens = collectDreamShaderSemanticTokens(text)
+                .sort((left, right) => left.offset - right.offset || left.length - right.length);
+            let lastEndOffset = -1;
+            for (const token of tokens) {
+                if (token.offset < lastEndOffset) {
+                    continue;
+                }
+
+                const tokenType = SEMANTIC_TOKEN_TYPES.indexOf(token.type);
+                if (tokenType < 0) {
+                    continue;
+                }
+
+                const position = document.positionAt(token.offset);
+                const tokenModifiers = (token.modifiers || []).reduce((bits, modifier) => {
+                    const modifierIndex = SEMANTIC_TOKEN_MODIFIERS.indexOf(modifier);
+                    return modifierIndex >= 0 ? bits | (1 << modifierIndex) : bits;
+                }, 0);
+                builder.push(position.line, position.character, token.length, tokenType, tokenModifiers);
+                lastEndOffset = token.offset + token.length;
+            }
+
+            return builder.build();
+        }
+    };
+}
+
+function createInlayHintsProvider() {
+    return {
+        provideInlayHints(document, range) {
+            if (!isDreamShaderDocument(document)) {
+                return [];
+            }
+
+            const text = document.getText();
+            const reachableCallables = collectReachableCallableSignatures(document);
+            const declarationCallOffsets = new Set(parseFunctionDefinitionsFromText(text).map((definition) => definition.nameOffset));
+            const hints = [];
+            for (const callExpression of findCallExpressionsInText(text, 0)) {
+                if (declarationCallOffsets.has(callExpression.calleeOffset)) {
+                    continue;
+                }
+
+                const signature = getInlayHintSignatureForCall(callExpression, reachableCallables);
+                if (!signature) {
+                    continue;
+                }
+
+                const parameters = getInlayHintParametersForSignature(signature);
+                for (let index = 0; index < callExpression.arguments.length && index < parameters.length; index += 1) {
+                    const argument = callExpression.arguments[index];
+                    const parameter = parameters[index];
+                    if (argument.isNamed || !parameter?.name || parameter.name === "...") {
+                        continue;
+                    }
+
+                    const position = document.positionAt(argument.valueOffset);
+                    if (range && !range.contains(position)) {
+                        continue;
+                    }
+
+                    const hint = new vscode.InlayHint(position, `${parameter.name}:`, vscode.InlayHintKind.Parameter);
+                    hint.paddingRight = true;
+                    hints.push(hint);
+                }
+            }
+
+            return hints;
+        }
+    };
+}
+
+function createFoldingRangeProvider() {
+    return {
+        provideFoldingRanges(document) {
+            if (!isDreamShaderDocument(document)) {
+                return [];
+            }
+
+            const text = document.getText();
+            const ranges = [];
+            const seen = new Set();
+            const addRange = (startOffset, endOffset) => {
+                if (typeof startOffset !== "number" || typeof endOffset !== "number" || endOffset <= startOffset) {
+                    return;
+                }
+
+                const startLine = document.positionAt(startOffset).line;
+                const endLine = document.positionAt(endOffset).line;
+                if (endLine <= startLine) {
+                    return;
+                }
+
+                const key = `${startLine}:${endLine}`;
+                if (seen.has(key)) {
+                    return;
+                }
+
+                seen.add(key);
+                ranges.push(new vscode.FoldingRange(startLine, endLine, vscode.FoldingRangeKind.Region));
+            };
+
+            for (const block of parseTopLevelBlocks(text)) {
+                addRange(block.bodyOpenOffset, block.bodyCloseOffset);
+                if (block.kind === "Shader" || block.kind === "ShaderFunction" || block.kind === "VirtualFunction") {
+                    for (const section of parseLegacySections(text, block)) {
+                        addRange(section.bodyOpenOffset, section.bodyCloseOffset);
+                    }
+                }
+            }
+
+            return ranges;
+        }
+    };
+}
+
+function createDocumentLinkProvider() {
+    return {
+        provideDocumentLinks(document) {
+            if (!isDreamShaderDocument(document)) {
+                return [];
+            }
+
+            const text = document.getText();
+            const links = [];
+            for (const importStatement of parseImportStatements(text)) {
+                const resolvedPath = resolveImportPath(document.fileName, importStatement.path);
+                if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+                    continue;
+                }
+
+                const range = makeRangeFromOffsets(document, importStatement.pathOffset, importStatement.pathOffset + importStatement.path.length);
+                const link = new vscode.DocumentLink(range, vscode.Uri.file(resolvedPath));
+                link.tooltip = `Open ${path.basename(resolvedPath)}`;
+                links.push(link);
+            }
+
+            return links;
+        }
+    };
+}
+
+function collectDreamShaderSemanticTokens(text) {
+    const tokens = [];
+    addTopLevelSemanticTokens(tokens, text);
+    addLegacySectionSemanticTokens(tokens, text);
+    addFunctionParameterSemanticTokens(tokens, text);
+    addCallSemanticTokens(tokens, text);
+    addKeywordAndTypeSemanticTokens(tokens, text);
+    return tokens;
+}
+
+function addTopLevelSemanticTokens(tokens, text) {
+    for (const block of parseTopLevelBlocks(text)) {
+        addSemanticToken(tokens, text, block.startOffset, block.kind.length, "keyword");
+        if (typeof block.nameOffset === "number") {
+            addSemanticToken(tokens, text, block.nameOffset, block.nameRangeLength || block.name.length, getSemanticTypeForBlockName(block.kind), ["declaration", "definition"]);
+        }
+
+        if (typeof block.attributeOpenOffset === "number" && typeof block.attributeCloseOffset === "number" && block.attributeCloseOffset > block.attributeOpenOffset) {
+            addAttributeSemanticTokens(tokens, text, block.attributeOpenOffset + 1, block.attributeCloseOffset);
+        }
+
+        if (block.kind === "Function" && typeof block.nameOffset === "number") {
+            const prefix = text.slice(block.startOffset, block.nameOffset);
+            for (const match of prefix.matchAll(/\b(SelfContained|Inline)\b/g)) {
+                addSemanticToken(tokens, text, block.startOffset + match.index, match[1].length, "modifier", ["declaration"]);
+            }
+        }
+    }
+}
+
+function addLegacySectionSemanticTokens(tokens, text) {
+    const blocks = [
+        ...parseNamedLegacyBlocks(text, "Shader"),
+        ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+        ...parseNamedLegacyBlocks(text, "VirtualFunction")
+    ];
+    for (const block of blocks) {
+        for (const section of parseLegacySections(text, block)) {
+            addSemanticToken(tokens, text, section.nameOffset, section.name.length, "property", ["declaration"]);
+
+            const allowBindings = section.name === "Outputs";
+            const parsed = parseTypedDeclarationsFromSection(section, allowBindings);
+            const declarationNameType = section.name === "Inputs" ? "parameter" : section.name === "Properties" ? "property" : "variable";
+            for (const declaration of parsed.declarations) {
+                if (declaration.kind === "declaration") {
+                    addDeclarationSemanticTokens(tokens, text, declaration, declarationNameType);
+                }
+            }
+
+            for (const binding of parsed.bindings) {
+                addOutputBindingSemanticTokens(tokens, text, binding);
+            }
+
+            if (section.name === "Settings" || section.name === "Options") {
+                addAssignmentPropertySemanticTokens(tokens, text, section);
+            }
+
+            if (section.name === "Graph") {
+                addGraphDeclarationSemanticTokens(tokens, text, section);
+            }
+        }
+    }
+}
+
+function addFunctionParameterSemanticTokens(tokens, text) {
+    for (const definition of parseFunctionDefinitionsFromText(text)) {
+        const parameterText = text.slice(definition.paramOpenOffset + 1, definition.paramCloseOffset);
+        const segments = splitTopLevelDelimitedWithOffsets(parameterText, definition.paramOpenOffset + 1, ",");
+        for (const segment of segments) {
+            const parts = segment.text.split(/\s+/).filter(Boolean);
+            if (parts.length < 2 || parts.length > 3) {
+                continue;
+            }
+
+            const hasQualifier = parts.length === 3;
+            const qualifier = hasQualifier ? parts[0] : "";
+            const typeText = hasQualifier ? parts[1] : parts[0];
+            const name = hasQualifier ? parts[2] : parts[1];
+            if (qualifier) {
+                const qualifierOffset = findIdentifierOffsetInRange(text, qualifier, segment.startOffset, segment.endOffset);
+                addSemanticToken(tokens, text, qualifierOffset, qualifier.length, "modifier", ["declaration"]);
+            }
+
+            const typeOffset = findIdentifierOffsetInRange(text, typeText, segment.startOffset, segment.endOffset);
+            const nameOffset = findIdentifierOffsetInRange(text, name, segment.startOffset, segment.endOffset);
+            addSemanticToken(tokens, text, typeOffset, typeText.length, "type");
+            addSemanticToken(tokens, text, nameOffset, name.length, "parameter", ["declaration"]);
+        }
+    }
+}
+
+function addCallSemanticTokens(tokens, text) {
+    for (const callExpression of findCallExpressionsInText(text, 0)) {
+        if (TOP_LEVEL_BLOCK_NAMES.includes(callExpression.callee)) {
+            continue;
+        }
+
+        addCalleeSemanticTokens(tokens, text, callExpression.callee, callExpression.calleeOffset);
+        for (const argument of callExpression.arguments) {
+            if (!argument.isNamed || !argument.name) {
+                continue;
+            }
+
+            const nameOffset = findIdentifierOffsetInRange(text, argument.name, argument.startOffset, argument.endOffset);
+            addSemanticToken(tokens, text, nameOffset, argument.name.length, "parameter");
+        }
+    }
+}
+
+function addKeywordAndTypeSemanticTokens(tokens, text) {
+    const hlslKeywords = new Set(HLSL_KEYWORD_ITEMS.map((item) => normalizeSymbolKey(item[0])));
+    const dreamShaderKeywords = new Set([
+        "import",
+        "shader",
+        "shaderfunction",
+        "virtualfunction",
+        "function",
+        "namespace",
+        "true",
+        "false"
+    ]);
+    const modifiers = new Set(["selfcontained", "inline", "in", "out", "const", "static"]);
+
+    forEachIdentifierOutsideTrivia(text, (identifier, startOffset, endOffset) => {
+        if (identifier.includes(".") || identifier.includes("::")) {
+            return;
+        }
+
+        const normalized = normalizeSymbolKey(identifier);
+        if (TYPE_LIKE_NAMES.has(normalized)) {
+            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "type");
+        } else if (modifiers.has(normalized)) {
+            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "modifier");
+        } else if (dreamShaderKeywords.has(normalized) || hlslKeywords.has(normalized)) {
+            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "keyword");
+        }
+    });
+}
+
+function addAttributeSemanticTokens(tokens, text, startOffset, endOffset) {
+    const attributeText = text.slice(startOffset, endOffset);
+    for (const match of attributeText.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*=/g)) {
+        addSemanticToken(tokens, text, startOffset + match.index, match[1].length, "property");
+    }
+}
+
+function addAssignmentPropertySemanticTokens(tokens, text, section) {
+    for (const statement of splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1)) {
+        const assignment = splitTopLevelAssignment(statement.text);
+        if (!assignment?.left) {
+            continue;
+        }
+
+        const propertyName = assignment.left.trim();
+        const propertyOffset = findIdentifierOffsetInRange(text, propertyName, statement.startOffset, statement.endOffset);
+        addSemanticToken(tokens, text, propertyOffset, propertyName.length, "property");
+    }
+}
+
+function addGraphDeclarationSemanticTokens(tokens, text, section) {
+    const statements = splitGraphStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
+    for (const statement of statements) {
+        for (const declaration of parseCodeDeclarationEntries(statement.text, statement.startOffset)) {
+            addDeclarationSemanticTokens(tokens, text, declaration, "variable");
+        }
+
+        const assignment = splitTopLevelAssignment(statement.text);
+        if (assignment?.left && !splitDeclarationTypeAndName(assignment.left)) {
+            addQualifiedIdentifierSemanticTokens(tokens, text, assignment.left.trim(), statement.startOffset, "variable");
+        }
+    }
+}
+
+function addDeclarationSemanticTokens(tokens, text, declaration, nameTokenType) {
+    const typeOffset = findTokenOffsetInRange(text, declaration.type, declaration.startOffset, declaration.endOffset);
+    const nameOffset = findIdentifierOffsetInRange(text, declaration.name, declaration.startOffset, declaration.endOffset);
+    addSemanticToken(tokens, text, typeOffset, declaration.type.length, "type");
+    addSemanticToken(tokens, text, nameOffset, declaration.name.length, nameTokenType, ["declaration"]);
+}
+
+function addOutputBindingSemanticTokens(tokens, text, binding) {
+    if (!binding.target) {
+        return;
+    }
+
+    addQualifiedIdentifierSemanticTokens(tokens, text, binding.target.trim(), binding.startOffset, "property");
+}
+
+function addCalleeSemanticTokens(tokens, text, callee, calleeOffset) {
+    if (isConstructorName(callee)) {
+        addSemanticToken(tokens, text, calleeOffset, callee.length, "type");
+        return;
+    }
+
+    const namespaceSeparatorIndex = callee.lastIndexOf("::");
+    if (namespaceSeparatorIndex >= 0) {
+        addSemanticToken(tokens, text, calleeOffset, namespaceSeparatorIndex, "namespace");
+        addSemanticToken(tokens, text, calleeOffset + namespaceSeparatorIndex + 2, callee.length - namespaceSeparatorIndex - 2, "function");
+        return;
+    }
+
+    const dotIndex = callee.indexOf(".");
+    if (dotIndex >= 0) {
+        const isDefaultLibrary = callee.slice(0, dotIndex) === "UE";
+        addSemanticToken(tokens, text, calleeOffset, dotIndex, "namespace", isDefaultLibrary ? ["defaultLibrary"] : []);
+        addSemanticToken(tokens, text, calleeOffset + dotIndex + 1, callee.length - dotIndex - 1, "method", isDefaultLibrary ? ["defaultLibrary"] : []);
+        return;
+    }
+
+    addSemanticToken(tokens, text, calleeOffset, callee.length, "function");
+}
+
+function addQualifiedIdentifierSemanticTokens(tokens, text, identifierText, baseOffset, fallbackType) {
+    const offset = text.indexOf(identifierText, baseOffset);
+    if (offset < 0) {
+        return;
+    }
+
+    const namespaceSeparatorIndex = identifierText.lastIndexOf("::");
+    if (namespaceSeparatorIndex >= 0) {
+        addSemanticToken(tokens, text, offset, namespaceSeparatorIndex, "namespace");
+        addSemanticToken(tokens, text, offset + namespaceSeparatorIndex + 2, identifierText.length - namespaceSeparatorIndex - 2, fallbackType);
+        return;
+    }
+
+    const dotIndex = identifierText.indexOf(".");
+    if (dotIndex >= 0) {
+        addSemanticToken(tokens, text, offset, dotIndex, "namespace");
+        addSemanticToken(tokens, text, offset + dotIndex + 1, identifierText.length - dotIndex - 1, "property");
+        return;
+    }
+
+    addSemanticToken(tokens, text, offset, identifierText.length, fallbackType);
+}
+
+function getSemanticTypeForBlockName(kind) {
+    if (kind === "Namespace") {
+        return "namespace";
+    }
+    if (kind === "Shader") {
+        return "class";
+    }
+    return "function";
+}
+
+function getInlayHintSignatureForCall(callExpression, reachableCallables) {
+    const normalized = normalizeSymbolKey(callExpression.callee);
+    const signatures = reachableCallables.get(normalized) || [];
+    if (signatures.length > 0) {
+        return signatures[0];
+    }
+
+    const ueBuiltin = UE_BUILTINS.find((item) => normalizeSymbolKey(item.qualifiedName) === normalized || normalizeSymbolKey(item.name) === normalized);
+    if (ueBuiltin) {
+        return {
+            kind: "UE",
+            name: ueBuiltin.qualifiedName,
+            inputs: ueBuiltin.parameters,
+            outputs: []
+        };
+    }
+
+    return null;
+}
+
+function getInlayHintParametersForSignature(signature) {
+    if (signature.kind === "Function") {
+        return [...(signature.inputs || []), ...(signature.outputs || [])];
+    }
+
+    return signature.inputs || [];
+}
+
+function addSemanticToken(tokens, text, offset, length, type, modifiers = []) {
+    if (typeof offset !== "number" || offset < 0 || !length || offset + length > text.length) {
+        return;
+    }
+
+    const tokenText = text.slice(offset, offset + length);
+    if (!tokenText || tokenText.includes("\n") || /^\s+$/.test(tokenText)) {
+        return;
+    }
+
+    if (!tokens._seen) {
+        Object.defineProperty(tokens, "_seen", { value: new Set(), enumerable: false });
+    }
+
+    const key = `${offset}:${length}`;
+    if (tokens._seen.has(key)) {
+        return;
+    }
+
+    tokens._seen.add(key);
+    tokens.push({
+        offset,
+        length,
+        type,
+        modifiers
+    });
+}
+
 function createCompletionProvider() {
     return {
         provideCompletionItems(document, position) {
@@ -925,23 +1397,77 @@ function createDocumentSymbolProvider() {
             const symbols = [];
 
             for (const block of parseTopLevelBlocks(text)) {
-                const start = document.positionAt(block.startOffset);
-                const end = document.positionAt(block.endOffset);
-                const range = new vscode.Range(start, end);
-                let kind = vscode.SymbolKind.Module;
-                if (block.kind === "Shader") {
-                    kind = vscode.SymbolKind.Object;
-                } else if (block.kind === "Function") {
-                    kind = vscode.SymbolKind.Function;
-                } else if (block.kind === "Namespace") {
-                    kind = vscode.SymbolKind.Namespace;
+                const range = makeRangeFromOffsets(document, block.startOffset, block.endOffset);
+                const selectionRange = typeof block.nameOffset === "number"
+                    ? makeRangeFromOffsets(document, block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length))
+                    : range;
+                const symbol = new vscode.DocumentSymbol(block.name, block.kind, getBlockSymbolKind(block.kind), range, selectionRange);
+
+                if (block.kind === "Shader" || block.kind === "ShaderFunction" || block.kind === "VirtualFunction") {
+                    symbol.children.push(...createLegacySectionDocumentSymbols(document, text, block));
                 }
-                symbols.push(new vscode.DocumentSymbol(block.name, "", kind, range, range));
+
+                symbols.push(symbol);
             }
 
             return symbols;
         }
     };
+}
+
+function getBlockSymbolKind(kind) {
+    if (kind === "Shader") {
+        return vscode.SymbolKind.Object;
+    }
+    if (kind === "ShaderFunction" || kind === "VirtualFunction" || kind === "Function") {
+        return vscode.SymbolKind.Function;
+    }
+    if (kind === "Namespace") {
+        return vscode.SymbolKind.Namespace;
+    }
+    return vscode.SymbolKind.Module;
+}
+
+function createLegacySectionDocumentSymbols(document, text, block) {
+    const symbols = [];
+    for (const section of parseLegacySections(text, block)) {
+        const closeOffset = section.bodyCloseOffset >= section.bodyOpenOffset ? section.bodyCloseOffset + 1 : section.bodyOpenOffset + 1;
+        const range = makeRangeFromOffsets(document, section.nameOffset, closeOffset);
+        const selectionRange = makeRangeFromOffsets(document, section.nameOffset, section.nameOffset + section.name.length);
+        const sectionSymbol = new vscode.DocumentSymbol(section.name, "", vscode.SymbolKind.Property, range, selectionRange);
+        const allowBindings = section.name === "Outputs";
+        const parsed = parseTypedDeclarationsFromSection(section, allowBindings);
+
+        for (const declaration of parsed.declarations) {
+            if (declaration.kind !== "declaration") {
+                continue;
+            }
+
+            const nameOffset = findIdentifierOffsetInRange(text, declaration.name, declaration.startOffset, declaration.endOffset);
+            const declarationRange = makeRangeFromOffsets(document, declaration.startOffset, declaration.endOffset);
+            const declarationSelection = nameOffset >= 0
+                ? makeRangeFromOffsets(document, nameOffset, nameOffset + declaration.name.length)
+                : declarationRange;
+            sectionSymbol.children.push(new vscode.DocumentSymbol(declaration.name, declaration.type, vscode.SymbolKind.Variable, declarationRange, declarationSelection));
+        }
+
+        for (const binding of parsed.bindings) {
+            if (!binding.target) {
+                continue;
+            }
+
+            const bindingName = binding.target.trim();
+            const bindingOffset = text.indexOf(bindingName, binding.startOffset);
+            const bindingRange = makeRangeFromOffsets(document, binding.startOffset, binding.endOffset);
+            const bindingSelection = bindingOffset >= 0 && bindingOffset <= binding.endOffset
+                ? makeRangeFromOffsets(document, bindingOffset, bindingOffset + bindingName.length)
+                : bindingRange;
+            sectionSymbol.children.push(new vscode.DocumentSymbol(bindingName, "binding", vscode.SymbolKind.Property, bindingRange, bindingSelection));
+        }
+
+        symbols.push(sectionSymbol);
+    }
+    return symbols;
 }
 
 function createDefinitionProvider() {
@@ -1197,6 +1723,131 @@ function buildSignatureInformation(signature) {
     const info = new vscode.SignatureInformation(label, new vscode.MarkdownString(signature.detail || `${signature.kind || "DreamShader"} callable`));
     info.parameters = parameterLabels.map((parameterLabel) => new vscode.ParameterInformation(parameterLabel));
     return info;
+}
+
+function makeRangeFromOffsets(document, startOffset, endOffset) {
+    const safeStart = Math.max(0, startOffset);
+    const safeEnd = Math.max(safeStart, endOffset);
+    return new vscode.Range(document.positionAt(safeStart), document.positionAt(safeEnd));
+}
+
+function findIdentifierOffsetInRange(text, identifier, startOffset, endOffset) {
+    if (!identifier || typeof startOffset !== "number" || typeof endOffset !== "number" || endOffset <= startOffset) {
+        return -1;
+    }
+
+    const regex = new RegExp(`\\b${escapeRegExp(identifier)}\\b`, "g");
+    const slice = text.slice(startOffset, endOffset);
+    const match = regex.exec(slice);
+    return match ? startOffset + match.index : -1;
+}
+
+function findTokenOffsetInRange(text, token, startOffset, endOffset) {
+    if (!token || typeof startOffset !== "number" || typeof endOffset !== "number" || endOffset <= startOffset) {
+        return -1;
+    }
+
+    const index = text.slice(startOffset, endOffset).indexOf(token);
+    return index >= 0 ? startOffset + index : -1;
+}
+
+function escapeRegExp(text) {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function forEachIdentifierOutsideTrivia(text, callback) {
+    let index = 0;
+    let stringQuote = "";
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    while (index < text.length) {
+        const char = text[index];
+        const next = index + 1 < text.length ? text[index + 1] : "\0";
+
+        if (inLineComment) {
+            if (char === "\n") {
+                inLineComment = false;
+            }
+            index += 1;
+            continue;
+        }
+
+        if (inBlockComment) {
+            if (char === "*" && next === "/") {
+                inBlockComment = false;
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+
+        if (stringQuote) {
+            if (char === "\\") {
+                index += 2;
+            } else {
+                if (char === stringQuote) {
+                    stringQuote = "";
+                }
+                index += 1;
+            }
+            continue;
+        }
+
+        if (char === "\"" || char === "'") {
+            stringQuote = char;
+            index += 1;
+            continue;
+        }
+
+        if (char === "/" && next === "/") {
+            inLineComment = true;
+            index += 2;
+            continue;
+        }
+
+        if (char === "/" && next === "*") {
+            inBlockComment = true;
+            index += 2;
+            continue;
+        }
+
+        if (!isIdentifierStart(char)) {
+            index += 1;
+            continue;
+        }
+
+        const identifier = readQualifiedIdentifier(text, index);
+        if (!identifier) {
+            index += 1;
+            continue;
+        }
+
+        callback(identifier.name, index, identifier.end);
+        index = identifier.end;
+    }
+}
+
+function findCallExpressionsInText(text, baseOffset) {
+    const calls = [];
+    forEachIdentifierOutsideTrivia(text, (_identifier, startOffset, endOffset) => {
+        const openParenOffset = skipWhitespace(text, endOffset);
+        if (text[openParenOffset] !== "(") {
+            return;
+        }
+
+        const closeParenOffset = findMatchingDelimiter(text, openParenOffset, "(", ")");
+        if (closeParenOffset === -1) {
+            return;
+        }
+
+        const callExpression = parseCallExpressionText(text.slice(startOffset, closeParenOffset + 1), baseOffset + startOffset);
+        if (callExpression) {
+            calls.push(callExpression);
+        }
+    });
+    return calls;
 }
 
 function findReferenceLocations(uri, text, searchNames) {
@@ -1716,6 +2367,12 @@ function parseNamespaceBlocks(text) {
     for (const match of text.matchAll(/\bNamespace\s*\(\s*Name\s*=\s*"([^"]+)"/g)) {
         const block = makeSimpleBlock("Namespace", match[1], match.index, text, "{", "}");
         if (block) {
+            const attributeOpenOffset = text.indexOf("(", match.index);
+            const attributeCloseOffset = attributeOpenOffset >= 0 ? findMatchingDelimiter(text, attributeOpenOffset, "(", ")") : -1;
+            block.nameOffset = match.index + match[0].lastIndexOf(match[1]);
+            block.nameRangeLength = match[1].length;
+            block.attributeOpenOffset = attributeOpenOffset;
+            block.attributeCloseOffset = attributeCloseOffset;
             blocks.push(block);
         }
     }
@@ -1925,7 +2582,7 @@ function findInnermostFunctionDefinition(text, offset) {
 
 function parseImportStatements(text) {
     const imports = [];
-    const lineRegex = /^\s*import\s+["']([^"']+)["']\s*;/gm;
+    const lineRegex = /^\s*import\s+["']([^"']+)["']\s*;?(?:\s*\/\/.*)?$/gm;
     for (const match of text.matchAll(lineRegex)) {
         imports.push({
             path: match[1],
@@ -1948,13 +2605,18 @@ function parseNamedLegacyBlocks(text, kind) {
         const openIndex = text.indexOf("(", match.index);
         const closeIndex = findMatchingDelimiter(text, openIndex, "(", ")");
         const attributeText = closeIndex === -1 ? text.slice(openIndex + 1) : text.slice(openIndex + 1, closeIndex);
-        const name = extractStringAttribute(attributeText, "Name");
+        const nameAttribute = extractStringAttributeInfo(attributeText, "Name");
+        const name = nameAttribute ? nameAttribute.value : "";
         if (!name) {
             continue;
         }
 
         const block = makeSimpleBlock(kind, name, match.index, text, "{", "}");
         if (block) {
+            block.nameOffset = openIndex + 1 + nameAttribute.valueOffset;
+            block.nameRangeLength = name.length;
+            block.attributeOpenOffset = openIndex;
+            block.attributeCloseOffset = closeIndex;
             blocks.push(block);
         }
     }
@@ -1962,9 +2624,21 @@ function parseNamedLegacyBlocks(text, kind) {
 }
 
 function extractStringAttribute(attributeText, attributeName) {
+    const info = extractStringAttributeInfo(attributeText, attributeName);
+    return info ? info.value : "";
+}
+
+function extractStringAttributeInfo(attributeText, attributeName) {
     const regex = new RegExp(`\\b${attributeName}\\s*=\\s*"([^"]*)"`, "i");
     const match = regex.exec(attributeText);
-    return match ? match[1] : "";
+    if (!match) {
+        return null;
+    }
+
+    return {
+        value: match[1],
+        valueOffset: match.index + match[0].indexOf(match[1])
+    };
 }
 
 function skipTrivia(text, index, endIndex = text.length) {
