@@ -545,6 +545,12 @@ const TEXTURE_TYPE_NAMES = new Set([
     "samplerstate"
 ]);
 
+const SWIZZLE_CHANNEL_GROUPS = [
+    "rgba",
+    "xyzw"
+];
+const SWIZZLE_COMPLETION_ITEMS = createSwizzleCompletionSpecs();
+
 const TYPE_LIKE_NAMES = new Set([
     ...SCALAR_TYPE_NAMES,
     ...VECTOR_TYPE_COMPONENTS.keys(),
@@ -968,6 +974,7 @@ function collectDreamShaderSemanticTokens(text) {
     addLegacySectionSemanticTokens(tokens, text);
     addFunctionParameterSemanticTokens(tokens, text);
     addCallSemanticTokens(tokens, text);
+    addSwizzleSemanticTokens(tokens, text);
     addKeywordAndTypeSemanticTokens(tokens, text);
     return tokens;
 }
@@ -1069,6 +1076,14 @@ function addCallSemanticTokens(tokens, text) {
             addSemanticToken(tokens, text, nameOffset, argument.name.length, "parameter");
         }
     }
+}
+
+function addSwizzleSemanticTokens(tokens, text) {
+    forEachIdentifierOutsideTrivia(text, (identifier, startOffset, endOffset) => {
+        if (isSwizzleMemberAccess(text, startOffset, identifier)) {
+            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "property");
+        }
+    });
 }
 
 function addKeywordAndTypeSemanticTokens(tokens, text) {
@@ -1293,6 +1308,11 @@ function createCompletionProvider() {
                 return items;
             }
 
+            if (context.afterSwizzleAccessor) {
+                addSwizzleItems(items);
+                return items;
+            }
+
             addKeywordItems(items, context);
             addTopLevelAttributeItems(items, context);
             addImportItems(items, context);
@@ -1322,6 +1342,10 @@ function createHoverProvider() {
 
             const word = document.getText(range);
             const normalized = word.toLowerCase();
+            if (isSwizzleMemberAccess(document.getText(), document.offsetAt(range.start), word)) {
+                return new vscode.Hover(new vscode.MarkdownString(`Vector swizzle \`.${word}\`\n\nSelects ${word.length} channel${word.length === 1 ? "" : "s"} from the source value.`));
+            }
+
             if (HOVER_DOCS.has(normalized)) {
                 return new vscode.Hover(new vscode.MarkdownString(HOVER_DOCS.get(normalized)));
             }
@@ -2197,6 +2221,15 @@ function addDeclaredIdentifierItems(items, context) {
     }
 }
 
+function addSwizzleItems(items) {
+    for (const spec of SWIZZLE_COMPLETION_ITEMS) {
+        const item = new vscode.CompletionItem(spec.label, vscode.CompletionItemKind.Field);
+        item.detail = spec.detail;
+        item.documentation = spec.documentation;
+        items.push(item);
+    }
+}
+
 function analyzeDocument(document, position) {
     const text = document.getText();
     const offset = document.offsetAt(position);
@@ -2245,7 +2278,12 @@ function analyzeDocument(document, position) {
         inPathPluginValue: Boolean(pathPluginValueInfo),
         inImportLine,
         afterUEAccessor: /UE\.\w*$/.test(linePrefix),
-        afterOutputExpressionAccessor: currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix)
+        afterOutputExpressionAccessor: currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix),
+        afterSwizzleAccessor: (inGraphCode || inFunctionBody || currentSection === "Outputs" || currentSection === "Properties")
+            && /\.\w*$/.test(linePrefix)
+            && !/UE\.\w*$/.test(linePrefix)
+            && !/Base\.\w*$/i.test(linePrefix)
+            && !(currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix))
     };
 }
 
@@ -4708,6 +4746,11 @@ function analyzeExpressionText(document, text, baseOffset, symbols, reachableCal
             continue;
         }
 
+        if (isSwizzleMemberAccess(text, identifier.start, identifier.name)) {
+            index = identifier.end;
+            continue;
+        }
+
         const afterIdentifier = skipWhitespace(text, identifier.end);
         if (text[afterIdentifier] === "(") {
             const callText = text.slice(identifier.start, Math.min(text.length, findMatchingDelimiter(text, afterIdentifier, "(", ")") + 1));
@@ -4971,6 +5014,52 @@ function isConstructorName(name) {
         || normalized === "mat2"
         || normalized === "mat3"
         || normalized === "mat4";
+}
+
+function createSwizzleCompletionSpecs() {
+    const specs = [];
+    for (const group of SWIZZLE_CHANNEL_GROUPS) {
+        collectSwizzleCombinations(group, "", specs);
+    }
+    return specs;
+}
+
+function collectSwizzleCombinations(group, prefix, specs) {
+    if (prefix.length > 0) {
+        specs.push({
+            label: prefix,
+            detail: `${group.toUpperCase()} vector swizzle`,
+            documentation: `Selects the \`${prefix}\` vector channel${prefix.length === 1 ? "" : "s"}.`
+        });
+    }
+
+    if (prefix.length >= 4) {
+        return;
+    }
+
+    for (const channel of group) {
+        collectSwizzleCombinations(group, prefix + channel, specs);
+    }
+}
+
+function isSwizzleName(name) {
+    const normalized = String(name || "").trim().toLowerCase();
+    return normalized.length >= 1
+        && normalized.length <= 4
+        && SWIZZLE_CHANNEL_GROUPS.some((group) => [...normalized].every((char) => group.includes(char)));
+}
+
+function isSwizzleMemberAccess(text, identifierStart, identifierName) {
+    if (!isSwizzleName(identifierName)) {
+        return false;
+    }
+
+    let cursor = identifierStart - 1;
+    while (cursor >= 0 && /\s/.test(text[cursor])) {
+        cursor -= 1;
+    }
+
+    return text[cursor] === ".";
 }
 
 function areTypeInfosCompatible(left, right) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.21
+
+- Added `.rgba` / `.xyzw` vector swizzle diagnostics support for chained expressions such as `DebugFloat2Values(...).rg`
+- Added swizzle completion and hover entries for 1-4 channel selections, including repeated channels such as `.rrr`, `.ggg`, `.aaa`, `.rgaa`, and `.rgbb`
+- Updated extension packaging metadata for the 1.2.21 release
+
 ## 1.2.20
 
 - Added Semantic Tokens for DreamShaderLang symbols, types, parameters, material outputs, and UE builtin calls

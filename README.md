@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.20`
+- Version：`1.2.21`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -17,6 +17,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Shader` / `ShaderFunction` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
+- `Graph` 表达式支持 `.rgba` / `.xyzw` 向量 swizzle，例如 `.rg`、`.rrr`、`.rgaa`、`.rgbb`
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
 - Semantic Tokens 语义高亮，能区分类型、函数、参数、变量、材质输出和 UE 内置调用
@@ -49,6 +50,11 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.21 更新
+
+- `Graph` / `Function` 表达式诊断现在识别向量 swizzle，`DebugFloat2Values(...).rg` 不会再把 `rg` 当成未知变量
+- 新增 `.rgba` / `.xyzw` swizzle 补全和 Hover，支持 1 到 4 个通道以及重复通道，例如 `.rrr`、`.ggg`、`.aaa`、`.rgaa`
 
 ### 1.2.20 更新
 
@@ -186,7 +192,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.20.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.21.vsix
 ```
 
 ## 项目根目录
