@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm material files and .dsh shared headers.",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -60,79 +60,98 @@
     "commands": [
       {
         "command": "dreamshader.showBridgeDiagnostics",
-        "title": "DreamShaderLang: Show Bridge Panel"
+        "title": "DreamShaderLang: Show Bridge Panel",
+        "icon": "$(pulse)"
       },
       {
         "command": "dreamshader.recompileCurrent",
-        "title": "DreamShaderLang: Recompile Current Source"
+        "title": "DreamShaderLang: Recompile Current Source",
+        "icon": "$(play)"
       },
       {
         "command": "dreamshader.recompileAll",
-        "title": "DreamShaderLang: Recompile All DSM"
+        "title": "DreamShaderLang: Recompile All DSM",
+        "icon": "$(sync)"
       },
       {
         "command": "dreamshader.cleanGeneratedShaders",
-        "title": "DreamShaderLang: Clean Generated Shaders"
+        "title": "DreamShaderLang: Clean Generated Shaders",
+        "icon": "$(trash)"
       },
       {
         "command": "dreamshader.refreshBridgeDiagnostics",
-        "title": "DreamShaderLang: Refresh Bridge Diagnostics"
+        "title": "DreamShaderLang: Refresh Bridge Diagnostics",
+        "icon": "$(refresh)"
       },
       {
         "command": "dreamshader.openBridgeDiagnosticLocation",
-        "title": "DreamShaderLang: Open Bridge Diagnostic"
+        "title": "DreamShaderLang: Open Bridge Diagnostic",
+        "icon": "$(link-external)"
       },
       {
         "command": "dreamshader.installPackageFromGitHub",
-        "title": "DreamShaderLang: Install Package from GitHub"
+        "title": "DreamShaderLang: Install Package from GitHub",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "dreamshader.browsePackages",
-        "title": "DreamShaderLang: Browse Package Store"
+        "title": "DreamShaderLang: Browse Package Store",
+        "icon": "$(package)"
       },
       {
         "command": "dreamshader.updatePackages",
-        "title": "DreamShaderLang: Update Installed Packages"
+        "title": "DreamShaderLang: Update Installed Packages",
+        "icon": "$(sync)"
       },
       {
         "command": "dreamshader.removePackage",
-        "title": "DreamShaderLang: Remove Installed Package"
+        "title": "DreamShaderLang: Remove Installed Package",
+        "icon": "$(trash)"
       },
       {
         "command": "dreamshader.packageUninstall",
-        "title": "DreamShaderLang: Package Uninstall"
+        "title": "DreamShaderLang: Package Uninstall",
+        "icon": "$(trash)"
       },
       {
         "command": "dreamshader.openPackagesFolder",
-        "title": "DreamShaderLang: Open Packages Folder"
+        "title": "DreamShaderLang: Open Packages Folder",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "dreamshader.addPackageStoreIndex",
-        "title": "DreamShaderLang: Add Package Store Index Source"
+        "title": "DreamShaderLang: Add Package Store Index Source",
+        "icon": "$(add)"
       },
       {
         "command": "dreamshader.removePackageStoreIndex",
-        "title": "DreamShaderLang: Remove Package Store Index Source"
+        "title": "DreamShaderLang: Remove Package Store Index Source",
+        "icon": "$(remove)"
       },
       {
         "command": "dreamshader.createPackage",
-        "title": "DreamShaderLang: Create Package Step by Step"
+        "title": "DreamShaderLang: Create Package Step by Step",
+        "icon": "$(package)"
       },
       {
         "command": "dreamshader.createMaterial",
-        "title": "DreamShaderLang: Create DreamShader Material"
+        "title": "DreamShaderLang: Create DreamShader Material",
+        "icon": "$(new-file)"
       },
       {
         "command": "dreamshader.createHeader",
-        "title": "DreamShaderLang: Create DreamShader Header"
+        "title": "DreamShaderLang: Create DreamShader Header",
+        "icon": "$(file-code)"
       },
       {
         "command": "dreamshader.createTextureSample",
-        "title": "DreamShaderLang: Create DreamShader Texture Sample"
+        "title": "DreamShaderLang: Create DreamShader Texture Sample",
+        "icon": "$(file-media)"
       },
       {
         "command": "dreamshader.createNoiseMaterial",
-        "title": "DreamShaderLang: Create DreamShader Noise Material"
+        "title": "DreamShaderLang: Create DreamShader Noise Material",
+        "icon": "$(symbol-event)"
       }
     ],
     "languages": [

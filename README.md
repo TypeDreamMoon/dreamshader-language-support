@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.18`
+- Version：`1.2.19`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -45,6 +45,11 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.19 更新
+
+- 编辑器标题栏、Bridge 面板标题栏和右键菜单命令补充 codicon 缩略图
+- CodeLens 快捷入口从长文本改为纯图标按钮：重编当前、重编全部和打开 Bridge
 
 ### 1.2.18 更新
 

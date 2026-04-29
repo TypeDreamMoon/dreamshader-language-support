@@ -760,16 +760,16 @@ function createCodeLensProvider(changeEmitter) {
                 const position = document.positionAt(block.startOffset);
                 const range = new vscode.Range(position, position);
                 lenses.push(new vscode.CodeLens(range, {
-                    title: "$(play) Recompile Current",
+                    title: "$(play)",
                     command: "dreamshader.recompileCurrent",
                     arguments: [document.uri]
                 }));
                 lenses.push(new vscode.CodeLens(range, {
-                    title: "$(refresh) Recompile All",
+                    title: "$(sync)",
                     command: "dreamshader.recompileAll"
                 }));
                 lenses.push(new vscode.CodeLens(range, {
-                    title: "$(pulse) Bridge",
+                    title: "$(pulse)",
                     command: "dreamshader.showBridgeDiagnostics"
                 }));
             }
@@ -780,7 +780,7 @@ function createCodeLensProvider(changeEmitter) {
                     const position = document.positionAt(definitions[0].startOffset);
                     const range = new vscode.Range(position, position);
                     lenses.push(new vscode.CodeLens(range, {
-                        title: "$(refresh) Recompile All",
+                        title: "$(sync)",
                         command: "dreamshader.recompileAll"
                     }));
                 }

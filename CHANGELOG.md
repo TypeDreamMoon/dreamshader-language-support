@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.19
+
+- Added codicon thumbnails to DreamShader command contributions so editor title, view title, and context-menu shortcuts render as compact icon actions
+- Changed DreamShader CodeLens shortcuts from long text labels to icon-only actions
+- Updated extension packaging metadata for the 1.2.19 release
+
 ## 1.2.18
 
 - Added completion, hover, signature help, snippets, syntax highlighting, and diagnostics for `VirtualFunction`
