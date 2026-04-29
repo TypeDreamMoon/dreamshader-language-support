@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.18
+
+- Added completion, hover, signature help, snippets, syntax highlighting, and diagnostics for `VirtualFunction`
+- Added `Path(Plugins.*)` project content plugin completion for `VirtualFunction` asset references
+- Updated extension packaging metadata for the 1.2.18 release
+
 ## 1.2.17
 
 - Added `Root="Plugins.*"` completion and hover compatibility for the same project content plugin targets as `Root="Plugin.*"`

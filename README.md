@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.17`
+- Version：`1.2.18`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -15,6 +15,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 - `Shader` / `ShaderFunction` 使用 `Graph = { ... }` 作为图构建区块
 - `Shader` / `ShaderFunction` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
+- `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
@@ -44,6 +45,12 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.18 更新
+
+- 新增 `VirtualFunction` 语言服务支持，用于声明并调用现有 Unreal `MaterialFunction` 资产
+- `VirtualFunction` 的 `Options.Asset = Path(Plugins.PluginName, "...")` 支持项目内容插件名补全
+- snippets、语法高亮、Hover、Signature Help 和本地诊断同步识别 `VirtualFunction`
 
 ### 1.2.17 更新
 
@@ -93,6 +100,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Function Name(in ..., out ...) { ... }`
 - `Function SelfContained Name(in ..., out ...) { ... }`
 - `Namespace(Name="Texture") { Function Sample(...) { ... } }`
+- `VirtualFunction(Name="MyFunction") { Options = { Asset = Path(Plugins.MyPlugin, "MaterialFunctions/MyFunction"); } ... }`
 - `import "Shared/Common.dsh";`
 - `import "Builtin/Texture.dsh";`
 - `import "@typedreammoon/dream-noise/Library/Noise.dsh";`
@@ -161,7 +169,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.17.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.18.vsix
 ```
 
 ## 项目根目录

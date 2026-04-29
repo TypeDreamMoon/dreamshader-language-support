@@ -98,6 +98,27 @@
     ],
     "description": "Create a DreamShader MaterialFunction asset"
   },
+  "DreamShader VirtualFunction": {
+    "scope": "dreamshaderlang",
+    "prefix": "virtualfunction",
+    "body": [
+      "VirtualFunction(Name=\"${1:MyFunction}\")",
+      "{",
+      "\tOptions = {",
+      "\t\tAsset = Path(Plugins.${2:PluginName}, \"${3:MaterialFunctions/MyFunction}\");",
+      "\t}",
+      "",
+      "\tInputs = {",
+      "\t\t${4:float} ${5:Value};",
+      "\t}",
+      "",
+      "\tOutputs = {",
+      "\t\t${6:float} ${7:Result};",
+      "\t}",
+      "}"
+    ],
+    "description": "Declare an existing Unreal MaterialFunction asset for DreamShader Graph calls"
+  },
   "DreamShader Graph Block": {
     "scope": "dreamshaderlang",
     "prefix": "graphblock",

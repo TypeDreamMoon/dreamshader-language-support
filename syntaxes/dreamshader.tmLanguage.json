@@ -60,10 +60,10 @@
             { "include": "#operators" }
           ]
         },
-        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|ShaderFunction|import)\\b" },
+        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|ShaderFunction|VirtualFunction|import)\\b" },
         { "name": "storage.modifier.function.dreamshader", "match": "\\b(?:SelfContained|Inline)\\b" },
         { "name": "entity.name.namespace.definition.dreamshader", "match": "(?<=\\bNamespace\\s*\\(\\s*Name\\s*=\\s*\")[A-Za-z_][A-Za-z0-9_]*\\b" },
-        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Root|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time)\\b(?=\\s*=)" }
+        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Root|Asset|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time)\\b(?=\\s*=)" }
       ]
     },
     "shaderKeywords": {
@@ -74,7 +74,7 @@
     },
     "sections": {
       "patterns": [
-        { "name": "entity.name.section.dreamshader", "match": "\\b(?:Properties|Settings|Outputs|Graph|Inputs)\\b(?=\\s*=\\s*\\{)" }
+        { "name": "entity.name.section.dreamshader", "match": "\\b(?:Properties|Settings|Options|Outputs|Graph|Inputs)\\b(?=\\s*=\\s*\\{)" }
       ]
     },
     "types": {

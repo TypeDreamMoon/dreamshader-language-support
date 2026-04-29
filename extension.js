@@ -20,14 +20,16 @@ const LEGACY_SECTION_NAMES = [
     "Settings",
     "Outputs",
     "Graph",
-    "Inputs"
+    "Inputs",
+    "Options"
 ];
 
 const TOP_LEVEL_BLOCK_NAMES = [
     "Shader",
     "Function",
     "Namespace",
-    "ShaderFunction"
+    "ShaderFunction",
+    "VirtualFunction"
 ];
 
 const QUALIFIER_ITEMS = [
@@ -299,6 +301,11 @@ const SETTINGS_ITEMS = [
     createSettingItem("LibraryCategories", "Comma-separated categories for a ShaderFunction")
 ];
 
+const VIRTUAL_FUNCTION_OPTION_ITEMS = [
+    createSettingItem("Asset", "Existing MaterialFunction asset reference for a VirtualFunction", "Asset = Path(Plugins.${1:PluginName}, \"${2:MaterialFunctions/MyFunction}\");"),
+    createSettingItem("Description", "Optional note for generated VirtualFunction declarations")
+];
+
 const MATERIAL_OUTPUT_ITEMS = [
     createMaterialOutputItem("BaseColor", "Material base color output"),
     createMaterialOutputItem("EmissiveColor", "Material emissive output"),
@@ -429,8 +436,9 @@ const UE_BUILTINS = [
 ];
 
 const DREAMSHADER_HELPER_ITEMS = [
-    ["Path", "Path(${1:Game}, \"${2:/Textures/MyTexture}\")", "Resolves a Game or Engine asset path for texture defaults and Settings object references."],
-    ["Path", "Path(\"${1:/Game/Textures/MyTexture.DefaultTexture}\")", "Resolves a fully qualified Unreal object path for texture defaults and Settings object references."]
+    ["Path", "Path(${1:Game}, \"${2:/Textures/MyTexture}\")", "Resolves a Game, Engine, or Plugin asset path for texture defaults, Settings object references, and VirtualFunction assets."],
+    ["Path", "Path(Plugins.${1:PluginName}, \"${2:MaterialFunctions/MyFunction}\")", "Resolves an asset under a project content plugin."],
+    ["Path", "Path(\"${1:/Game/Textures/MyTexture.DefaultTexture}\")", "Resolves a fully qualified Unreal object path for texture defaults, Settings object references, and VirtualFunction assets."]
 ];
 
 const HOVER_DOCS = new Map([
@@ -442,29 +450,33 @@ const HOVER_DOCS = new Map([
     ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
     ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
+    ["virtualfunction", "Declares an existing Unreal MaterialFunction asset so Graph code can call it without generating or overwriting the asset."],
     ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for the project plugin content root `[Project]/Plugins/PluginName/Content`. `Plugins.PluginName` is also accepted as a compatibility alias."],
+    ["asset", "VirtualFunction option that points at an existing MaterialFunction asset, for example `Asset = Path(Plugins.MoonToon, \"MaterialFunctions/Buffer/Writer\");`."],
     ["properties", "Declares user inputs or UE-generated property nodes."],
-    ["settings", "Declares Unreal material or ShaderFunction settings."],
-    ["outputs", "Declares shader outputs or ShaderFunction result pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
+    ["settings", "Declares Unreal material or ShaderFunction settings. In VirtualFunction, `Settings` is accepted as an alias of `Options`."],
+    ["options", "Declares VirtualFunction metadata such as `Asset = Path(...)`."],
+    ["outputs", "Declares shader outputs, ShaderFunction result pins, or VirtualFunction output pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
     ["graph", "Inside `Shader` or `ShaderFunction`, `Graph` is DreamShader graph code. It supports basic `if` / `else`; put loops and complex flow logic inside `Function` blocks."],
     ["code", "`Code` is kept for Function helper code only. Use `Graph = { ... }` inside `Shader` or `ShaderFunction`."],
-    ["inputs", "ShaderFunction input pin list."],
+    ["inputs", "ShaderFunction or VirtualFunction input pin list."],
     ["outputtype", "Required for generic `UE.Expression(...)` or reflected `UE.ClassName(...)` calls."],
     ["resulttype", "Alias of `OutputType` for generic MaterialExpression calls."],
     ["class", "Explicit MaterialExpression class selector."],
-    ["output", "Selects a named output from a multi-output expression or ShaderFunction call."],
+    ["output", "Selects a named output from a multi-output expression, ShaderFunction call, or VirtualFunction call."],
     ["outputname", "Alias of `Output`."],
     ["outputindex", "Selects an output by zero-based output index."],
     ["base", "Material output root namespace used in Shader Outputs bindings, for example `Base.BaseColor = ...`."],
     ["pin", "Selects an auxiliary material output node pin by zero-based index, for example `Expression(Class=\"ThinTranslucentMaterialOutput\").Pin[0] = ...`."] ,
-    ["path", "Resolves a texture or object asset path. Use `Path(Game, \"/Textures/MyTexture\")` or `Path(\"/Game/Folder/Asset.Asset\")`."],
+    ["path", "Resolves a texture, object, or VirtualFunction asset path. Use `Path(Game, \"Folder/Asset\")`, `Path(Engine, \"Folder/Asset\")`, `Path(Plugins.PluginName, \"Folder/Asset\")`, or a full `/Game/...` object path."],
     ["in", "Function input parameter qualifier."],
     ["out", "Function output parameter qualifier. Callers pass a target variable explicitly, for example `ApplyTint(Color, Tint, Result)`."]
 ]);
 
 const BLOCK_SECTION_RULES = new Map([
     ["Shader", new Set(["Properties", "Settings", "Outputs", "Graph"])],
-    ["ShaderFunction", new Set(["Inputs", "Outputs", "Settings", "Graph"])]
+    ["ShaderFunction", new Set(["Inputs", "Outputs", "Settings", "Graph"])],
+    ["VirtualFunction", new Set(["Inputs", "Outputs", "Options", "Settings"])]
 ]);
 
 const SCALAR_TYPE_NAMES = new Set([
@@ -786,7 +798,8 @@ function createCompletionProvider() {
             const items = [];
 
             addRootPluginValueItems(items, document, context);
-            if (context.inRootPluginValue) {
+            addPathPluginValueItems(items, document, context);
+            if (context.inRootPluginValue || context.inPathPluginValue) {
                 return items;
             }
 
@@ -815,6 +828,7 @@ function createCompletionProvider() {
             addQualifierItems(items, context);
             addHlslKeywordItems(items, context);
             addSettingItems(items, context);
+            addOptionItems(items, context);
             addOutputItems(items, context);
             addBuiltinItems(items, context);
             addHelperItems(items, context);
@@ -868,6 +882,13 @@ function createHoverProvider() {
             if (matchingDefinitions) {
                 const firstDefinition = matchingDefinitions[0];
                 return new vscode.Hover(new vscode.MarkdownString(`DreamShaderLang function \`${firstDefinition.name}\`\n\nDefined in \`${path.basename(firstDefinition.fsPath)}\``));
+            }
+
+            const callableSignatures = collectReachableCallableSignatures(document);
+            const callableEntries = callableSignatures.get(normalizeSymbolKey(qualifiedIdentifier ? qualifiedIdentifier.text : word)) || [];
+            const callable = callableEntries.find((entry) => entry.kind === "ShaderFunction" || entry.kind === "VirtualFunction");
+            if (callable) {
+                return new vscode.Hover(new vscode.MarkdownString(`${callable.kind} \`${callable.name}\`\n\nDefined in \`${path.basename(callable.fsPath)}\``));
             }
 
             return undefined;
@@ -1246,7 +1267,8 @@ function addKeywordItems(items, context) {
         ["Function SelfContained", "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
-        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Inputs = {\n        $3\n    }\n\n    Outputs = {\n        $4\n    }\n\n    Graph = {\n        $0\n    }\n}"]
+        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Inputs = {\n        $3\n    }\n\n    Outputs = {\n        $4\n    }\n\n    Graph = {\n        $0\n    }\n}"],
+        ["VirtualFunction", "VirtualFunction(Name=\"${1:MyFunction}\")\n{\n    Options = {\n        Asset = Path(Plugins.${2:PluginName}, \"${3:MaterialFunctions/MyFunction}\");\n    }\n\n    Inputs = {\n        ${4:float} ${5:Value};\n    }\n\n    Outputs = {\n        ${6:float} ${7:Result};\n    }\n}"]
     ];
 
     if (context.inTopLevelAttributeList || context.inFunctionBody || context.inFunctionSignature || context.currentSection) {
@@ -1287,6 +1309,10 @@ function addTopLevelAttributeItems(items, context) {
         ? [
             ["Name", "Name=\"${1:Common}\"", "Required Namespace name."]
         ]
+        : context.topLevelAttributeKind === "VirtualFunction"
+            ? [
+                ["Name", "Name=\"${1:MyFunction}\"", "Required callable VirtualFunction name."]
+            ]
         : [
             ["Name", "Name=\"${1:Materials/MyMaterial}\"", "Required generated asset path relative to Root."],
             ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName; Plugins.PluginName is also accepted."]
@@ -1310,6 +1336,27 @@ function addRootPluginValueItems(items, document, context) {
     const range = new vscode.Range(
         document.positionAt(context.rootPluginValueInfo.replaceStartOffset),
         document.positionAt(context.rootPluginValueInfo.replaceEndOffset));
+
+    for (const pluginName of pluginNames) {
+        const item = new vscode.CompletionItem(pluginName, vscode.CompletionItemKind.Module);
+        item.insertText = pluginName;
+        item.range = range;
+        item.detail = "Project content plugin";
+        item.documentation = new vscode.MarkdownString(`Maps to \`[Project]/Plugins/${pluginName}/Content\`.`);
+        items.push(item);
+    }
+}
+
+function addPathPluginValueItems(items, document, context) {
+    if (!context.inPathPluginValue || !context.pathPluginValueInfo) {
+        return;
+    }
+
+    const projectRoot = findProjectRoot(document.uri.fsPath);
+    const pluginNames = collectProjectContentPluginNames(projectRoot);
+    const range = new vscode.Range(
+        document.positionAt(context.pathPluginValueInfo.replaceStartOffset),
+        document.positionAt(context.pathPluginValueInfo.replaceEndOffset));
 
     for (const pluginName of pluginNames) {
         const item = new vscode.CompletionItem(pluginName, vscode.CompletionItemKind.Module);
@@ -1380,6 +1427,19 @@ function addSettingItems(items, context) {
     }
 }
 
+function addOptionItems(items, context) {
+    if (!context.inOptions) {
+        return;
+    }
+
+    for (const option of VIRTUAL_FUNCTION_OPTION_ITEMS) {
+        const item = new vscode.CompletionItem(option.name, vscode.CompletionItemKind.Property);
+        item.insertText = new vscode.SnippetString(option.insertText);
+        item.detail = option.detail;
+        items.push(item);
+    }
+}
+
 function addOutputItems(items, context) {
     if (!context.inMaterialOutputs) {
         return;
@@ -1419,7 +1479,7 @@ function addBuiltinItems(items, context) {
 }
 
 function addHelperItems(items, context) {
-    if (context.currentSection !== "Properties") {
+    if (context.currentSection !== "Properties" && !context.inOptions) {
         return;
     }
 
@@ -1433,6 +1493,7 @@ function addHelperItems(items, context) {
 
 function addReachableFunctionItems(items, document, context) {
     const definitions = collectReachableFunctionDefinitions(document);
+    const seenNames = new Set();
     const namespaceMatch = context?.linePrefix?.match(/([A-Za-z_][A-Za-z0-9_]*)::[A-Za-z0-9_]*$/);
     const namespacePrefix = namespaceMatch ? `${namespaceMatch[1]}::` : "";
 
@@ -1449,6 +1510,31 @@ function addReachableFunctionItems(items, document, context) {
         if (namespacePrefix) {
             item.documentation = new vscode.MarkdownString(`Namespace function \`${name}\``);
         }
+        seenNames.add(normalizeSymbolKey(localName));
+        items.push(item);
+    }
+
+    if (namespacePrefix) {
+        return;
+    }
+
+    for (const signatures of collectReachableCallableSignatures(document).values()) {
+        const signature = signatures[0];
+        if (!signature || (signature.kind !== "ShaderFunction" && signature.kind !== "VirtualFunction")) {
+            continue;
+        }
+
+        const localName = getCallableShortName(signature.localName || signature.name);
+        const key = normalizeSymbolKey(localName);
+        if (!key || seenNames.has(key)) {
+            continue;
+        }
+
+        const item = new vscode.CompletionItem(localName, vscode.CompletionItemKind.Function);
+        item.insertText = new vscode.SnippetString(localName);
+        item.detail = signature.kind === "VirtualFunction" ? "DreamShader VirtualFunction" : "DreamShader ShaderFunction";
+        item.documentation = new vscode.MarkdownString(`Callable \`${signature.name}\``);
+        seenNames.add(key);
         items.push(item);
     }
 }
@@ -1466,13 +1552,14 @@ function analyzeDocument(document, position) {
     const prefix = text.slice(0, offset);
     const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
     const topLevelBlocks = parseTopLevelBlocks(text);
-    const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction"]));
+    const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction", "VirtualFunction"]));
     const currentSectionInfo = currentLegacyBlock ? findEnclosingLegacySection(text, currentLegacyBlock, offset) : null;
     const currentBlock = currentLegacyBlock ? currentLegacyBlock.kind : "";
     const currentSection = currentSectionInfo ? currentSectionInfo.name : "";
     const currentFunction = findInnermostFunctionDefinition(text, offset);
     const topLevelAttributeKind = getTopLevelAttributeKindAtOffset(text, offset);
     const rootPluginValueInfo = getRootPluginValueCompletionInfo(text, offset);
+    const pathPluginValueInfo = getPathPluginValueCompletionInfo(text, offset);
     const inFunctionSignature = Boolean(currentFunction && offset > currentFunction.paramOpenOffset && offset < currentFunction.paramCloseOffset);
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
     const inRawHlslContext = inFunctionBody;
@@ -1490,18 +1577,21 @@ function analyzeDocument(document, position) {
         currentSectionInfo,
         topLevelAttributeKind,
         rootPluginValueInfo,
+        pathPluginValueInfo,
         linePrefix,
         inFunctionSignature,
         inFunctionBody,
         inRawHlslContext,
         inGraphCode,
-        inSettings: currentSection === "Settings",
+        inSettings: currentSection === "Settings" && currentBlock !== "VirtualFunction",
+        inOptions: currentBlock === "VirtualFunction" && (currentSection === "Options" || currentSection === "Settings"),
         inProperties: currentSection === "Properties" || currentSection === "Inputs",
         inOutputs: currentSection === "Outputs",
         inMaterialOutputs: currentSection === "Outputs" && currentBlock === "Shader",
         inGraphLikeContext: inGraphCode || currentSection === "Properties",
         inTopLevelAttributeList: Boolean(topLevelAttributeKind),
         inRootPluginValue: Boolean(rootPluginValueInfo),
+        inPathPluginValue: Boolean(pathPluginValueInfo),
         inImportLine,
         afterUEAccessor: /UE\.\w*$/.test(linePrefix),
         afterOutputExpressionAccessor: currentSection === "Outputs" && currentBlock === "Shader" && /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix)
@@ -1545,9 +1635,24 @@ function getRootPluginValueCompletionInfo(text, offset) {
     };
 }
 
+function getPathPluginValueCompletionInfo(text, offset) {
+    const prefix = stripCommentsPreserveLayout(text.slice(0, offset));
+    const match = /Path\s*\(\s*(?:Plugins?|Plugin)\.([A-Za-z0-9_]*)$/i.exec(prefix);
+    if (!match) {
+        return undefined;
+    }
+
+    const typedPluginName = match[1] || "";
+    return {
+        typedPluginName,
+        replaceStartOffset: offset - typedPluginName.length,
+        replaceEndOffset: offset
+    };
+}
+
 function getTopLevelAttributeKindAtOffset(text, offset) {
     const prefix = text.slice(0, offset);
-    const matches = Array.from(prefix.matchAll(/\b(ShaderFunction|Shader|Namespace)\s*\(/g));
+    const matches = Array.from(prefix.matchAll(/\b(VirtualFunction|ShaderFunction|Shader|Namespace)\s*\(/g));
     if (matches.length === 0) {
         return "";
     }
@@ -1562,7 +1667,7 @@ function getTopLevelAttributeKindAtOffset(text, offset) {
 }
 
 function findCurrentLegacyTopLevelBlock(prefix) {
-    const blockRegex = /\b(?:Shader|ShaderFunction)\s*\(/g;
+    const blockRegex = /\b(?:Shader|ShaderFunction|VirtualFunction)\s*\(/g;
     let current = "";
     for (const match of prefix.matchAll(blockRegex)) {
         const blockName = match[0].match(/[A-Za-z_][A-Za-z0-9_]*/);
@@ -1574,7 +1679,7 @@ function findCurrentLegacyTopLevelBlock(prefix) {
 }
 
 function findCurrentLegacySection(prefix) {
-    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Inputs)\s*=\s*\{/g;
+    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Inputs|Options)\s*=\s*\{/g;
     let current = "";
     for (const match of prefix.matchAll(sectionRegex)) {
         current = match[1];
@@ -1601,6 +1706,7 @@ function parseTopLevelBlocks(text) {
     }
 
     blocks.push(...parseNamedLegacyBlocks(text, "ShaderFunction"));
+    blocks.push(...parseNamedLegacyBlocks(text, "VirtualFunction"));
 
     return blocks.filter(Boolean).sort((a, b) => a.startOffset - b.startOffset);
 }
@@ -1832,7 +1938,7 @@ function parseImportStatements(text) {
 }
 
 function parseNamedLegacyBlocks(text, kind) {
-    if (kind !== "Shader" && kind !== "ShaderFunction") {
+    if (kind !== "Shader" && kind !== "ShaderFunction" && kind !== "VirtualFunction") {
         return [];
     }
 
@@ -2580,6 +2686,26 @@ function addCallableSignature(map, signature) {
         map.set(key, []);
     }
     map.get(key).push(signature);
+
+    if (signature.kind === "ShaderFunction" || signature.kind === "VirtualFunction") {
+        const shortName = getCallableShortName(signature.name);
+        const shortKey = normalizeSymbolKey(shortName);
+        if (shortKey && shortKey !== key) {
+            if (!map.has(shortKey)) {
+                map.set(shortKey, []);
+            }
+            map.get(shortKey).push({
+                ...signature,
+                localName: shortName
+            });
+        }
+    }
+}
+
+function getCallableShortName(name) {
+    const normalized = String(name || "").replace(/\\/g, "/");
+    const slashIndex = normalized.lastIndexOf("/");
+    return slashIndex >= 0 ? normalized.slice(slashIndex + 1) : normalized;
 }
 
 function collectReachableCallableSignatures(document) {
@@ -2614,15 +2740,19 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
     }
 
 
-    for (const block of parseNamedLegacyBlocks(text, "ShaderFunction")) {
+    for (const block of [
+        ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+        ...parseNamedLegacyBlocks(text, "VirtualFunction")
+    ]) {
         const sectionMap = new Map(parseLegacySections(text, block).map((section) => [section.name, section]));
         const inputs = sectionMap.has("Inputs") ? parseTypedDeclarationsFromSection(sectionMap.get("Inputs")).declarations.filter((entry) => entry.kind === "declaration") : [];
         const outputs = sectionMap.has("Outputs") ? parseTypedDeclarationsFromSection(sectionMap.get("Outputs")).declarations.filter((entry) => entry.kind === "declaration") : [];
         addCallableSignature(results, {
-            kind: "ShaderFunction",
+            kind: block.kind,
             name: block.name,
             inputs: inputs.map((entry) => ({ type: entry.type, name: entry.name })),
             outputs: outputs.map((entry) => ({ type: entry.type, name: entry.name })),
+            detail: block.kind === "VirtualFunction" ? "DreamShader VirtualFunction" : "DreamShader ShaderFunction",
             fsPath: normalizedPath,
             nameOffset: block.startOffset
         });
@@ -2643,14 +2773,14 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
     }
 }
 
-function collectReachableFunctionDefinitions(document) {
+function collectReachableFunctionDefinitionEntries(document) {
     const results = [];
     const visited = new Set();
-    collectReachableFunctionDefinitionsFromFile(document.fileName, document.getText(), results, visited);
+    collectReachableFunctionDefinitionEntriesFromFile(document.fileName, document.getText(), results, visited);
     return results;
 }
 
-function collectReachableFunctionDefinitionsFromFile(fsPath, text, results, visited) {
+function collectReachableFunctionDefinitionEntriesFromFile(fsPath, text, results, visited) {
     const normalizedPath = normalizeFsPath(fsPath);
     if (visited.has(normalizedPath)) {
         return;
@@ -2679,7 +2809,7 @@ function collectReachableFunctionDefinitionsFromFile(fsPath, text, results, visi
 
         try {
             const importedText = fs.readFileSync(resolvedPath, "utf8");
-            collectReachableFunctionDefinitionsFromFile(resolvedPath, importedText, results, visited);
+            collectReachableFunctionDefinitionEntriesFromFile(resolvedPath, importedText, results, visited);
         } catch (_error) {
             // Ignore unreadable imports here; diagnostics handle reporting separately.
         }
@@ -2772,7 +2902,7 @@ function collectDreamShaderFunctionCallNames(text) {
 function computeFunctionCycleDiagnostics(document, text) {
     const diagnostics = [];
     const currentPath = normalizeFsPath(document.fileName);
-    const definitions = collectReachableFunctionDefinitions(document);
+    const definitions = collectReachableFunctionDefinitionEntries(document);
     if (definitions.length === 0) {
         return diagnostics;
     }
@@ -3189,17 +3319,17 @@ function computeLocalDiagnostics(document) {
     const extension = path.extname(document.fileName).toLowerCase();
     const reachableCallables = collectReachableCallableSignatures(document);
 
-    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text)) {
+    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\") or ShaderFunction(Name=\"...\") block.",
+            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), or VirtualFunction(Name=\"...\") block.",
             vscode.DiagnosticSeverity.Warning));
     }
 
     if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text))) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            "DreamShader header (.dsh) may only contain import statements, Function blocks, and Namespace blocks.",
+            "DreamShader header (.dsh) may only contain import statements, Function blocks, Namespace blocks, and VirtualFunction declarations.",
             vscode.DiagnosticSeverity.Error));
     }
 
@@ -3313,7 +3443,8 @@ function computeDetailedBlockDiagnostics(document, text, reachableCallables) {
     const diagnostics = [];
     const blocks = [
         ...parseNamedLegacyBlocks(text, "Shader"),
-        ...parseNamedLegacyBlocks(text, "ShaderFunction")
+        ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+        ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ].sort((a, b) => a.startOffset - b.startOffset);
 
     for (const block of blocks) {
@@ -3380,10 +3511,48 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
             diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
         }
 
+    } else if (block.kind === "VirtualFunction") {
+        const inputsSection = seenSections.get("Inputs")?.[0];
+        const outputsSection = seenSections.get("Outputs")?.[0];
+        if (inputsSection) {
+            diagnostics.push(...validateDeclarationSection(document, inputsSection, symbols, "Inputs", false, reachableCallables));
+        }
+        if (outputsSection) {
+            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
+        } else {
+            diagnostics.push(makeOffsetDiagnostic(
+                document,
+                block.startOffset,
+                block.startOffset + block.kind.length,
+                `VirtualFunction '${block.name}' must declare an Outputs section.`));
+        }
+
+        const optionsSection = seenSections.get("Options")?.[0] || seenSections.get("Settings")?.[0];
+        if (optionsSection) {
+            diagnostics.push(...validateSettingsSection(document, optionsSection, optionsSection.name));
+            const hasAsset = splitStatementsWithOffsets(optionsSection.bodyText, optionsSection.bodyOpenOffset + 1)
+                .some((statement) => {
+                    const assignment = splitTopLevelAssignment(statement.text);
+                    return assignment && normalizeSymbolKey(assignment.left) === "asset";
+                });
+            if (!hasAsset) {
+                diagnostics.push(makeOffsetDiagnostic(
+                    document,
+                    optionsSection.nameOffset,
+                    optionsSection.nameOffset + optionsSection.name.length,
+                    `VirtualFunction '${block.name}' Options must include Asset = Path(...);`));
+            }
+        } else {
+            diagnostics.push(makeOffsetDiagnostic(
+                document,
+                block.startOffset,
+                block.startOffset + block.kind.length,
+                `VirtualFunction '${block.name}' must declare Options = { Asset = Path(...); }.`));
+        }
     }
 
     const settingsSection = seenSections.get("Settings")?.[0];
-    if (settingsSection) {
+    if (settingsSection && block.kind !== "VirtualFunction") {
         diagnostics.push(...validateSettingsSection(document, settingsSection));
     }
 
@@ -3498,7 +3667,7 @@ function validateDeclarationSection(document, section, symbols, sectionLabel, al
     return diagnostics;
 }
 
-function validateSettingsSection(document, section) {
+function validateSettingsSection(document, section, sectionLabel = "Settings") {
     const diagnostics = [];
     const statements = splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
     for (const statement of statements) {
@@ -3507,7 +3676,7 @@ function validateSettingsSection(document, section) {
                 document,
                 statement.startOffset,
                 statement.endOffset,
-                "Settings statement is missing a trailing ';'."));
+                `${sectionLabel} statement is missing a trailing ';'.`));
         }
 
         const assignment = splitTopLevelAssignment(statement.text);
@@ -3516,7 +3685,7 @@ function validateSettingsSection(document, section) {
                 document,
                 statement.startOffset,
                 statement.endOffset,
-                `Invalid Settings statement '${statement.text}'.`));
+                `Invalid ${sectionLabel} statement '${statement.text}'.`));
         }
     }
     return diagnostics;
@@ -3944,14 +4113,14 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
         }
     }
 
-    if (signature.kind === "ShaderFunction") {
+    if (signature.kind === "ShaderFunction" || signature.kind === "VirtualFunction") {
         const positionalArguments = callExpression.arguments.filter((argument) => !argument.isNamed);
         if (positionalArguments.length > signature.inputs.length) {
             diagnostics.push(makeOffsetDiagnostic(
                 document,
                 callExpression.calleeOffset,
                 callExpression.endOffset,
-                `ShaderFunction '${signature.name}' has too many positional arguments.`));
+                `${signature.kind} '${signature.name}' has too many positional arguments.`));
         }
     }
 
@@ -3962,7 +4131,7 @@ function parseTexturePathReferenceText(text) {
     const callExpression = parseCallExpressionText(text, 0);
     if (!callExpression || normalizeSymbolKey(callExpression.callee) !== "path") {
         return {
-            error: "Texture defaults must use Path(Game|Engine, \"/Folder/Asset\") or Path(\"/Game/Folder/Asset\")."
+            error: "Texture defaults must use Path(Game|Engine|Plugin.PluginName, \"/Folder/Asset\") or Path(\"/Game/Folder/Asset\")."
         };
     }
 
@@ -3974,25 +4143,25 @@ function parseTexturePathReferenceText(text) {
 
     if (callExpression.arguments.length !== 1 && callExpression.arguments.length !== 2) {
         return {
-            error: "Texture Path(...) expects either 1 argument (absolute asset path) or 2 arguments (Game|Engine, asset path)."
+            error: "Texture Path(...) expects either 1 argument (absolute asset path) or 2 arguments (Game|Engine|Plugin.PluginName, asset path)."
         };
     }
 
     if (callExpression.arguments.length === 1) {
         const assetPath = readTexturePathArgumentText(callExpression.arguments[0].valueText);
-        if (!assetPath || !/^\/(?:Game|Engine)\//i.test(assetPath)) {
+        if (!assetPath || !/^\/[A-Za-z0-9_][A-Za-z0-9_]*\//.test(assetPath)) {
             return {
-                error: "Single-argument Path(...) must use an absolute /Game/... or /Engine/... asset path."
+                error: "Single-argument Path(...) must use an absolute /Game/..., /Engine/..., or plugin mount asset path."
             };
         }
 
         return { error: "" };
     }
 
-    const rootText = callExpression.arguments[0].valueText.trim();
-    if (!/^(Game|Engine)$/i.test(rootText)) {
+    const rootText = readTexturePathArgumentText(callExpression.arguments[0].valueText);
+    if (!isSupportedAssetPathRoot(rootText)) {
         return {
-            error: `Unsupported texture Path root '${rootText}'. Use Game or Engine.`
+            error: `Unsupported texture Path root '${rootText}'. Use Game, Engine, or Plugin.PluginName.`
         };
     }
 
@@ -4004,6 +4173,19 @@ function parseTexturePathReferenceText(text) {
     }
 
     return { error: "" };
+}
+
+function isSupportedAssetPathRoot(text) {
+    const root = String(text || "").trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    if (/^(Game|Engine)$/i.test(root)) {
+        return true;
+    }
+
+    if (/^Plugins?\.[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)*$/i.test(root)) {
+        return true;
+    }
+
+    return /^Plugins?\/[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)*$/i.test(root);
 }
 
 function readTexturePathArgumentText(text) {
