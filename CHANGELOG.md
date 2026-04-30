@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.24
+
+- Added `MaterialAttributes` graph type completion, hover text, and snippets
+- Added completion for `Attrs.BaseColor`, `Attrs.Roughness`, and other Material Attributes members
+- Updated local diagnostics so `Attrs.Member = ...` is treated as a MaterialAttributes member write instead of a new variable
+- Added `Base.MaterialAttributes` as a valid Shader Outputs binding
+
 ## 1.2.23
 
 - Updated declaration metadata parsing and snippets to the semicolon-based reflection block syntax

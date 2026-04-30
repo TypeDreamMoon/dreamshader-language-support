@@ -99,6 +99,7 @@ const GRAPH_TYPE_ITEMS = [
     ["Texture2D", "Texture object input"],
     ["TextureCube", "Texture cube input"],
     ["Texture2DArray", "Texture array input"],
+    ["MaterialAttributes", "Unreal Material Attributes aggregate"],
     ["ScalarParameter", "Scalar material parameter"],
     ["VectorParameter", "Vector material parameter"],
     ["DoubleVectorParameter", "Double vector material parameter"],
@@ -348,6 +349,7 @@ const VIRTUAL_FUNCTION_OPTION_ITEMS = [
 ];
 
 const MATERIAL_OUTPUT_ITEMS = [
+    createMaterialOutputItem("MaterialAttributes", "Full Material Attributes output"),
     createMaterialOutputItem("BaseColor", "Material base color output"),
     createMaterialOutputItem("EmissiveColor", "Material emissive output"),
     createMaterialOutputItem("Opacity", "Material opacity output"),
@@ -371,6 +373,8 @@ const MATERIAL_OUTPUT_ITEMS = [
 ];
 
 const MATERIAL_OUTPUT_NAME_SET = new Set(MATERIAL_OUTPUT_ITEMS.map((item) => String(item.name || "").trim().toLowerCase()));
+const MATERIAL_ATTRIBUTE_MEMBER_ITEMS = MATERIAL_OUTPUT_ITEMS.filter((item) => normalizeSymbolKey(item.name) !== "materialattributes");
+const MATERIAL_ATTRIBUTE_MEMBER_NAME_SET = new Set(MATERIAL_ATTRIBUTE_MEMBER_ITEMS.map((item) => String(item.name || "").trim().toLowerCase()));
 
 const OUTPUT_HELPER_ITEMS = [
     {
@@ -535,6 +539,7 @@ const HOVER_DOCS = new Map([
     ["output", "Selects a named output from a multi-output expression, ShaderFunction call, or VirtualFunction call."],
     ["outputname", "Alias of `Output`."],
     ["outputindex", "Selects an output by zero-based output index."],
+    ["materialattributes", "Unreal Material Attributes aggregate. In Graph, declare `MaterialAttributes Attrs;` and assign members such as `Attrs.BaseColor = Color;`."],
     ["opt", "Marks a ShaderFunction or VirtualFunction input as optional. Calls may pass `default` or omit trailing optional inputs."],
     ["default", "Uses an optional ShaderFunction or VirtualFunction input's Unreal preview/default value."],
     ["group", "Reflected parameter property for Material Instance grouping, used inside a trailing `[...]` block."],
@@ -1389,6 +1394,11 @@ function createCompletionProvider() {
                 item.insertText = new vscode.SnippetString("Pin[${1:0}] = $0;");
                 item.detail = "Auxiliary material output node pin binding";
                 items.push(item);
+                return items;
+            }
+
+            if (isAfterMaterialAttributesAccessor(context)) {
+                addMaterialAttributeMemberItems(items);
                 return items;
             }
 
@@ -2343,6 +2353,36 @@ function addSwizzleItems(items) {
         item.documentation = spec.documentation;
         items.push(item);
     }
+}
+
+function addMaterialAttributeMemberItems(items) {
+    for (const member of MATERIAL_ATTRIBUTE_MEMBER_ITEMS) {
+        const item = new vscode.CompletionItem(member.name, vscode.CompletionItemKind.Field);
+        item.insertText = member.name;
+        item.detail = `MaterialAttributes.${member.name}`;
+        item.documentation = new vscode.MarkdownString(member.detail);
+        items.push(item);
+    }
+}
+
+function getAccessorBaseName(linePrefix) {
+    const match = /([A-Za-z_][A-Za-z0-9_]*)\.\w*$/.exec(linePrefix || "");
+    return match ? match[1] : "";
+}
+
+function isAfterMaterialAttributesAccessor(context) {
+    if (!context.afterSwizzleAccessor || !(context.inGraphCode || context.currentSection === "Outputs")) {
+        return false;
+    }
+
+    const baseName = getAccessorBaseName(context.linePrefix);
+    if (!baseName) {
+        return false;
+    }
+
+    const entry = collectVisibleIdentifierEntries(context)
+        .find((candidate) => normalizeSymbolKey(candidate.name) === normalizeSymbolKey(baseName));
+    return Boolean(entry?.typeInfo?.isMaterialAttributes);
 }
 
 function analyzeDocument(document, position) {
@@ -3360,7 +3400,7 @@ function resolveTypeInfo(typeText) {
     }
 
     if (normalized === "materialattributes") {
-        return { type: normalized, componentCount: 0, isTexture: false };
+        return { type: normalized, componentCount: 0, isTexture: false, isMaterialAttributes: true };
     }
 
     return null;
@@ -4056,7 +4096,7 @@ function collectVisibleIdentifierEntries(context) {
     if (context.inFunctionBody && currentFunction) {
         const parameters = parseFunctionSignatureParameters(currentFunction, text);
         for (const parameter of [...parameters.inputs, ...parameters.outputs]) {
-            addVisibleIdentifierEntry(entries, parameter.name, `${parameter.type} Function ${parameter.qualifier} parameter`);
+            addVisibleIdentifierEntry(entries, parameter.name, `${parameter.type} Function ${parameter.qualifier} parameter`, parameter.type);
         }
 
         addLocalDeclarationEntries(entries, text, currentFunction.bodyOpenOffset + 1, offset, "Function local variable");
@@ -4113,13 +4153,13 @@ function collectVisibleIdentifierEntries(context) {
     return Array.from(entries.values());
 }
 
-function addVisibleIdentifierEntry(entries, name, detail) {
+function addVisibleIdentifierEntry(entries, name, detail, typeText = "") {
     const normalized = normalizeSymbolKey(name);
     if (!normalized || entries.has(normalized)) {
         return;
     }
 
-    entries.set(normalized, { name, detail });
+    entries.set(normalized, { name, detail, typeInfo: resolveTypeInfo(typeText) });
 }
 
 function describeSectionSymbol(blockKind, sectionName) {
@@ -4145,7 +4185,7 @@ function addSectionDeclarationEntries(entries, section, cutoffOffset, detailLabe
             continue;
         }
 
-        addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} ${detailLabel}`);
+        addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} ${detailLabel}`, declaration.type);
     }
 }
 
@@ -4167,7 +4207,7 @@ function addLocalDeclarationEntries(entries, text, startOffset, cutoffOffset, de
                 continue;
             }
 
-            addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} ${detailLabel}`);
+            addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} ${detailLabel}`, declaration.type);
         }
     }
 }
@@ -4187,7 +4227,7 @@ function addGraphCodeEntries(entries, codeSection, cutoffOffset, reachableCallab
                     continue;
                 }
 
-                addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} Graph local variable`);
+                addVisibleIdentifierEntry(entries, declaration.name, `${declaration.type} Graph local variable`, declaration.type);
             }
             continue;
         }
@@ -4209,7 +4249,7 @@ function addGraphCodeEntries(entries, codeSection, cutoffOffset, reachableCallab
                 continue;
             }
 
-            addVisibleIdentifierEntry(entries, argument.valueText, `${signature.outputs[index].type} Graph out variable`);
+            addVisibleIdentifierEntry(entries, argument.valueText, `${signature.outputs[index].type} Graph out variable`, signature.outputs[index].type);
         }
     }
 }
@@ -4757,6 +4797,22 @@ function analyzeGraphIfStatement(document, statement, symbols, reachableCallable
     return diagnostics;
 }
 
+function splitMaterialAttributesMemberTarget(targetText) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*$/.exec(targetText || "");
+    if (!match) {
+        return null;
+    }
+
+    return {
+        baseName: match[1],
+        memberName: match[2].replace(/\s+/g, "")
+    };
+}
+
+function isMaterialAttributeMemberName(name) {
+    return MATERIAL_ATTRIBUTE_MEMBER_NAME_SET.has(normalizeSymbolKey(name));
+}
+
 function analyzeGraphStatements(document, bodyText, baseOffset, symbols, reachableCallables) {
     const diagnostics = [];
     const statements = splitGraphStatementsWithOffsets(bodyText, baseOffset);
@@ -4804,6 +4860,32 @@ function analyzeGraphStatements(document, bodyText, baseOffset, symbols, reachab
         if (assignment) {
             const rightOffset = statement.startOffset + statement.text.indexOf(assignment.right);
             diagnostics.push(...analyzeExpressionText(document, assignment.right, rightOffset, symbols, reachableCallables, "value"));
+
+            const memberTarget = splitMaterialAttributesMemberTarget(assignment.left);
+            if (memberTarget) {
+                const baseSymbol = symbols.get(normalizeSymbolKey(memberTarget.baseName));
+                if (!baseSymbol) {
+                    diagnostics.push(makeOffsetDiagnostic(
+                        document,
+                        statement.startOffset + assignment.left.indexOf(memberTarget.baseName),
+                        statement.startOffset + assignment.left.indexOf(memberTarget.baseName) + memberTarget.baseName.length,
+                        `Unknown MaterialAttributes variable '${memberTarget.baseName}'.`));
+                } else if (!baseSymbol.typeInfo?.isMaterialAttributes) {
+                    diagnostics.push(makeOffsetDiagnostic(
+                        document,
+                        statement.startOffset + assignment.left.indexOf(memberTarget.baseName),
+                        statement.startOffset + assignment.left.indexOf(memberTarget.baseName) + memberTarget.baseName.length,
+                        `Graph variable '${memberTarget.baseName}' is not a MaterialAttributes value.`));
+                } else if (memberTarget.memberName.includes(".") || !isMaterialAttributeMemberName(memberTarget.memberName)) {
+                    const memberOffset = statement.startOffset + assignment.left.indexOf(memberTarget.memberName);
+                    diagnostics.push(makeOffsetDiagnostic(
+                        document,
+                        memberOffset,
+                        memberOffset + memberTarget.memberName.length,
+                        `Unsupported MaterialAttributes member '${memberTarget.memberName}'.`));
+                }
+                continue;
+            }
 
             symbols.set(normalizeSymbolKey(assignment.left), {
                 name: assignment.left,
@@ -4992,14 +5074,27 @@ function analyzeExpressionText(document, text, baseOffset, symbols, reachableCal
             continue;
         }
 
-        const baseName = identifier.name.split(".")[0];
+        const identifierParts = identifier.name.split(".");
+        const baseName = identifierParts[0];
         const normalizedBaseName = normalizeSymbolKey(baseName);
-        if (baseName !== "UE" && !IGNORED_IDENTIFIER_NAMES.has(normalizedBaseName) && !isTypeLikeName(baseName) && !symbols.has(normalizedBaseName)) {
+        const baseSymbol = symbols.get(normalizedBaseName);
+        if (baseName !== "UE" && !IGNORED_IDENTIFIER_NAMES.has(normalizedBaseName) && !isTypeLikeName(baseName) && !baseSymbol) {
             diagnostics.push(makeOffsetDiagnostic(
                 document,
                 baseOffset + identifier.start,
                 baseOffset + identifier.start + baseName.length,
                 `Unknown identifier '${baseName}'.`));
+        }
+        if (baseSymbol?.typeInfo?.isMaterialAttributes && identifierParts.length > 1) {
+            const memberName = identifierParts[1];
+            if (!isMaterialAttributeMemberName(memberName)) {
+                const memberStart = identifier.start + baseName.length + 1;
+                diagnostics.push(makeOffsetDiagnostic(
+                    document,
+                    baseOffset + memberStart,
+                    baseOffset + memberStart + memberName.length,
+                    `Unsupported MaterialAttributes member '${memberName}'.`));
+            }
         }
 
         index = identifier.end;
@@ -5349,7 +5444,9 @@ function areTypeInfosCompatible(left, right) {
         return true;
     }
 
-    return left.isTexture === right.isTexture && left.componentCount === right.componentCount;
+    return left.isTexture === right.isTexture
+        && Boolean(left.isMaterialAttributes) === Boolean(right.isMaterialAttributes)
+        && left.componentCount === right.componentCount;
 }
 
 function makeOffsetDiagnostic(document, startOffset, endOffset, message, severity = vscode.DiagnosticSeverity.Error) {

@@ -222,6 +222,23 @@
     ],
     "description": "Insert a UE.TransformVector call"
   },
+  "DreamShader Material Attributes Output": {
+    "scope": "dreamshaderlang",
+    "prefix": "matattrs",
+    "body": [
+      "MaterialAttributes ${1:Attrs};",
+      "Base.MaterialAttributes = ${1:Attrs};"
+    ],
+    "description": "Declare and fill a MaterialAttributes output"
+  },
+  "DreamShader MaterialAttributes Member": {
+    "scope": "dreamshaderlang",
+    "prefix": "attrmember",
+    "body": [
+      "${1:Attrs}.${2|BaseColor,Roughness,Metallic,Specular,Normal,Opacity,EmissiveColor,AmbientOcclusion|} = ${3:Value};"
+    ],
+    "description": "Assign a MaterialAttributes member in Graph"
+  },
   "DreamShader Output Node Binding": {
     "scope": "dreamshaderlang",
     "prefix": "ueoutputpin",
