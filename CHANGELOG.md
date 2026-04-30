@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.25
+
+- Added `ShaderFunction.Properties` section support in completion, diagnostics, symbols, and visible identifier collection
+- Added `const` property keyword support and a `constprop` snippet
+- Updated ShaderFunction snippets so optional texture inputs can use property-backed preview defaults
+
 ## 1.2.24
 
 - Added `MaterialAttributes` graph type completion, hover text, and snippets

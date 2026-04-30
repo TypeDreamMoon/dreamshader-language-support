@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.23`
+- Version：`1.2.25`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -18,7 +18,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `Graph` 表达式支持 `.rgba` / `.xyzw` 向量 swizzle，例如 `.rg`、`.rrr`、`.rgaa`、`.rgbb`
-- 支持 `Properties` 显式 Parameter 类型、`StaticSwitchParameter`、`UE.CollectionParam(...)`、声明反射属性块、`opt` 输入和 `default` 调用参数
+- 支持 `Properties` 显式 Parameter 类型、`const` helper、`StaticSwitchParameter`、`UE.CollectionParam(...)`、声明反射属性块、`opt` 输入和 `default` 调用参数
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
 - Semantic Tokens 语义高亮，能区分类型、函数、参数、变量、材质输出和 UE 内置调用
@@ -51,6 +51,18 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.25 更新
+
+- `ShaderFunction` 新增 `Properties` section 语言服务支持，可在 `Inputs` 默认值和 `Graph` 中补全/诊断这些属性
+- 新增 `const` property 关键字 Hover、补全和 `constprop` snippet
+- ShaderFunction snippet 更新为 `Properties` + `opt Texture2D Input = PreviewTex` 的预览默认值写法
+
+### 1.2.24 更新
+
+- 新增 `MaterialAttributes` 图类型补全、Hover 和 snippets
+- 新增 `Attrs.BaseColor` / `Attrs.Roughness` 等材质属性成员补全
+- `Outputs` 中新增 `Base.MaterialAttributes` 输出绑定支持
 
 ### 1.2.23 更新
 
@@ -206,7 +218,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.23.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.25.vsix
 ```
 
 ## 项目根目录

@@ -83,16 +83,20 @@
     "body": [
       "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")",
       "{",
+      "\tProperties = {",
+      "\t\tconst Texture2D ${3:PreviewTex};",
+      "\t}",
+      "",
       "\tInputs = {",
-      "\t\t${3:float} ${4:Value};",
+      "\t\topt Texture2D ${4:InputTex} = ${3:PreviewTex};",
       "\t}",
       "",
       "\tOutputs = {",
-      "\t\t${5:float} ${6:Result};",
+      "\t\t${5:float4} ${6:Result};",
       "\t}",
       "",
       "\tGraph = {",
-      "\t\t${6:Result} = ${4:Value};",
+      "\t\t${6:Result} = ${5:float4}(1.0, 1.0, 1.0, 1.0);",
       "\t}",
       "}"
     ],
@@ -173,6 +177,14 @@
       "];"
     ],
     "description": "Insert a StaticSwitchParameter property"
+  },
+  "DreamShader Const Property": {
+    "scope": "dreamshaderlang",
+    "prefix": "constprop",
+    "body": [
+      "const ${1:float} ${2:Value} = ${3:0.0};"
+    ],
+    "description": "Insert a const DreamShader Properties declaration"
   },
   "DreamShader Collection Param": {
     "scope": "dreamshaderlang",

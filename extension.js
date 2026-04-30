@@ -526,7 +526,7 @@ const HOVER_DOCS = new Map([
     ["virtualfunction", "Declares an existing Unreal MaterialFunction asset so Graph code can call it without generating or overwriting the asset."],
     ["root", "Optional Shader or ShaderFunction asset root. Use `Root=\"Game\"` for `/Game` or `Root=\"Plugin.PluginName\"` for the project plugin content root `[Project]/Plugins/PluginName/Content`. `Plugins.PluginName` is also accepted as a compatibility alias."],
     ["asset", "VirtualFunction option that points at an existing MaterialFunction asset, for example `Asset = Path(Plugins.MoonToon, \"MaterialFunctions/Buffer/Writer\");`."],
-    ["properties", "Declares user inputs or UE-generated property nodes."],
+    ["properties", "Declares user inputs or UE-generated property nodes. In ShaderFunction, `Properties` creates helper parameter or const nodes that Graph and input preview defaults can reference."],
     ["settings", "Declares Unreal material or ShaderFunction settings. In VirtualFunction, `Settings` is accepted as an alias of `Options`."],
     ["options", "Declares VirtualFunction metadata such as `Asset = Path(...)`."],
     ["outputs", "Declares shader outputs, ShaderFunction result pins, or VirtualFunction output pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
@@ -541,6 +541,7 @@ const HOVER_DOCS = new Map([
     ["outputindex", "Selects an output by zero-based output index."],
     ["materialattributes", "Unreal Material Attributes aggregate. In Graph, declare `MaterialAttributes Attrs;` and assign members such as `Attrs.BaseColor = Color;`."],
     ["opt", "Marks a ShaderFunction or VirtualFunction input as optional. Calls may pass `default` or omit trailing optional inputs."],
+    ["const", "Marks a Properties declaration as a const helper node instead of an externally adjustable parameter."],
     ["default", "Uses an optional ShaderFunction or VirtualFunction input's Unreal preview/default value."],
     ["group", "Reflected parameter property for Material Instance grouping, used inside a trailing `[...]` block."],
     ["sortpriority", "Reflected parameter or function pin ordering property, used inside a trailing `[...]` block."],
@@ -555,7 +556,7 @@ const HOVER_DOCS = new Map([
 
 const BLOCK_SECTION_RULES = new Map([
     ["Shader", new Set(["Properties", "Settings", "Outputs", "Graph"])],
-    ["ShaderFunction", new Set(["Inputs", "Outputs", "Settings", "Graph"])],
+    ["ShaderFunction", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
     ["VirtualFunction", new Set(["Inputs", "Outputs", "Options", "Settings"])]
 ]);
 
@@ -2039,7 +2040,7 @@ function addKeywordItems(items, context) {
         ["Function SelfContained", "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
-        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Inputs = {\n        $3\n    }\n\n    Outputs = {\n        $4\n    }\n\n    Graph = {\n        $0\n    }\n}"],
+        ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Properties = {\n        const Texture2D ${3:PreviewTex};\n    }\n\n    Inputs = {\n        opt Texture2D ${4:InputTex} = ${3:PreviewTex};\n    }\n\n    Outputs = {\n        ${5:float4} ${6:Result};\n    }\n\n    Graph = {\n        ${6:Result} = ${5:float4}(1.0, 1.0, 1.0, 1.0);\n    }\n}"],
         ["VirtualFunction", "VirtualFunction(Name=\"${1:MyFunction}\")\n{\n    Options = {\n        Asset = Path(Plugins.${2:PluginName}, \"${3:MaterialFunctions/MyFunction}\");\n    }\n\n    Inputs = {\n        ${4:float} ${5:Value};\n    }\n\n    Outputs = {\n        ${6:float} ${7:Result};\n    }\n}"]
     ];
 
@@ -2177,6 +2178,13 @@ function addDeclarationHelperItems(items, context) {
         optional.insertText = new vscode.SnippetString("opt ${1:float} ${2:Value} = ${3:0.0};");
         optional.detail = "Optional ShaderFunction / VirtualFunction input";
         items.push(optional);
+    }
+
+    if (context.currentSection === "Properties") {
+        const constItem = new vscode.CompletionItem("const", vscode.CompletionItemKind.Keyword);
+        constItem.insertText = new vscode.SnippetString("const ${1:float} ${2:Value} = ${3:0.0};");
+        constItem.detail = "Const helper node, not an externally adjustable parameter";
+        items.push(constItem);
     }
 
     if (context.inGraphLikeContext || context.currentSection === "Graph") {
@@ -2403,6 +2411,7 @@ function analyzeDocument(document, position) {
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
     const inRawHlslContext = inFunctionBody;
     const inGraphCode = currentSection === "Graph";
+    const inShaderFunctionInputSection = currentBlock === "ShaderFunction" && currentSection === "Inputs";
     const inImportLine = /^\s*import\b/i.test(linePrefix.trimStart());
 
     return {
@@ -2427,7 +2436,7 @@ function analyzeDocument(document, position) {
         inProperties: currentSection === "Properties" || currentSection === "Inputs",
         inOutputs: currentSection === "Outputs",
         inMaterialOutputs: currentSection === "Outputs" && currentBlock === "Shader",
-        inGraphLikeContext: inGraphCode || currentSection === "Properties",
+        inGraphLikeContext: inGraphCode || currentSection === "Properties" || inShaderFunctionInputSection,
         inTopLevelAttributeList: Boolean(topLevelAttributeKind),
         inRootPluginValue: Boolean(rootPluginValueInfo),
         inPathPluginValue: Boolean(pathPluginValueInfo),
@@ -3532,15 +3541,32 @@ function stripOptionalKeyword(text) {
     };
 }
 
+function stripConstKeyword(text) {
+    const source = String(text || "").trim();
+    const match = source.match(/^const\b/i);
+    if (!match) {
+        return { text: source, isConst: false };
+    }
+
+    return {
+        text: source.slice(match[0].length).trim(),
+        isConst: true
+    };
+}
+
 function parseTypedDeclarationsFromSection(section, allowBindings = false) {
     const declarations = [];
     const bindings = [];
     const statements = splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
+    const allowConst = section.name === "Properties";
 
     for (const statement of statements) {
         const strippedMetadata = stripTrailingMetadata(statement.text);
         const strippedOptional = stripOptionalKeyword(strippedMetadata.text);
-        const statementText = strippedOptional.text;
+        const strippedConst = allowConst
+            ? stripConstKeyword(strippedOptional.text)
+            : { text: strippedOptional.text, isConst: false };
+        const statementText = strippedConst.text;
         const assignment = splitTopLevelAssignment(statementText);
         if (assignment) {
             const declaration = splitDeclarationTypeAndName(assignment.left);
@@ -3552,6 +3578,7 @@ function parseTypedDeclarationsFromSection(section, allowBindings = false) {
                     name: declaration.name,
                     valueText: assignment.right,
                     optional: strippedOptional.optional,
+                    isConst: strippedConst.isConst,
                     metadata: strippedMetadata.metadata
                 });
                 continue;
@@ -3577,6 +3604,7 @@ function parseTypedDeclarationsFromSection(section, allowBindings = false) {
                 name: declaration.name,
                 valueText: "",
                 optional: strippedOptional.optional,
+                isConst: strippedConst.isConst,
                 metadata: strippedMetadata.metadata
             });
             continue;
@@ -4108,18 +4136,26 @@ function collectVisibleIdentifierEntries(context) {
     }
 
     const sectionMap = new Map(parseLegacySections(text, currentLegacyBlock).map((section) => [section.name, section]));
-    const primaryDeclarationSectionName = currentLegacyBlock.kind === "Shader"
-        ? "Properties"
-        : "Inputs";
-    const secondaryDeclarationSectionName = "Outputs";
+    const propertySectionName = currentLegacyBlock.kind === "VirtualFunction" ? "" : "Properties";
+    const inputSectionName = currentLegacyBlock.kind === "Shader" ? "" : "Inputs";
+    const outputSectionName = "Outputs";
 
-    if (currentSectionInfo.name === primaryDeclarationSectionName || currentSectionInfo.name === secondaryDeclarationSectionName) {
-        if (currentSectionInfo.name === secondaryDeclarationSectionName) {
+    if (["Properties", "Inputs", "Outputs"].includes(currentSectionInfo.name)) {
+        if (currentSectionInfo.name !== "Properties" && propertySectionName) {
             addSectionDeclarationEntries(
                 entries,
-                sectionMap.get(primaryDeclarationSectionName),
+                sectionMap.get(propertySectionName),
                 Number.POSITIVE_INFINITY,
-                describeSectionSymbol(currentLegacyBlock.kind, primaryDeclarationSectionName)
+                describeSectionSymbol(currentLegacyBlock.kind, propertySectionName)
+            );
+        }
+
+        if (currentSectionInfo.name === "Outputs" && inputSectionName) {
+            addSectionDeclarationEntries(
+                entries,
+                sectionMap.get(inputSectionName),
+                Number.POSITIVE_INFINITY,
+                describeSectionSymbol(currentLegacyBlock.kind, inputSectionName)
             );
         }
 
@@ -4133,17 +4169,27 @@ function collectVisibleIdentifierEntries(context) {
     }
 
     if (currentSectionInfo.name === "Graph") {
+        if (propertySectionName) {
+            addSectionDeclarationEntries(
+                entries,
+                sectionMap.get(propertySectionName),
+                Number.POSITIVE_INFINITY,
+                describeSectionSymbol(currentLegacyBlock.kind, propertySectionName)
+            );
+        }
+        if (inputSectionName) {
+            addSectionDeclarationEntries(
+                entries,
+                sectionMap.get(inputSectionName),
+                Number.POSITIVE_INFINITY,
+                describeSectionSymbol(currentLegacyBlock.kind, inputSectionName)
+            );
+        }
         addSectionDeclarationEntries(
             entries,
-            sectionMap.get(primaryDeclarationSectionName),
+            sectionMap.get(outputSectionName),
             Number.POSITIVE_INFINITY,
-            describeSectionSymbol(currentLegacyBlock.kind, primaryDeclarationSectionName)
-        );
-        addSectionDeclarationEntries(
-            entries,
-            sectionMap.get(secondaryDeclarationSectionName),
-            Number.POSITIVE_INFINITY,
-            describeSectionSymbol(currentLegacyBlock.kind, secondaryDeclarationSectionName)
+            describeSectionSymbol(currentLegacyBlock.kind, outputSectionName)
         );
 
         const reachableCallables = collectReachableCallableSignatures(context.document);
@@ -4476,8 +4522,12 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
             diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", true, reachableCallables));
         }
     } else if (block.kind === "ShaderFunction") {
+        const propertiesSection = seenSections.get("Properties")?.[0];
         const inputsSection = seenSections.get("Inputs")?.[0];
         const outputsSection = seenSections.get("Outputs")?.[0];
+        if (propertiesSection) {
+            diagnostics.push(...validateDeclarationSection(document, propertiesSection, symbols, "Properties", false, reachableCallables));
+        }
         if (inputsSection) {
             diagnostics.push(...validateDeclarationSection(document, inputsSection, symbols, "Inputs", false, reachableCallables));
         }
@@ -4573,7 +4623,7 @@ function validateDeclarationSection(document, section, symbols, sectionLabel, al
             continue;
         }
 
-        if ((resolvedType?.isTexture || resolvedType?.expectsTextureDefault) && declaration.valueText) {
+        if (sectionLabel === "Properties" && (resolvedType?.isTexture || resolvedType?.expectsTextureDefault) && declaration.valueText) {
             const valueOffset = declaration.startOffset + declaration.text.indexOf(declaration.valueText);
             const texturePathResult = parseTexturePathReferenceText(declaration.valueText);
             if (texturePathResult.error) {
