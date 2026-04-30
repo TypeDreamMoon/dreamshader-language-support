@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.23
+
+- Updated declaration metadata parsing and snippets to the semicolon-based reflection block syntax
+- Added a TextureSampleParameter2D reflection snippet covering sampler, mip, coordinate, and view mip bias properties
+- Kept local symbol extraction compatible with both comma-style historical metadata and the new reflected property blocks
+
 ## 1.2.22
 
 - Added Properties support for explicit Parameter node types, `StaticSwitchParameter`, declaration metadata, and optional function inputs

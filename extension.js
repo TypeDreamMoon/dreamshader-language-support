@@ -537,8 +537,8 @@ const HOVER_DOCS = new Map([
     ["outputindex", "Selects an output by zero-based output index."],
     ["opt", "Marks a ShaderFunction or VirtualFunction input as optional. Calls may pass `default` or omit trailing optional inputs."],
     ["default", "Uses an optional ShaderFunction or VirtualFunction input's Unreal preview/default value."],
-    ["group", "Parameter metadata for Material Instance grouping, used in `[Group=\"...\"]`."],
-    ["sortpriority", "Parameter or function pin ordering metadata, used in `[SortPriority=32]`."],
+    ["group", "Reflected parameter property for Material Instance grouping, used inside a trailing `[...]` block."],
+    ["sortpriority", "Reflected parameter or function pin ordering property, used inside a trailing `[...]` block."],
     ["collectionparam", "Reads a scalar or vector parameter from a MaterialParameterCollection: `UE.CollectionParam(Collection=Path(...), Parameter=\"Name\")`."],
     ["staticswitchparameter", "Creates a static switch parameter. In Properties, call it as `UseSwitch(True=A, False=B)` inside Graph."],
     ["base", "Material output root namespace used in Shader Outputs bindings, for example `Base.BaseColor = ...`."],
@@ -2157,9 +2157,9 @@ function addDeclarationHelperItems(items, context) {
         return;
     }
 
-    const metadata = new vscode.CompletionItem("[Group, SortPriority, Description]", vscode.CompletionItemKind.Snippet);
-    metadata.insertText = new vscode.SnippetString("[Group=\"${1:General}\", SortPriority=${2:32}, Description=\"${3:Description}\"]");
-    metadata.detail = "DreamShader declaration metadata";
+    const metadata = new vscode.CompletionItem("[reflection block]", vscode.CompletionItemKind.Snippet);
+    metadata.insertText = new vscode.SnippetString("[\n\tGroup=\"${1:General}\";\n\tSortPriority=${2:32};\n\tDescription=\"${3:Description}\";\n]");
+    metadata.detail = "DreamShader reflected parameter properties";
     items.push(metadata);
 
     if (context.currentSection === "Inputs") {
@@ -2884,6 +2884,7 @@ function parseLegacySections(text, block) {
 function splitTopLevelDelimitedWithOffsets(text, baseOffset, delimiter) {
     const normalizedText = stripCommentsPreserveLayout(text);
     const segments = [];
+    const delimiters = Array.isArray(delimiter) ? delimiter : [delimiter];
     let startIndex = 0;
     let parenDepth = 0;
     let braceDepth = 0;
@@ -2962,7 +2963,7 @@ function splitTopLevelDelimitedWithOffsets(text, baseOffset, delimiter) {
             continue;
         }
 
-        if (char === delimiter && parenDepth === 0 && braceDepth === 0 && bracketDepth === 0) {
+        if (delimiters.includes(char) && parenDepth === 0 && braceDepth === 0 && bracketDepth === 0) {
             const raw = normalizedText.slice(startIndex, index);
             const trimmedStartDelta = raw.search(/\S|$/);
             const trimmedEndDelta = raw.length - raw.trimEnd().length;
@@ -3465,7 +3466,7 @@ function stripTrailingMetadata(text) {
 
     const metadata = {};
     const metadataBody = source.slice(metadataStart + 1, -1);
-    for (const entry of splitTopLevelDelimitedWithOffsets(metadataBody, 0, ",")) {
+    for (const entry of splitTopLevelDelimitedWithOffsets(metadataBody, 0, [",", ";"])) {
         const assignment = splitTopLevelAssignment(entry.text);
         if (assignment) {
             metadata[normalizeSymbolKey(assignment.left)] = trimMatchingQuotes(assignment.right);

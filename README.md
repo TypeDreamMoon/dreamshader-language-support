@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.22`
+- Version：`1.2.23`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -18,7 +18,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `Graph` 表达式支持 `.rgba` / `.xyzw` 向量 swizzle，例如 `.rg`、`.rrr`、`.rgaa`、`.rgbb`
-- 支持 `Properties` 显式 Parameter 类型、`StaticSwitchParameter`、`UE.CollectionParam(...)`、声明 metadata、`opt` 输入和 `default` 调用参数
+- 支持 `Properties` 显式 Parameter 类型、`StaticSwitchParameter`、`UE.CollectionParam(...)`、声明反射属性块、`opt` 输入和 `default` 调用参数
 - `DreamShaderLang` `.dsm` / `.dsh` 文件关联
 - 语法高亮
 - Semantic Tokens 语义高亮，能区分类型、函数、参数、变量、材质输出和 UE 内置调用
@@ -51,6 +51,12 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.23 更新
+
+- 新增分号式 `[...]` 声明反射属性块 snippet 和解析，可用于 `Group`、`SortPriority`、`Description` 以及 Texture Sample 等参数节点反射字段
+- 新增 `TextureSampleParameter2D` 反射属性 snippet，覆盖 sampler、mip、coordinate 和 view mip bias 常用字段
+- 本地声明解析同时兼容历史逗号 metadata 和新的分号属性块
 
 ### 1.2.22 更新
 
@@ -200,7 +206,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.21.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.23.vsix
 ```
 
 ## 项目根目录

@@ -155,7 +155,10 @@
     "scope": "dreamshaderlang",
     "prefix": "optinput",
     "body": [
-      "opt ${1:float4} ${2:Color} = ${3:float4(1.0, 1.0, 1.0, 1.0)} [Group=\"${4:General}\", SortPriority=${5:32}, Description=\"${6:Optional input}\"];"
+      "opt ${1:float4} ${2:Color} = ${3:float4(1.0, 1.0, 1.0, 1.0)} [",
+      "\tDescription=\"${4:Optional input}\";",
+      "\tSortPriority=${5:32};",
+      "];"
     ],
     "description": "Insert an optional ShaderFunction / VirtualFunction input"
   },
@@ -163,7 +166,11 @@
     "scope": "dreamshaderlang",
     "prefix": "staticswitch",
     "body": [
-      "StaticSwitchParameter ${1:UseDetail} = ${2:true} [Group=\"${3:Switches}\", SortPriority=${4:32}, Description=\"${5:Use detail branch}\"];"
+      "StaticSwitchParameter ${1:UseDetail} = ${2:true} [",
+      "\tGroup=\"${3:Switches}\";",
+      "\tSortPriority=${4:32};",
+      "\tDescription=\"${5:Use detail branch}\";",
+      "];"
     ],
     "description": "Insert a StaticSwitchParameter property"
   },
@@ -179,9 +186,30 @@
     "scope": "dreamshaderlang",
     "prefix": "metadata",
     "body": [
-      "[Group=\"${1:General}\", SortPriority=${2:32}, Description=\"${3:Description}\"]"
+      "[",
+      "\tGroup=\"${1:General}\";",
+      "\tSortPriority=${2:32};",
+      "\tDescription=\"${3:Description}\";",
+      "]"
     ],
-    "description": "Insert DreamShader declaration metadata"
+    "description": "Insert DreamShader reflected declaration properties"
+  },
+  "DreamShader Texture Sample Parameter Reflection": {
+    "scope": "dreamshaderlang",
+    "prefix": "texparam",
+    "body": [
+      "TextureSampleParameter2D ${1:MetallicMap} = Path(${2:Game}, \"${3:Textures/T_White_Linear}\") [",
+      "\tGroup=\"${4:11 - Specular}\";",
+      "\tSortPriority=${5:51};",
+      "\tSamplerType=\"${6:LinearColor}\";",
+      "\tSamplerSource=\"${7:FromTextureAsset}\";",
+      "\tMipValueMode=\"${8:None}\";",
+      "\tAutomaticViewMipBias=${9:true};",
+      "\tConstCoordinate=${10:0};",
+      "\tConstMipValue=${11:-1};",
+      "];"
+    ],
+    "description": "Insert a TextureSampleParameter2D with reflected properties"
   },
   "DreamShader Transform Vector": {
     "scope": "dreamshaderlang",
