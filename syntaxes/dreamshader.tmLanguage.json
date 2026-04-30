@@ -63,13 +63,13 @@
         { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|ShaderFunction|VirtualFunction|import)\\b" },
         { "name": "storage.modifier.function.dreamshader", "match": "\\b(?:SelfContained|Inline)\\b" },
         { "name": "entity.name.namespace.definition.dreamshader", "match": "(?<=\\bNamespace\\s*\\(\\s*Name\\s*=\\s*\")[A-Za-z_][A-Za-z0-9_]*\\b" },
-        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Root|Asset|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time)\\b(?=\\s*=)" }
+        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Root|Asset|Collection|Parameter|ParameterName|Default|True|False|Group|SortPriority|Description|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time)\\b(?=\\s*=)" }
       ]
     },
     "shaderKeywords": {
       "patterns": [
         { "name": "keyword.control.shadercode.dreamshader", "match": "\\b(?:if|else|for|while|do|switch|case|default|break|continue|return)\\b" },
-        { "name": "storage.modifier.shadercode.dreamshader", "match": "\\b(?:const|static|in|out|inout|struct)\\b" }
+        { "name": "storage.modifier.shadercode.dreamshader", "match": "\\b(?:const|static|in|out|inout|struct|opt)\\b" }
       ]
     },
     "sections": {
@@ -79,7 +79,7 @@
     },
     "types": {
       "patterns": [
-        { "name": "storage.type.dreamshader", "match": "\\b(?:float|float1|float2|float3|float4|float2x2|float3x3|float4x4|half|half1|half2|half3|half4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool|bool2|bool3|bool4|void|Texture2D|TextureCube|Texture2DArray|SamplerState|MaterialAttributes|vec2|vec3|vec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|bvec2|bvec3|bvec4|mat2|mat3|mat4)\\b" }
+        { "name": "storage.type.dreamshader", "match": "\\b(?:float|float1|float2|float3|float4|float2x2|float3x3|float4x4|half|half1|half2|half3|half4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool|bool2|bool3|bool4|void|Texture2D|TextureCube|Texture2DArray|SamplerState|MaterialAttributes|ScalarParameter|VectorParameter|DoubleVectorParameter|StaticBoolParameter|StaticSwitchParameter|TextureObjectParameter|TextureSampleParameter2D|TextureSampleParameter2DArray|TextureSampleParameterCube|TextureSampleParameterCubeArray|TextureSampleParameterVolume|TextureSampleParameterSubUV|RuntimeVirtualTextureSampleParameter|SparseVolumeTextureSampleParameter|SparseVolumeTextureObjectParameter|ChannelMaskParameter|StaticComponentMaskParameter|TextureCollectionParameter|CurveAtlasRowParameter|DynamicParameter|FontSampleParameter|SpriteTextureSampler|vec2|vec3|vec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|bvec2|bvec3|bvec4|mat2|mat3|mat4)\\b" }
       ]
     },
     "booleans": {
@@ -89,7 +89,7 @@
     },
     "settings": {
       "patterns": [
-        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|Description|ExposeToLibrary|UserExposedCaption|LibraryCategories)\\b(?=\\s*=)" }
+        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|Description|Group|SortPriority|ExposeToLibrary|UserExposedCaption|LibraryCategories)\\b(?=\\s*=)" }
       ]
     },
     "materialOutputs": {

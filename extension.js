@@ -99,6 +99,28 @@ const GRAPH_TYPE_ITEMS = [
     ["Texture2D", "Texture object input"],
     ["TextureCube", "Texture cube input"],
     ["Texture2DArray", "Texture array input"],
+    ["ScalarParameter", "Scalar material parameter"],
+    ["VectorParameter", "Vector material parameter"],
+    ["DoubleVectorParameter", "Double vector material parameter"],
+    ["StaticBoolParameter", "Static bool material parameter"],
+    ["StaticSwitchParameter", "Static switch material parameter"],
+    ["TextureObjectParameter", "Texture object material parameter"],
+    ["TextureSampleParameter2D", "Texture sample parameter"],
+    ["TextureSampleParameter2DArray", "Texture array sample parameter"],
+    ["TextureSampleParameterCube", "Texture cube sample parameter"],
+    ["TextureSampleParameterCubeArray", "Texture cube array sample parameter"],
+    ["TextureSampleParameterVolume", "Volume texture sample parameter"],
+    ["TextureSampleParameterSubUV", "SubUV texture sample parameter"],
+    ["RuntimeVirtualTextureSampleParameter", "Runtime virtual texture sample parameter"],
+    ["SparseVolumeTextureSampleParameter", "Sparse volume texture sample parameter"],
+    ["SparseVolumeTextureObjectParameter", "Sparse volume texture object parameter"],
+    ["ChannelMaskParameter", "Channel mask parameter"],
+    ["StaticComponentMaskParameter", "Static component mask parameter"],
+    ["TextureCollectionParameter", "Texture collection parameter"],
+    ["CurveAtlasRowParameter", "Curve atlas row parameter"],
+    ["DynamicParameter", "Dynamic parameter expression"],
+    ["FontSampleParameter", "Font sample parameter"],
+    ["SpriteTextureSampler", "Sprite texture sampler parameter"],
 ];
 
 const HLSL_TYPE_ITEMS = [
@@ -451,6 +473,34 @@ const UE_BUILTINS = [
             { qualifier: "in", type: "value", name: "OutputIndex" }
         ],
         "UE.Expression(Class=\"Sine\", OutputType=\"float1\", Input=UE.Time())"
+    ),
+    createUEBuiltinItem(
+        "CollectionParam",
+        "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")",
+        "Reads a scalar or vector from a MaterialParameterCollection.",
+        [
+            { qualifier: "in", type: "Path", name: "Collection" },
+            { qualifier: "in", type: "value", name: "Parameter" },
+            { qualifier: "in", type: "value", name: "Group" },
+            { qualifier: "in", type: "value", name: "SortPriority" },
+            { qualifier: "in", type: "value", name: "Description" }
+        ],
+        "UE.CollectionParam(Collection=Path(Game, \"MaterialParameterCollections/MPC_Global\"), Parameter=\"Value\")"
+    ),
+    createUEBuiltinItem(
+        "StaticSwitchParameter",
+        "UE.StaticSwitchParameter(Name=\"${1:UseDetail}\", Default=${2:true}, True=${3:Detail}, False=${4:Base})",
+        "Creates an inline StaticSwitchParameter with True and False branches.",
+        [
+            { qualifier: "in", type: "value", name: "Name" },
+            { qualifier: "in", type: "value", name: "Default" },
+            { qualifier: "in", type: "value", name: "True" },
+            { qualifier: "in", type: "value", name: "False" },
+            { qualifier: "in", type: "value", name: "Group" },
+            { qualifier: "in", type: "value", name: "SortPriority" },
+            { qualifier: "in", type: "value", name: "Description" }
+        ],
+        "UE.StaticSwitchParameter(Name=\"UseDetail\", Default=true, True=Detail, False=Base)"
     )
 ];
 
@@ -485,6 +535,12 @@ const HOVER_DOCS = new Map([
     ["output", "Selects a named output from a multi-output expression, ShaderFunction call, or VirtualFunction call."],
     ["outputname", "Alias of `Output`."],
     ["outputindex", "Selects an output by zero-based output index."],
+    ["opt", "Marks a ShaderFunction or VirtualFunction input as optional. Calls may pass `default` or omit trailing optional inputs."],
+    ["default", "Uses an optional ShaderFunction or VirtualFunction input's Unreal preview/default value."],
+    ["group", "Parameter metadata for Material Instance grouping, used in `[Group=\"...\"]`."],
+    ["sortpriority", "Parameter or function pin ordering metadata, used in `[SortPriority=32]`."],
+    ["collectionparam", "Reads a scalar or vector parameter from a MaterialParameterCollection: `UE.CollectionParam(Collection=Path(...), Parameter=\"Name\")`."],
+    ["staticswitchparameter", "Creates a static switch parameter. In Properties, call it as `UseSwitch(True=A, False=B)` inside Graph."],
     ["base", "Material output root namespace used in Shader Outputs bindings, for example `Base.BaseColor = ...`."],
     ["pin", "Selects an auxiliary material output node pin by zero-based index, for example `Expression(Class=\"ThinTranslucentMaterialOutput\").Pin[0] = ...`."] ,
     ["path", "Resolves a texture, object, or VirtualFunction asset path. Use `Path(Game, \"Folder/Asset\")`, `Path(Engine, \"Folder/Asset\")`, `Path(Plugins.PluginName, \"Folder/Asset\")`, or a full `/Game/...` object path."],
@@ -545,6 +601,31 @@ const TEXTURE_TYPE_NAMES = new Set([
     "samplerstate"
 ]);
 
+const PARAMETER_TYPE_INFOS = new Map([
+    ["scalarparameter", { type: "scalarparameter", componentCount: 1, isTexture: false }],
+    ["staticboolparameter", { type: "staticboolparameter", componentCount: 1, isTexture: false }],
+    ["staticswitchparameter", { type: "staticswitchparameter", componentCount: 1, isTexture: false, isStaticSwitch: true }],
+    ["vectorparameter", { type: "vectorparameter", componentCount: 4, isTexture: false }],
+    ["doublevectorparameter", { type: "doublevectorparameter", componentCount: 4, isTexture: false }],
+    ["channelmaskparameter", { type: "channelmaskparameter", componentCount: 1, isTexture: false }],
+    ["staticcomponentmaskparameter", { type: "staticcomponentmaskparameter", componentCount: 4, isTexture: false }],
+    ["dynamicparameter", { type: "dynamicparameter", componentCount: 4, isTexture: false }],
+    ["fontsampleparameter", { type: "fontsampleparameter", componentCount: 4, isTexture: false }],
+    ["curveatlasrowparameter", { type: "curveatlasrowparameter", componentCount: 4, isTexture: false }],
+    ["spritetexturesampler", { type: "spritetexturesampler", componentCount: 4, isTexture: false }],
+    ["textureobjectparameter", { type: "textureobjectparameter", componentCount: 0, isTexture: true }],
+    ["texturecollectionparameter", { type: "texturecollectionparameter", componentCount: 0, isTexture: true }],
+    ["sparsevolumetextureobjectparameter", { type: "sparsevolumetextureobjectparameter", componentCount: 0, isTexture: true }],
+    ["texturesampleparameter2d", { type: "texturesampleparameter2d", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["texturesampleparameter2darray", { type: "texturesampleparameter2darray", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["texturesampleparametercube", { type: "texturesampleparametercube", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["texturesampleparametercubearray", { type: "texturesampleparametercubearray", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["texturesampleparametervolume", { type: "texturesampleparametervolume", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["texturesampleparametersubuv", { type: "texturesampleparametersubuv", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["runtimevirtualtexturesampleparameter", { type: "runtimevirtualtexturesampleparameter", componentCount: 4, isTexture: false, expectsTextureDefault: true }],
+    ["sparsevolumetexturesampleparameter", { type: "sparsevolumetexturesampleparameter", componentCount: 4, isTexture: false, expectsTextureDefault: true }]
+]);
+
 const SWIZZLE_CHANNEL_GROUPS = [
     "rgba",
     "xyzw"
@@ -555,6 +636,7 @@ const TYPE_LIKE_NAMES = new Set([
     ...SCALAR_TYPE_NAMES,
     ...VECTOR_TYPE_COMPONENTS.keys(),
     ...TEXTURE_TYPE_NAMES,
+    ...PARAMETER_TYPE_INFOS.keys(),
     "materialattributes",
     "void"
 ]);
@@ -563,7 +645,9 @@ const IGNORED_IDENTIFIER_NAMES = new Set([
     "true",
     "false",
     "in",
-    "out"
+    "out",
+    "opt",
+    "default"
 ]);
 
 function activate(context) {
@@ -1317,6 +1401,7 @@ function createCompletionProvider() {
             addTopLevelAttributeItems(items, context);
             addImportItems(items, context);
             addTypeItems(items, context);
+            addDeclarationHelperItems(items, context);
             addQualifierItems(items, context);
             addHlslKeywordItems(items, context);
             addSettingItems(items, context);
@@ -1741,7 +1826,9 @@ function buildSignatureInformation(signature) {
     const parameters = [...(signature.inputs || []), ...(signature.outputs || [])];
     const parameterLabels = parameters.map((parameter) => {
         const qualifier = parameter.qualifier || ((signature.outputs || []).includes(parameter) ? "out" : "in");
-        return `${qualifier} ${parameter.type || "value"} ${parameter.name || "value"}`.trim();
+        const optional = parameter.optional ? " opt" : "";
+        const defaultText = parameter.optional && parameter.defaultValueText ? ` = ${parameter.defaultValueText}` : "";
+        return `${qualifier}${optional} ${parameter.type || "value"} ${parameter.name || "value"}${defaultText}`.trim();
     });
     const label = `${signature.name}(${parameterLabels.join(", ")})`;
     const info = new vscode.SignatureInformation(label, new vscode.MarkdownString(signature.detail || `${signature.kind || "DreamShader"} callable`));
@@ -2065,6 +2152,30 @@ function addTypeItems(items, context) {
     }
 }
 
+function addDeclarationHelperItems(items, context) {
+    if (!["Properties", "Inputs", "Outputs"].includes(context.currentSection)) {
+        return;
+    }
+
+    const metadata = new vscode.CompletionItem("[Group, SortPriority, Description]", vscode.CompletionItemKind.Snippet);
+    metadata.insertText = new vscode.SnippetString("[Group=\"${1:General}\", SortPriority=${2:32}, Description=\"${3:Description}\"]");
+    metadata.detail = "DreamShader declaration metadata";
+    items.push(metadata);
+
+    if (context.currentSection === "Inputs") {
+        const optional = new vscode.CompletionItem("opt", vscode.CompletionItemKind.Keyword);
+        optional.insertText = new vscode.SnippetString("opt ${1:float} ${2:Value} = ${3:0.0};");
+        optional.detail = "Optional ShaderFunction / VirtualFunction input";
+        items.push(optional);
+    }
+
+    if (context.inGraphLikeContext || context.currentSection === "Graph") {
+        const defaultItem = new vscode.CompletionItem("default", vscode.CompletionItemKind.Keyword);
+        defaultItem.detail = "Use an optional function input default";
+        items.push(defaultItem);
+    }
+}
+
 function addQualifierItems(items, context) {
     if (!context.inFunctionSignature) {
         return;
@@ -2139,6 +2250,10 @@ function addBuiltinItems(items, context) {
     if (!context.inGraphLikeContext) {
         return;
     }
+
+    const defaultItem = new vscode.CompletionItem("default", vscode.CompletionItemKind.Keyword);
+    defaultItem.detail = "Use an optional ShaderFunction / VirtualFunction input default";
+    items.push(defaultItem);
 
     const ueRoot = new vscode.CompletionItem("UE", vscode.CompletionItemKind.Module);
     ueRoot.insertText = new vscode.SnippetString("UE.$0");
@@ -3239,6 +3354,10 @@ function resolveTypeInfo(typeText) {
         return { type: normalized, componentCount: 0, isTexture: true };
     }
 
+    if (PARAMETER_TYPE_INFOS.has(normalized)) {
+        return PARAMETER_TYPE_INFOS.get(normalized);
+    }
+
     if (normalized === "materialattributes") {
         return { type: normalized, componentCount: 0, isTexture: false };
     }
@@ -3287,13 +3406,101 @@ function parseFunctionSignatureParameters(definition, text) {
     return { inputs, outputs };
 }
 
+function trimMatchingQuotes(text) {
+    const source = String(text || "").trim();
+    if (source.length >= 2 && source.startsWith("\"") && source.endsWith("\"")) {
+        return source.slice(1, -1);
+    }
+    return source;
+}
+
+function stripTrailingMetadata(text) {
+    const source = String(text || "").trim();
+    if (!source.endsWith("]")) {
+        return { text: source, metadata: {} };
+    }
+
+    let metadataStart = -1;
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    let inString = false;
+    for (let index = 0; index < source.length; index += 1) {
+        const char = source[index];
+        if (inString) {
+            if (char === "\\") {
+                index += 1;
+            } else if (char === "\"") {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === "\"") {
+            inString = true;
+            continue;
+        }
+        if (char === "(") {
+            parenDepth += 1;
+            continue;
+        }
+        if (char === ")") {
+            parenDepth = Math.max(0, parenDepth - 1);
+            continue;
+        }
+        if (char === "[") {
+            if (parenDepth === 0 && bracketDepth === 0) {
+                metadataStart = index;
+            }
+            bracketDepth += 1;
+            continue;
+        }
+        if (char === "]") {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+        }
+    }
+
+    if (metadataStart < 0) {
+        return { text: source, metadata: {} };
+    }
+
+    const metadata = {};
+    const metadataBody = source.slice(metadataStart + 1, -1);
+    for (const entry of splitTopLevelDelimitedWithOffsets(metadataBody, 0, ",")) {
+        const assignment = splitTopLevelAssignment(entry.text);
+        if (assignment) {
+            metadata[normalizeSymbolKey(assignment.left)] = trimMatchingQuotes(assignment.right);
+        }
+    }
+
+    return {
+        text: source.slice(0, metadataStart).trim(),
+        metadata
+    };
+}
+
+function stripOptionalKeyword(text) {
+    const source = String(text || "").trim();
+    const match = source.match(/^opt\b/i);
+    if (!match) {
+        return { text: source, optional: false };
+    }
+
+    return {
+        text: source.slice(match[0].length).trim(),
+        optional: true
+    };
+}
+
 function parseTypedDeclarationsFromSection(section, allowBindings = false) {
     const declarations = [];
     const bindings = [];
     const statements = splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
 
     for (const statement of statements) {
-        const assignment = splitTopLevelAssignment(statement.text);
+        const strippedMetadata = stripTrailingMetadata(statement.text);
+        const strippedOptional = stripOptionalKeyword(strippedMetadata.text);
+        const statementText = strippedOptional.text;
+        const assignment = splitTopLevelAssignment(statementText);
         if (assignment) {
             const declaration = splitDeclarationTypeAndName(assignment.left);
             if (declaration) {
@@ -3302,7 +3509,9 @@ function parseTypedDeclarationsFromSection(section, allowBindings = false) {
                     kind: "declaration",
                     type: declaration.type,
                     name: declaration.name,
-                    valueText: assignment.right
+                    valueText: assignment.right,
+                    optional: strippedOptional.optional,
+                    metadata: strippedMetadata.metadata
                 });
                 continue;
             }
@@ -3318,14 +3527,16 @@ function parseTypedDeclarationsFromSection(section, allowBindings = false) {
             }
         }
 
-        const declaration = splitDeclarationTypeAndName(statement.text);
+        const declaration = splitDeclarationTypeAndName(statementText);
         if (declaration) {
             declarations.push({
                 ...statement,
                 kind: "declaration",
                 type: declaration.type,
                 name: declaration.name,
-                valueText: ""
+                valueText: "",
+                optional: strippedOptional.optional,
+                metadata: strippedMetadata.metadata
             });
             continue;
         }
@@ -3462,8 +3673,18 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
         addCallableSignature(results, {
             kind: block.kind,
             name: block.name,
-            inputs: inputs.map((entry) => ({ type: entry.type, name: entry.name })),
-            outputs: outputs.map((entry) => ({ type: entry.type, name: entry.name })),
+            inputs: inputs.map((entry) => ({
+                type: entry.type,
+                name: entry.name,
+                optional: Boolean(entry.optional),
+                defaultValueText: entry.valueText || "",
+                metadata: entry.metadata || {}
+            })),
+            outputs: outputs.map((entry) => ({
+                type: entry.type,
+                name: entry.name,
+                metadata: entry.metadata || {}
+            })),
             detail: block.kind === "VirtualFunction" ? "DreamShader VirtualFunction" : "DreamShader ShaderFunction",
             fsPath: normalizedPath,
             nameOffset: block.startOffset
@@ -4311,7 +4532,7 @@ function validateDeclarationSection(document, section, symbols, sectionLabel, al
             continue;
         }
 
-        if (resolvedType?.isTexture && declaration.valueText) {
+        if ((resolvedType?.isTexture || resolvedType?.expectsTextureDefault) && declaration.valueText) {
             const valueOffset = declaration.startOffset + declaration.text.indexOf(declaration.valueText);
             const texturePathResult = parseTexturePathReferenceText(declaration.valueText);
             if (texturePathResult.error) {
@@ -4786,11 +5007,18 @@ function analyzeExpressionText(document, text, baseOffset, symbols, reachableCal
     return diagnostics;
 }
 
+function isDefaultArgumentText(text) {
+    return String(text || "").trim().toLowerCase() === "default";
+}
+
 function analyzeCallExpression(document, callExpression, symbols, reachableCallables, mode) {
     const diagnostics = [];
 
     for (const argument of callExpression.arguments) {
         if (argument.isNamed) {
+            if (isDefaultArgumentText(argument.valueText)) {
+                continue;
+            }
             diagnostics.push(...analyzeExpressionText(document, argument.valueText, argument.valueOffset, symbols, reachableCallables, "value"));
         }
     }
@@ -4806,6 +5034,29 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
 
     const signatures = reachableCallables.get(normalizeSymbolKey(callExpression.callee)) || [];
     if (signatures.length === 0) {
+        const symbol = symbols ? symbols.get(normalizeSymbolKey(callExpression.callee)) : null;
+        if (symbol?.typeInfo?.isStaticSwitch) {
+            for (const argument of callExpression.arguments) {
+                if (!isDefaultArgumentText(argument.valueText)) {
+                    diagnostics.push(...analyzeExpressionText(document, argument.valueText, argument.valueOffset, symbols, reachableCallables, "value"));
+                }
+            }
+            const hasTrue = callExpression.arguments.some((argument, index) =>
+                (!argument.isNamed && index === 0)
+                || (argument.isNamed && ["true", "a"].includes(normalizeSymbolKey(argument.name))));
+            const hasFalse = callExpression.arguments.some((argument, index) =>
+                (!argument.isNamed && index === 1)
+                || (argument.isNamed && ["false", "b"].includes(normalizeSymbolKey(argument.name))));
+            if (!hasTrue || !hasFalse) {
+                diagnostics.push(makeOffsetDiagnostic(
+                    document,
+                    callExpression.calleeOffset,
+                    callExpression.endOffset,
+                    `StaticSwitchParameter '${callExpression.callee}' requires True=... and False=... inputs.`));
+            }
+            return diagnostics;
+        }
+
         diagnostics.push(makeOffsetDiagnostic(
             document,
             callExpression.calleeOffset,
@@ -4826,6 +5077,9 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
 
     for (const argument of callExpression.arguments) {
         if (!argument.isNamed) {
+            if (isDefaultArgumentText(argument.valueText)) {
+                continue;
+            }
             diagnostics.push(...analyzeExpressionText(document, argument.valueText, argument.valueOffset, symbols, reachableCallables, "value"));
         }
     }
@@ -4838,6 +5092,33 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
                 callExpression.calleeOffset,
                 callExpression.endOffset,
                 `${signature.kind} '${signature.name}' has too many positional arguments.`));
+        }
+
+        const inputs = signature.inputs || [];
+        for (let inputIndex = 0; inputIndex < inputs.length; inputIndex += 1) {
+            const input = inputs[inputIndex];
+            const positionalArgument = positionalArguments[inputIndex];
+            const namedArgument = callExpression.arguments.find((argument) => argument.isNamed && normalizeSymbolKey(argument.name) === normalizeSymbolKey(input.name));
+            const inputArgument = namedArgument || positionalArgument;
+
+            if (!inputArgument) {
+                if (!input.optional) {
+                    diagnostics.push(makeOffsetDiagnostic(
+                        document,
+                        callExpression.calleeOffset,
+                        callExpression.endOffset,
+                        `${signature.kind} '${signature.name}' is missing required input '${input.name}'.`));
+                }
+                continue;
+            }
+
+            if (isDefaultArgumentText(inputArgument.valueText) && !input.optional) {
+                diagnostics.push(makeOffsetDiagnostic(
+                    document,
+                    inputArgument.valueOffset,
+                    inputArgument.valueOffset + inputArgument.valueText.length,
+                    `${signature.kind} '${signature.name}' input '${input.name}' is not optional and cannot use default.`));
+            }
         }
     }
 

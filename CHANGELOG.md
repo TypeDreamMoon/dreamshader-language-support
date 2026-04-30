@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.22
+
+- Added Properties support for explicit Parameter node types, `StaticSwitchParameter`, declaration metadata, and optional function inputs
+- Added `UE.CollectionParam(...)` and `UE.StaticSwitchParameter(...)` completion, hover, signature help, and inlay-hint metadata
+- Updated local diagnostics to understand `opt` inputs and `default` arguments for ShaderFunction / VirtualFunction calls
+- Added snippets for optional inputs, declaration metadata, static switch parameters, and Material Parameter Collection reads
+- Updated extension packaging metadata for the 1.2.22 release
+
 ## 1.2.21
 
 - Added `.rgba` / `.xyzw` vector swizzle diagnostics support for chained expressions such as `DebugFloat2Values(...).rg`

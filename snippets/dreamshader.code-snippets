@@ -151,6 +151,38 @@
     ],
     "description": "Insert a generic reflected MaterialExpression call"
   },
+  "DreamShader Optional Function Input": {
+    "scope": "dreamshaderlang",
+    "prefix": "optinput",
+    "body": [
+      "opt ${1:float4} ${2:Color} = ${3:float4(1.0, 1.0, 1.0, 1.0)} [Group=\"${4:General}\", SortPriority=${5:32}, Description=\"${6:Optional input}\"];"
+    ],
+    "description": "Insert an optional ShaderFunction / VirtualFunction input"
+  },
+  "DreamShader Static Switch Parameter": {
+    "scope": "dreamshaderlang",
+    "prefix": "staticswitch",
+    "body": [
+      "StaticSwitchParameter ${1:UseDetail} = ${2:true} [Group=\"${3:Switches}\", SortPriority=${4:32}, Description=\"${5:Use detail branch}\"];"
+    ],
+    "description": "Insert a StaticSwitchParameter property"
+  },
+  "DreamShader Collection Param": {
+    "scope": "dreamshaderlang",
+    "prefix": "collectionparam",
+    "body": [
+      "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")"
+    ],
+    "description": "Insert a MaterialParameterCollection read"
+  },
+  "DreamShader Declaration Metadata": {
+    "scope": "dreamshaderlang",
+    "prefix": "metadata",
+    "body": [
+      "[Group=\"${1:General}\", SortPriority=${2:32}, Description=\"${3:Description}\"]"
+    ],
+    "description": "Insert DreamShader declaration metadata"
+  },
   "DreamShader Transform Vector": {
     "scope": "dreamshaderlang",
     "prefix": "uetransform",
