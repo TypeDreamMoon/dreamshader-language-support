@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($VsixPath)) {
-    $VsixPath = Join-Path $PSScriptRoot "dreamshaderlang-language-support-1.2.18.vsix"
+    $VsixPath = Join-Path $PSScriptRoot "dreamshaderlang-language-support-1.2.26.vsix"
 }
 
 if (-not (Test-Path -LiteralPath $VsixPath)) {
@@ -13,10 +13,10 @@ if (-not (Test-Path -LiteralPath $VsixPath)) {
 }
 
 $codeCandidates = @(
-    "code",
     (Join-Path $env:LOCALAPPDATA "Programs\Microsoft VS Code\bin\code.cmd"),
     (Join-Path $env:ProgramFiles "Microsoft VS Code\bin\code.cmd"),
-    (Join-Path ${env:ProgramFiles(x86)} "Microsoft VS Code\bin\code.cmd")
+    (Join-Path ${env:ProgramFiles(x86)} "Microsoft VS Code\bin\code.cmd"),
+    "code"
 ) | Where-Object { $_ -and $_.Trim().Length -gt 0 }
 
 $codeCommand = $null
@@ -40,4 +40,14 @@ if (-not $codeCommand) {
     throw "Could not find the VSCode 'code' command. Open VSCode and install from VSIX manually."
 }
 
+if ([System.IO.Path]::GetFileName($codeCommand) -ieq "Code.exe") {
+    $binCandidate = Join-Path (Split-Path -Parent $codeCommand) "bin\code.cmd"
+    if (Test-Path -LiteralPath $binCandidate) {
+        $codeCommand = $binCandidate
+    }
+}
+
 & $codeCommand --install-extension $VsixPath --force
+if ($LASTEXITCODE -ne 0) {
+    throw "VSCode extension install failed with exit code $LASTEXITCODE."
+}

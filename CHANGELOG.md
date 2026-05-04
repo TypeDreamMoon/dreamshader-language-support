@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.26
+
+- Synced local material output diagnostics with the DreamShader plugin, including `Base.CustomizedUV0..7`, `Base.CustomizedUVs0..7`, custom data, legacy color, displacement, surface thickness, and Mooa encoded attribute outputs
+- Updated expression diagnostics so DreamShader `Path(...)` helper calls are accepted inside `UE.CollectionParam(...)` arguments
+
 ## 1.2.25
 
 - Added `ShaderFunction.Properties` section support in completion, diagnostics, symbols, and visible identifier collection

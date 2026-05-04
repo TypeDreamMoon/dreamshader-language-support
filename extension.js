@@ -350,8 +350,10 @@ const VIRTUAL_FUNCTION_OPTION_ITEMS = [
 
 const MATERIAL_OUTPUT_ITEMS = [
     createMaterialOutputItem("MaterialAttributes", "Full Material Attributes output"),
+    createMaterialOutputItem("Attributes", "Alias of MaterialAttributes"),
     createMaterialOutputItem("BaseColor", "Material base color output"),
     createMaterialOutputItem("EmissiveColor", "Material emissive output"),
+    createMaterialOutputItem("Emissive", "Alias of EmissiveColor"),
     createMaterialOutputItem("Opacity", "Material opacity output"),
     createMaterialOutputItem("OpacityMask", "Material opacity mask output"),
     createMaterialOutputItem("Metallic", "Material metallic output"),
@@ -368,6 +370,33 @@ const MATERIAL_OUTPUT_ITEMS = [
     createMaterialOutputItem("SubsurfaceColor", "Subsurface color output"),
     createMaterialOutputItem("ClearCoat", "Clear coat output"),
     createMaterialOutputItem("ClearCoatRoughness", "Clear coat roughness output"),
+    createMaterialOutputItem("CustomData0", "Material custom data 0 output"),
+    createMaterialOutputItem("CustomData1", "Material custom data 1 output"),
+    createMaterialOutputItem("DiffuseColor", "Material diffuse color output"),
+    createMaterialOutputItem("SpecularColor", "Material specular color output"),
+    createMaterialOutputItem("SurfaceThickness", "Material surface thickness output"),
+    createMaterialOutputItem("Displacement", "Material displacement output"),
+    createMaterialOutputItem("CustomizedUV0", "Customized UV 0 output"),
+    createMaterialOutputItem("CustomizedUV1", "Customized UV 1 output"),
+    createMaterialOutputItem("CustomizedUV2", "Customized UV 2 output"),
+    createMaterialOutputItem("CustomizedUV3", "Customized UV 3 output"),
+    createMaterialOutputItem("CustomizedUV4", "Customized UV 4 output"),
+    createMaterialOutputItem("CustomizedUV5", "Customized UV 5 output"),
+    createMaterialOutputItem("CustomizedUV6", "Customized UV 6 output"),
+    createMaterialOutputItem("CustomizedUV7", "Customized UV 7 output"),
+    createMaterialOutputItem("CustomizedUVs0", "Alias of CustomizedUV0"),
+    createMaterialOutputItem("CustomizedUVs1", "Alias of CustomizedUV1"),
+    createMaterialOutputItem("CustomizedUVs2", "Alias of CustomizedUV2"),
+    createMaterialOutputItem("CustomizedUVs3", "Alias of CustomizedUV3"),
+    createMaterialOutputItem("CustomizedUVs4", "Alias of CustomizedUV4"),
+    createMaterialOutputItem("CustomizedUVs5", "Alias of CustomizedUV5"),
+    createMaterialOutputItem("CustomizedUVs6", "Alias of CustomizedUV6"),
+    createMaterialOutputItem("CustomizedUVs7", "Alias of CustomizedUV7"),
+    createMaterialOutputItem("MooaEncodedAttribute0", "Mooa encoded attribute 0 output"),
+    createMaterialOutputItem("MooaEncodedAttribute1", "Mooa encoded attribute 1 output"),
+    createMaterialOutputItem("MooaEncodedAttribute2", "Mooa encoded attribute 2 output"),
+    createMaterialOutputItem("MooaEncodedAttribute3", "Mooa encoded attribute 3 output"),
+    createMaterialOutputItem("MooaEncodedAttribute4", "Mooa encoded attribute 4 output"),
     createMaterialOutputItem("Anisotropy", "Anisotropy output"),
     createMaterialOutputItem("Tangent", "Tangent output")
 ];
@@ -5157,8 +5186,16 @@ function isDefaultArgumentText(text) {
     return String(text || "").trim().toLowerCase() === "default";
 }
 
+function isDreamShaderHelperFunctionName(name) {
+    return normalizeSymbolKey(name) === "path";
+}
+
 function analyzeCallExpression(document, callExpression, symbols, reachableCallables, mode) {
     const diagnostics = [];
+
+    if (isDreamShaderHelperFunctionName(callExpression.callee)) {
+        return diagnostics;
+    }
 
     for (const argument of callExpression.arguments) {
         if (argument.isNamed) {
