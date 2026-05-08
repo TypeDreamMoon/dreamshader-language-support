@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Added `GraphFunction` language support for reusable graph-node helpers that can call `UE.*` nodes and expand at the call site
+- Added `GraphFunction` snippets, completion, hover, signature help, symbols, folding, and local diagnostics
+- Added local diagnostics that reject `UE.*` graph node calls inside plain HLSL `Function` blocks and recommend `GraphFunction`
+
 ## 1.3.0
 
 - Added `MaterialLayer` and `MaterialLayerBlend` language support, snippets, semantic tokens, folding, symbols, CodeLens, completion, hover, signature help, and local diagnostics

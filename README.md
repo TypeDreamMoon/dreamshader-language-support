@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.3.0`
+- Version：`1.3.1`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -16,6 +16,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 使用 `Graph = { ... }` 作为图构建区块
 - `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
+- `GraphFunction` 支持在可复用 Graph helper 中调用 `UE.*` 节点，并在调用点展开
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `Graph` 表达式支持 `.rgba` / `.xyzw` 向量 swizzle，例如 `.rg`、`.rrr`、`.rgaa`、`.rgbb`
 - 支持 `Properties` 显式 Parameter 类型、`const` helper、`StaticSwitchParameter`、`UE.CollectionParam(...)`、声明反射属性块、`opt` 输入和 `default` 调用参数
@@ -26,7 +27,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 作用域感知变量补全
 - 函数调用参数 Inlay Hints
 - `import` 路径可点击跳转
-- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` / `VirtualFunction` / `Function` / `Namespace` 和区块折叠
+- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` / `VirtualFunction` / `Function` / `GraphFunction` / `Namespace` 和区块折叠
 - `Function` / `Namespace::Function` / `import` / `Path(...)` 联想
 - `UE.*` 内置材质节点补全、Hover、Signature Help
 - `Settings` 支持 `TranslucencyLightingMode` / `LightingMode`
@@ -51,6 +52,12 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.3.1 更新
+
+- 新增 `GraphFunction` 补全、snippet、语义高亮、折叠、符号、Hover、Signature Help 和本地诊断
+- `GraphFunction` 体内按 Graph 语义诊断，可调用 `UE.*`
+- 普通 `Function` 体内出现 `UE.*` 会被本地诊断标红，提示改用 `GraphFunction`
 
 ### 1.3.0 更新
 
@@ -236,7 +243,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.3.0.vsix
+code --install-extension .\dreamshaderlang-language-support-1.3.1.vsix
 ```
 
 ## 项目根目录

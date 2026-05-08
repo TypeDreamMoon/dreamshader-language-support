@@ -47,6 +47,7 @@ const LEGACY_SECTION_NAMES = [
 const TOP_LEVEL_BLOCK_NAMES = [
     "Shader",
     "Function",
+    "GraphFunction",
     "Namespace",
     "ShaderFunction",
     "MaterialLayer",
@@ -2310,6 +2311,7 @@ function addKeywordItems(items, context) {
         ["Shader", "Shader(Name=\"Materials/${1:MyMaterial}\", Root=\"${2:Game}\")\n{\n    $0\n}"],
         ["Function", "Function ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
         ["Function SelfContained", "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {\n    ${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);\n}"],
+        ["GraphFunction", "GraphFunction ${1:BuildLayerInfo}(in Texture2D ${2:BaseTex}, out float3 ${3:Color}, out float ${4:Alpha}) {\n    float2 UV0 = UE.TexCoord(Index=0);\n    ${3:Color} = Texture::Sample2DRGB(${2:BaseTex}, UV0);\n    ${4:Alpha} = Texture::Sample2DAlpha(${2:BaseTex}, UV0);\n}"],
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
         ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Properties = {\n        const Texture2D ${3:PreviewTex};\n    }\n\n    Inputs = {\n        opt Texture2D ${4:InputTex} = ${3:PreviewTex};\n    }\n\n    Outputs = {\n        ${5:float4} ${6:Result};\n    }\n\n    Graph = {\n        ${6:Result} = ${5:float4}(1.0, 1.0, 1.0, 1.0);\n    }\n}"],
@@ -2603,7 +2605,8 @@ function addReachableFunctionItems(items, document, context) {
         const localName = namespacePrefix ? (entry.localName || name.slice(namespacePrefix.length)) : name;
         const item = new vscode.CompletionItem(localName, vscode.CompletionItemKind.Function);
         item.insertText = new vscode.SnippetString(localName);
-        item.detail = entry.sourceKind === "imported" ? "Imported DreamShader function" : "DreamShader function";
+        const kindLabel = entry.kind === "GraphFunction" ? "GraphFunction" : "function";
+        item.detail = entry.sourceKind === "imported" ? `Imported DreamShader ${kindLabel}` : `DreamShader ${kindLabel}`;
         if (namespacePrefix) {
             item.documentation = new vscode.MarkdownString(`Namespace function \`${name}\``);
         }
@@ -2698,8 +2701,9 @@ function analyzeDocument(document, position) {
     const pathPluginValueInfo = getPathPluginValueCompletionInfo(text, offset);
     const inFunctionSignature = Boolean(currentFunction && offset > currentFunction.paramOpenOffset && offset < currentFunction.paramCloseOffset);
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
-    const inRawHlslContext = inFunctionBody;
-    const inGraphCode = currentSection === "Graph";
+    const inGraphFunctionBody = Boolean(inFunctionBody && currentFunction.kind === "GraphFunction");
+    const inRawHlslContext = Boolean(inFunctionBody && currentFunction.kind === "Function");
+    const inGraphCode = currentSection === "Graph" || inGraphFunctionBody;
     const inShaderFunctionInputSection = isGeneratedMaterialFunctionKind(currentBlock) && currentSection === "Inputs";
     const inImportLine = /^\s*import\b/i.test(linePrefix.trimStart());
 
@@ -2718,6 +2722,7 @@ function analyzeDocument(document, position) {
         linePrefix,
         inFunctionSignature,
         inFunctionBody,
+        inGraphFunctionBody,
         inRawHlslContext,
         inGraphCode,
         inSettings: currentSection === "Settings" && currentBlock !== "VirtualFunction",
@@ -2996,11 +3001,14 @@ function parseFunctionDefinitionsFromText(text) {
             continue;
         }
 
-        if (!matchKeywordAt(text, index, "Function")) {
+        const isGraphFunction = matchKeywordAt(text, index, "GraphFunction");
+        const isFunction = !isGraphFunction && matchKeywordAt(text, index, "Function");
+        if (!isFunction && !isGraphFunction) {
             continue;
         }
 
-        let cursor = index + "Function".length;
+        const keyword = isGraphFunction ? "GraphFunction" : "Function";
+        let cursor = index + keyword.length;
         cursor = skipWhitespace(text, cursor);
         if (!isIdentifierStart(text[cursor])) {
             continue;
@@ -3018,7 +3026,7 @@ function parseFunctionDefinitionsFromText(text) {
 
             const token = text.slice(tokenStart, cursor);
             const normalizedToken = token.toLowerCase();
-            if (normalizedToken === "selfcontained" || normalizedToken === "inline") {
+            if (!isGraphFunction && (normalizedToken === "selfcontained" || normalizedToken === "inline")) {
                 selfContained = true;
                 cursor = skipWhitespace(text, cursor);
                 if (!isIdentifierStart(text[cursor])) {
@@ -3064,7 +3072,7 @@ function parseFunctionDefinitionsFromText(text) {
         const name = namespaceName ? `${namespaceName}::${localName}` : localName;
 
         definitions.push({
-            kind: "Function",
+            kind: isGraphFunction ? "GraphFunction" : "Function",
             name,
             localName,
             namespaceName,
@@ -3085,7 +3093,7 @@ function parseFunctionDefinitionsFromText(text) {
 }
 function findInnermostFunctionDefinition(text, offset) {
     const definitions = parseFunctionDefinitionsFromText(text)
-        .filter((definition) => definition.kind === "Function" && offset >= definition.startOffset && offset <= definition.bodyCloseOffset)
+        .filter((definition) => (definition.kind === "Function" || definition.kind === "GraphFunction") && offset >= definition.startOffset && offset <= definition.bodyCloseOffset)
         .sort((a, b) => (a.bodyCloseOffset - a.startOffset) - (b.bodyCloseOffset - b.startOffset));
     return definitions[0];
 }
@@ -4009,6 +4017,9 @@ function getCallableShortName(name) {
 }
 
 function getCallableKindDetail(kind) {
+    if (kind === "GraphFunction") {
+        return "DreamShader GraphFunction";
+    }
     if (kind === "VirtualFunction") {
         return "DreamShader VirtualFunction";
     }
@@ -4036,17 +4047,19 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
     visited.add(normalizedPath);
 
     for (const definition of parseFunctionDefinitionsFromText(text)) {
-        if (definition.kind !== "Function") {
+        if (definition.kind !== "Function" && definition.kind !== "GraphFunction") {
             continue;
         }
 
         const parameters = parseFunctionSignatureParameters(definition, text);
         addCallableSignature(results, {
-            kind: "Function",
+            kind: definition.kind,
             name: definition.name,
             inputs: parameters.inputs,
             outputs: parameters.outputs,
-            detail: definition.selfContained ? "SelfContained DreamShader Function" : "DreamShader Function",
+            detail: definition.kind === "GraphFunction"
+                ? "DreamShader GraphFunction"
+                : definition.selfContained ? "SelfContained DreamShader Function" : "DreamShader Function",
             fsPath: normalizedPath,
             nameOffset: definition.nameOffset
         });
@@ -4363,6 +4376,7 @@ function collectReachableFunctionDefinitionsFromFile(fsPath, text, isRoot, resul
 
     for (const definition of parseFunctionDefinitionsFromText(text)) {
         const location = {
+            kind: definition.kind,
             name: definition.name,
             localName: definition.localName || definition.name,
             nameRangeLength: definition.nameRangeLength || definition.name.length,
@@ -4662,17 +4676,17 @@ function computeLocalDiagnostics(document) {
     const extension = path.extname(document.fileName).toLowerCase();
     const reachableCallables = collectReachableCallableSignatures(document);
 
-    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bMaterialLayer\s*\(/.test(text) && !/\bMaterialLayerBlend\s*\(/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
+    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bMaterialLayer\s*\(/.test(text) && !/\bMaterialLayerBlend\s*\(/.test(text) && !/\bGraphFunction\b/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), MaterialLayer(Name=\"...\"), MaterialLayerBlend(Name=\"...\"), or VirtualFunction(Name=\"...\") block.",
+            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), MaterialLayer(Name=\"...\"), MaterialLayerBlend(Name=\"...\"), GraphFunction, or VirtualFunction(Name=\"...\") block.",
             vscode.DiagnosticSeverity.Warning));
     }
 
     if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text) || /\bMaterialLayer\s*\(/.test(text) || /\bMaterialLayerBlend\s*\(/.test(text))) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            "DreamShader header (.dsh) may only contain import statements, Function blocks, Namespace blocks, and VirtualFunction declarations.",
+            "DreamShader header (.dsh) may only contain import statements, Function blocks, GraphFunction blocks, Namespace blocks, and VirtualFunction declarations.",
             vscode.DiagnosticSeverity.Error));
     }
 
@@ -4714,11 +4728,8 @@ function computeLocalDiagnostics(document) {
     }
 
     for (const definition of parseFunctionDefinitionsFromText(text)) {
-        if (definition.kind !== "Function") {
-            continue;
-        }
-
         diagnostics.push(...computeFunctionSignatureDiagnostics(document, text, definition));
+        diagnostics.push(...computeFunctionBodyDiagnostics(document, text, definition, reachableCallables));
     }
 
     diagnostics.push(...computeFunctionCycleDiagnostics(document, text));
@@ -4744,7 +4755,7 @@ function computeFunctionSignatureDiagnostics(document, text, definition) {
             diagnostics.push(makeFunctionDiagnostic(
                 document,
                 definition,
-                `Function '${definition.name}' has an invalid parameter declaration '${trimmed}'.`));
+                `${definition.kind} '${definition.name}' has an invalid parameter declaration '${trimmed}'.`));
             continue;
         }
 
@@ -4757,7 +4768,7 @@ function computeFunctionSignatureDiagnostics(document, text, definition) {
             diagnostics.push(makeFunctionDiagnostic(
                 document,
                 definition,
-                `Function '${definition.name}' parameter '${trimmed}' uses unsupported qualifier '${parts[0]}'. Supported qualifiers are in and out.`));
+                `${definition.kind} '${definition.name}' parameter '${trimmed}' uses unsupported qualifier '${parts[0]}'. Supported qualifiers are in and out.`));
             continue;
         }
 
@@ -4770,7 +4781,46 @@ function computeFunctionSignatureDiagnostics(document, text, definition) {
         diagnostics.push(makeFunctionDiagnostic(
             document,
             definition,
-            `Function '${definition.name}' must declare at least one out parameter.`));
+            `${definition.kind} '${definition.name}' must declare at least one out parameter.`));
+    }
+
+    return diagnostics;
+}
+
+function computeFunctionBodyDiagnostics(document, text, definition, reachableCallables) {
+    const diagnostics = [];
+    const bodyText = text.slice(definition.bodyOpenOffset + 1, definition.bodyCloseOffset);
+    const bodyOffset = definition.bodyOpenOffset + 1;
+
+    if (definition.kind === "Function") {
+        const ueCallRegex = /\bUE\s*\./g;
+        for (const match of bodyText.matchAll(ueCallRegex)) {
+            diagnostics.push(makeOffsetDiagnostic(
+                document,
+                bodyOffset + match.index,
+                bodyOffset + match.index + match[0].length,
+                "UE.* material graph nodes are not valid inside Function. Use GraphFunction when you need to call UE graph nodes.",
+                vscode.DiagnosticSeverity.Error));
+        }
+        return diagnostics;
+    }
+
+    if (definition.kind === "GraphFunction") {
+        const symbols = new Map();
+        const parameters = parseFunctionSignatureParameters(definition, text);
+        for (const input of parameters.inputs) {
+            symbols.set(normalizeSymbolKey(input.name), {
+                name: input.name,
+                typeInfo: resolveTypeInfo(input.type)
+            });
+        }
+        for (const output of parameters.outputs) {
+            symbols.set(normalizeSymbolKey(output.name), {
+                name: output.name,
+                typeInfo: resolveTypeInfo(output.type)
+            });
+        }
+        diagnostics.push(...analyzeGraphStatements(document, bodyText, bodyOffset, symbols, reachableCallables));
     }
 
     return diagnostics;
@@ -5323,14 +5373,14 @@ function analyzeGraphStatements(document, bodyText, baseOffset, symbols, reachab
 function analyzeStandaloneFunctionCall(document, callExpression, symbols, reachableCallables) {
     const diagnostics = [];
     const signatures = reachableCallables.get(normalizeSymbolKey(callExpression.callee)) || [];
-    const signature = signatures.find((entry) => entry.kind === "Function");
+    const signature = signatures.find((entry) => entry.kind === "Function" || entry.kind === "GraphFunction");
 
     if (!signature) {
         diagnostics.push(makeOffsetDiagnostic(
             document,
             callExpression.calleeOffset,
             callExpression.calleeOffset + callExpression.callee.length,
-            `Standalone Graph call '${callExpression.callee}(...)' is unsupported. Only DreamShader Function calls may use statement syntax.`));
+            `Standalone Graph call '${callExpression.callee}(...)' is unsupported. Only DreamShader Function or GraphFunction calls may use statement syntax.`));
         return diagnostics;
     }
 
@@ -5340,7 +5390,7 @@ function analyzeStandaloneFunctionCall(document, callExpression, symbols, reacha
             document,
             callExpression.calleeOffset,
             callExpression.endOffset,
-            `DreamShader Function '${signature.name}' expects ${expectedArgumentCount} arguments (${signature.inputs.length} inputs, ${signature.outputs.length} out targets) but got ${callExpression.arguments.length}.`));
+            `DreamShader ${signature.kind} '${signature.name}' expects ${expectedArgumentCount} arguments (${signature.inputs.length} inputs, ${signature.outputs.length} out targets) but got ${callExpression.arguments.length}.`));
         return diagnostics;
     }
 
@@ -5357,7 +5407,7 @@ function analyzeStandaloneFunctionCall(document, callExpression, symbols, reacha
                 document,
                 argument.startOffset,
                 argument.endOffset,
-                `DreamShader Function '${signature.name}' out argument '${expectedOutput.name}' must be passed positionally as a plain variable name.`));
+                `DreamShader ${signature.kind} '${signature.name}' out argument '${expectedOutput.name}' must be passed positionally as a plain variable name.`));
             continue;
         }
 
@@ -5366,7 +5416,7 @@ function analyzeStandaloneFunctionCall(document, callExpression, symbols, reacha
                 document,
                 argument.startOffset,
                 argument.endOffset,
-                `DreamShader Function '${signature.name}' out argument '${expectedOutput.name}' must be a plain variable name.`));
+                `DreamShader ${signature.kind} '${signature.name}' out argument '${expectedOutput.name}' must be a plain variable name.`));
             continue;
         }
 
@@ -5580,12 +5630,12 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
     }
 
     const signature = signatures[0];
-    if (signature.kind === "Function" && mode === "value") {
+    if ((signature.kind === "Function" || signature.kind === "GraphFunction") && mode === "value") {
         diagnostics.push(makeOffsetDiagnostic(
             document,
             callExpression.calleeOffset,
             callExpression.endOffset,
-            `DreamShader Function '${signature.name}' cannot be used as a value expression. Call it as '${signature.name}(..., OutVar);'.`));
+            `DreamShader ${signature.kind} '${signature.name}' cannot be used as a value expression. Call it as '${signature.name}(..., OutVar);'.`));
         return diagnostics;
     }
 

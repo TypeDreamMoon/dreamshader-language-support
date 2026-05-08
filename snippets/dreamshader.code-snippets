@@ -102,6 +102,18 @@
     ],
     "description": "Create a DreamShader MaterialFunction asset"
   },
+  "DreamShader GraphFunction": {
+    "scope": "dreamshaderlang",
+    "prefix": "graphfunction",
+    "body": [
+      "GraphFunction ${1:BuildLayerInfo}(in Texture2D ${2:BaseTex}, out float3 ${3:Color}, out float ${4:Alpha}) {",
+      "\tfloat2 UV0 = UE.TexCoord(Index=0);",
+      "\t${3:Color} = Texture::Sample2DRGB(${2:BaseTex}, UV0);",
+      "\t${4:Alpha} = Texture::Sample2DAlpha(${2:BaseTex}, UV0);",
+      "}"
+    ],
+    "description": "Create a GraphFunction that expands UE graph nodes at call sites"
+  },
   "DreamShader MaterialLayer": {
     "scope": "dreamshaderlang",
     "prefix": "materiallayer",
