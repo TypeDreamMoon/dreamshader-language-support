@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.26`
+- Version：`1.2.27`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -51,6 +51,12 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.2.27 更新
+
+- 自动读取 Unreal 侧生成的 `Saved/DreamShader/Bridge/material-expressions.json`
+- `UE.*` 补全、Hover 和 Signature Help 会动态合并反射到的 `MaterialExpression`
+- `UE.Expression(Class="...")` / `Expression(Class="...").Pin[n]` 的 `Class` 字符串支持从 manifest 补全
 
 ### 1.2.26 更新
 
@@ -223,7 +229,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.26.vsix
+code --install-extension .\dreamshaderlang-language-support-1.2.27.vsix
 ```
 
 ## 项目根目录

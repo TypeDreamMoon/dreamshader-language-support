@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.27
+
+- Added dynamic `MaterialExpression` completion, hover, and signature metadata from `Saved/DreamShader/Bridge/material-expressions.json`
+- Added `Class="..."` value completion for generic `UE.Expression(...)` and shader output `Expression(...).Pin[n]` bindings
+- Kept the existing hand-authored UE builtin metadata as stable overrides while merging reflected Unreal expression metadata behind it
+
 ## 1.2.26
 
 - Synced local material output diagnostics with the DreamShader plugin, including `Base.CustomizedUV0..7`, `Base.CustomizedUVs0..7`, custom data, legacy color, displacement, surface thickness, and Mooa encoded attribute outputs
