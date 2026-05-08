@@ -102,6 +102,52 @@
     ],
     "description": "Create a DreamShader MaterialFunction asset"
   },
+  "DreamShader MaterialLayer": {
+    "scope": "dreamshaderlang",
+    "prefix": "materiallayer",
+    "body": [
+      "MaterialLayer(Name=\"Layers/${1:ML_MyLayer}\", Root=\"${2:Game}\")",
+      "{",
+      "\tProperties = {",
+      "\t\tVectorParameter ${3:BaseColor} = float4(0.8, 0.8, 0.8, 1.0);",
+      "\t}",
+      "",
+      "\tOutputs = {",
+      "\t\tMaterialAttributes ${4:Result};",
+      "\t}",
+      "",
+      "\tGraph = {",
+      "\t\t${4:Result}.BaseColor = ${3:BaseColor}.rgb;",
+      "\t\t${4:Result}.Opacity = ${3:BaseColor}.a;",
+      "\t\t${4:Result}.Roughness = 0.5;",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a native Unreal Material Layer function asset"
+  },
+  "DreamShader MaterialLayerBlend": {
+    "scope": "dreamshaderlang",
+    "prefix": "materiallayerblend",
+    "body": [
+      "MaterialLayerBlend(Name=\"Layers/${1:MLB_MyBlend}\", Root=\"${2:Game}\")",
+      "{",
+      "\tInputs = {",
+      "\t\tMaterialAttributes ${3:Base};",
+      "\t\tMaterialAttributes ${4:Layer};",
+      "\t\topt float ${5:Alpha} = 1.0;",
+      "\t}",
+      "",
+      "\tOutputs = {",
+      "\t\tMaterialAttributes ${6:Result};",
+      "\t}",
+      "",
+      "\tGraph = {",
+      "\t\t${6:Result} = ${4:Layer};",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a native Unreal Material Layer Blend function asset"
+  },
   "DreamShader VirtualFunction": {
     "scope": "dreamshaderlang",
     "prefix": "virtualfunction",

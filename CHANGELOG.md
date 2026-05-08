@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Added `MaterialLayer` and `MaterialLayerBlend` language support, snippets, semantic tokens, folding, symbols, CodeLens, completion, hover, signature help, and local diagnostics
+- Added local validation for Material Layer output shape and Material Layer Blend `MaterialAttributes` inputs
+- Updated `.dsm` / `.dsh` diagnostics to recognize generated Material Layer assets
+- Updated Material Layer snippets to use explicit `.rgb` access so alpha remains available through `.a`
+
 ## 1.2.27
 
 - Added dynamic `MaterialExpression` completion, hover, and signature metadata from `Saved/DreamShader/Bridge/material-expressions.json`

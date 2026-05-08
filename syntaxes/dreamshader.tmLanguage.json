@@ -60,7 +60,7 @@
             { "include": "#operators" }
           ]
         },
-        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|ShaderFunction|VirtualFunction|import)\\b" },
+        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|ShaderFunction|MaterialLayer|MaterialLayerBlend|VirtualFunction|import)\\b" },
         { "name": "storage.modifier.function.dreamshader", "match": "\\b(?:SelfContained|Inline)\\b" },
         { "name": "entity.name.namespace.definition.dreamshader", "match": "(?<=\\bNamespace\\s*\\(\\s*Name\\s*=\\s*\")[A-Za-z_][A-Za-z0-9_]*\\b" },
         { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Root|Asset|Collection|Parameter|ParameterName|Default|True|False|Group|SortPriority|Description|Class|OutputType|ResultType|Output|OutputName|OutputIndex|Input|Source|Destination|Index|Period|Speed|Coordinate|Time|SamplerType|SamplerSource|MipValueMode|AutomaticViewMipBias|ConstCoordinate|ConstMipValue|Texture)\\b(?=\\s*=)" }

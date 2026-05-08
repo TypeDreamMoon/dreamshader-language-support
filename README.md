@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.2.27`
+- Version：`1.3.0`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -13,8 +13,8 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 支持内容
 
-- `Shader` / `ShaderFunction` 使用 `Graph = { ... }` 作为图构建区块
-- `Shader` / `ShaderFunction` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
+- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 使用 `Graph = { ... }` 作为图构建区块
+- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `Graph` 表达式支持 `.rgba` / `.xyzw` 向量 swizzle，例如 `.rg`、`.rrr`、`.rgaa`、`.rgbb`
@@ -26,7 +26,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 作用域感知变量补全
 - 函数调用参数 Inlay Hints
 - `import` 路径可点击跳转
-- `Shader` / `ShaderFunction` / `VirtualFunction` / `Function` / `Namespace` 和区块折叠
+- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` / `VirtualFunction` / `Function` / `Namespace` 和区块折叠
 - `Function` / `Namespace::Function` / `import` / `Path(...)` 联想
 - `UE.*` 内置材质节点补全、Hover、Signature Help
 - `Settings` 支持 `TranslucencyLightingMode` / `LightingMode`
@@ -51,6 +51,13 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 快速创建 Material/Header/Texture Sample/Noise Material 模板
 
 ## 当前重点特性
+
+### 1.3.0 更新
+
+- 新增 `MaterialLayer` / `MaterialLayerBlend` 补全、snippet、语义高亮、折叠、符号、CodeLens、Hover、Signature Help 和本地诊断
+- `MaterialLayer` 本地诊断要求只输出一个 `MaterialAttributes`
+- `MaterialLayerBlend` 本地诊断要求只输出一个 `MaterialAttributes`，并至少声明两个 `MaterialAttributes` 输入
+- MaterialLayer snippet 使用显式 `.rgb`，Alpha 可通过 `.a` 继续读取
 
 ### 1.2.27 更新
 
@@ -229,7 +236,7 @@ Package 安装和更新需要本机可用 `git` 命令。
 ```powershell
 npm install
 npm run package
-code --install-extension .\dreamshaderlang-language-support-1.2.27.vsix
+code --install-extension .\dreamshaderlang-language-support-1.3.0.vsix
 ```
 
 ## 项目根目录

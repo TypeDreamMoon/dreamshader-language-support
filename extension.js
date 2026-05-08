@@ -49,6 +49,8 @@ const TOP_LEVEL_BLOCK_NAMES = [
     "Function",
     "Namespace",
     "ShaderFunction",
+    "MaterialLayer",
+    "MaterialLayerBlend",
     "VirtualFunction"
 ];
 
@@ -798,6 +800,8 @@ const HOVER_DOCS = new Map([
 const BLOCK_SECTION_RULES = new Map([
     ["Shader", new Set(["Properties", "Settings", "Outputs", "Graph"])],
     ["ShaderFunction", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
+    ["MaterialLayer", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
+    ["MaterialLayerBlend", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
     ["VirtualFunction", new Set(["Inputs", "Outputs", "Options", "Settings"])]
 ]);
 
@@ -1110,7 +1114,9 @@ function createCodeLensProvider(changeEmitter) {
             const lenses = [];
             const topLevelBlocks = [
                 ...parseNamedLegacyBlocks(text, "Shader"),
-                ...parseNamedLegacyBlocks(text, "ShaderFunction")
+                ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+                ...parseNamedLegacyBlocks(text, "MaterialLayer"),
+                ...parseNamedLegacyBlocks(text, "MaterialLayerBlend")
             ].sort((left, right) => left.startOffset - right.startOffset);
 
             for (const block of topLevelBlocks) {
@@ -1261,7 +1267,7 @@ function createFoldingRangeProvider() {
 
             for (const block of parseTopLevelBlocks(text)) {
                 addRange(block.bodyOpenOffset, block.bodyCloseOffset);
-                if (block.kind === "Shader" || block.kind === "ShaderFunction" || block.kind === "VirtualFunction") {
+                if (isLegacySectionBlockKind(block.kind)) {
                     for (const section of parseLegacySections(text, block)) {
                         addRange(section.bodyOpenOffset, section.bodyCloseOffset);
                     }
@@ -1334,6 +1340,8 @@ function addLegacySectionSemanticTokens(tokens, text) {
     const blocks = [
         ...parseNamedLegacyBlocks(text, "Shader"),
         ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+        ...parseNamedLegacyBlocks(text, "MaterialLayer"),
+        ...parseNamedLegacyBlocks(text, "MaterialLayerBlend"),
         ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ];
     for (const block of blocks) {
@@ -1725,7 +1733,7 @@ function createHoverProvider() {
 
             const callableSignatures = collectReachableCallableSignatures(document);
             const callableEntries = callableSignatures.get(normalizeSymbolKey(qualifiedIdentifier ? qualifiedIdentifier.text : word)) || [];
-            const callable = callableEntries.find((entry) => entry.kind === "ShaderFunction" || entry.kind === "VirtualFunction");
+            const callable = callableEntries.find((entry) => isMaterialFunctionCallableKind(entry.kind));
             if (callable) {
                 return new vscode.Hover(new vscode.MarkdownString(`${callable.kind} \`${callable.name}\`\n\nDefined in \`${path.basename(callable.fsPath)}\``));
             }
@@ -1770,7 +1778,7 @@ function createDocumentSymbolProvider() {
                     : range;
                 const symbol = new vscode.DocumentSymbol(block.name, block.kind, getBlockSymbolKind(block.kind), range, selectionRange);
 
-                if (block.kind === "Shader" || block.kind === "ShaderFunction" || block.kind === "VirtualFunction") {
+                if (isLegacySectionBlockKind(block.kind)) {
                     symbol.children.push(...createLegacySectionDocumentSymbols(document, text, block));
                 }
 
@@ -1786,13 +1794,30 @@ function getBlockSymbolKind(kind) {
     if (kind === "Shader") {
         return vscode.SymbolKind.Object;
     }
-    if (kind === "ShaderFunction" || kind === "VirtualFunction" || kind === "Function") {
+    if (isMaterialFunctionCallableKind(kind) || kind === "Function") {
         return vscode.SymbolKind.Function;
     }
     if (kind === "Namespace") {
         return vscode.SymbolKind.Namespace;
     }
     return vscode.SymbolKind.Module;
+}
+
+function isMaterialFunctionCallableKind(kind) {
+    return kind === "ShaderFunction"
+        || kind === "MaterialLayer"
+        || kind === "MaterialLayerBlend"
+        || kind === "VirtualFunction";
+}
+
+function isGeneratedMaterialFunctionKind(kind) {
+    return kind === "ShaderFunction"
+        || kind === "MaterialLayer"
+        || kind === "MaterialLayerBlend";
+}
+
+function isLegacySectionBlockKind(kind) {
+    return kind === "Shader" || isMaterialFunctionCallableKind(kind);
 }
 
 function createLegacySectionDocumentSymbols(document, text, block) {
@@ -2288,6 +2313,8 @@ function addKeywordItems(items, context) {
         ["Namespace", "Namespace(Name=\"${1:Common}\")\n{\n    Function ${2:MyFunction}(in ${3:vec3} ${4:input}, out ${5:vec3} ${6:result}) {\n        ${6:result} = ${4:input};\n    }\n}"],
         ["import", "import \"${1:Shared/Common.dsh}\";"],
         ["ShaderFunction", "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")\n{\n    Properties = {\n        const Texture2D ${3:PreviewTex};\n    }\n\n    Inputs = {\n        opt Texture2D ${4:InputTex} = ${3:PreviewTex};\n    }\n\n    Outputs = {\n        ${5:float4} ${6:Result};\n    }\n\n    Graph = {\n        ${6:Result} = ${5:float4}(1.0, 1.0, 1.0, 1.0);\n    }\n}"],
+        ["MaterialLayer", "MaterialLayer(Name=\"Layers/${1:ML_MyLayer}\", Root=\"${2:Game}\")\n{\n    Properties = {\n        VectorParameter ${3:BaseColor} = float4(0.8, 0.8, 0.8, 1.0);\n    }\n\n    Outputs = {\n        MaterialAttributes ${4:Result};\n    }\n\n    Graph = {\n        ${4:Result}.BaseColor = ${3:BaseColor}.rgb;\n        ${4:Result}.Opacity = ${3:BaseColor}.a;\n        ${4:Result}.Roughness = 0.5;\n    }\n}"],
+        ["MaterialLayerBlend", "MaterialLayerBlend(Name=\"Layers/${1:MLB_MyBlend}\", Root=\"${2:Game}\")\n{\n    Inputs = {\n        MaterialAttributes ${3:Base};\n        MaterialAttributes ${4:Layer};\n        opt float ${5:Alpha} = 1.0;\n    }\n\n    Outputs = {\n        MaterialAttributes ${6:Result};\n    }\n\n    Graph = {\n        ${6:Result} = ${4:Layer};\n    }\n}"],
         ["VirtualFunction", "VirtualFunction(Name=\"${1:MyFunction}\")\n{\n    Options = {\n        Asset = Path(Plugins.${2:PluginName}, \"${3:MaterialFunctions/MyFunction}\");\n    }\n\n    Inputs = {\n        ${4:float} ${5:Value};\n    }\n\n    Outputs = {\n        ${6:float} ${7:Result};\n    }\n}"]
     ];
 
@@ -2590,7 +2617,7 @@ function addReachableFunctionItems(items, document, context) {
 
     for (const signatures of collectReachableCallableSignatures(document).values()) {
         const signature = signatures[0];
-        if (!signature || (signature.kind !== "ShaderFunction" && signature.kind !== "VirtualFunction")) {
+        if (!signature || !isMaterialFunctionCallableKind(signature.kind)) {
             continue;
         }
 
@@ -2602,7 +2629,7 @@ function addReachableFunctionItems(items, document, context) {
 
         const item = new vscode.CompletionItem(localName, vscode.CompletionItemKind.Function);
         item.insertText = new vscode.SnippetString(localName);
-        item.detail = signature.kind === "VirtualFunction" ? "DreamShader VirtualFunction" : "DreamShader ShaderFunction";
+        item.detail = getCallableKindDetail(signature.kind);
         item.documentation = new vscode.MarkdownString(`Callable \`${signature.name}\``);
         seenNames.add(key);
         items.push(item);
@@ -2661,7 +2688,7 @@ function analyzeDocument(document, position) {
     const prefix = text.slice(0, offset);
     const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
     const topLevelBlocks = parseTopLevelBlocks(text);
-    const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction", "VirtualFunction"]));
+    const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction", "MaterialLayer", "MaterialLayerBlend", "VirtualFunction"]));
     const currentSectionInfo = currentLegacyBlock ? findEnclosingLegacySection(text, currentLegacyBlock, offset) : null;
     const currentBlock = currentLegacyBlock ? currentLegacyBlock.kind : "";
     const currentSection = currentSectionInfo ? currentSectionInfo.name : "";
@@ -2673,7 +2700,7 @@ function analyzeDocument(document, position) {
     const inFunctionBody = Boolean(currentFunction && offset > currentFunction.bodyOpenOffset && offset < currentFunction.bodyCloseOffset);
     const inRawHlslContext = inFunctionBody;
     const inGraphCode = currentSection === "Graph";
-    const inShaderFunctionInputSection = currentBlock === "ShaderFunction" && currentSection === "Inputs";
+    const inShaderFunctionInputSection = isGeneratedMaterialFunctionKind(currentBlock) && currentSection === "Inputs";
     const inImportLine = /^\s*import\b/i.test(linePrefix.trimStart());
 
     return {
@@ -2715,7 +2742,7 @@ function analyzeDocument(document, position) {
 
 function getRootPluginValueCompletionInfo(text, offset) {
     const prefix = text.slice(0, offset);
-    const matches = Array.from(prefix.matchAll(/\b(ShaderFunction|Shader)\s*\(/g));
+    const matches = Array.from(prefix.matchAll(/\b(MaterialLayerBlend|MaterialLayer|ShaderFunction|Shader)\s*\(/g));
     if (matches.length === 0) {
         return undefined;
     }
@@ -2784,7 +2811,7 @@ function getMaterialExpressionClassValueCompletionInfo(text, offset) {
 
 function getTopLevelAttributeKindAtOffset(text, offset) {
     const prefix = text.slice(0, offset);
-    const matches = Array.from(prefix.matchAll(/\b(VirtualFunction|ShaderFunction|Shader|Namespace)\s*\(/g));
+    const matches = Array.from(prefix.matchAll(/\b(VirtualFunction|MaterialLayerBlend|MaterialLayer|ShaderFunction|Shader|Namespace)\s*\(/g));
     if (matches.length === 0) {
         return "";
     }
@@ -2799,7 +2826,7 @@ function getTopLevelAttributeKindAtOffset(text, offset) {
 }
 
 function findCurrentLegacyTopLevelBlock(prefix) {
-    const blockRegex = /\b(?:Shader|ShaderFunction|VirtualFunction)\s*\(/g;
+    const blockRegex = /\b(?:Shader|ShaderFunction|MaterialLayer|MaterialLayerBlend|VirtualFunction)\s*\(/g;
     let current = "";
     for (const match of prefix.matchAll(blockRegex)) {
         const blockName = match[0].match(/[A-Za-z_][A-Za-z0-9_]*/);
@@ -2838,6 +2865,8 @@ function parseTopLevelBlocks(text) {
     }
 
     blocks.push(...parseNamedLegacyBlocks(text, "ShaderFunction"));
+    blocks.push(...parseNamedLegacyBlocks(text, "MaterialLayer"));
+    blocks.push(...parseNamedLegacyBlocks(text, "MaterialLayerBlend"));
     blocks.push(...parseNamedLegacyBlocks(text, "VirtualFunction"));
 
     return blocks.filter(Boolean).sort((a, b) => a.startOffset - b.startOffset);
@@ -3076,7 +3105,7 @@ function parseImportStatements(text) {
 }
 
 function parseNamedLegacyBlocks(text, kind) {
-    if (kind !== "Shader" && kind !== "ShaderFunction" && kind !== "VirtualFunction") {
+    if (kind !== "Shader" && kind !== "ShaderFunction" && kind !== "MaterialLayer" && kind !== "MaterialLayerBlend" && kind !== "VirtualFunction") {
         return [];
     }
 
@@ -3958,7 +3987,7 @@ function addCallableSignature(map, signature) {
     }
     map.get(key).push(signature);
 
-    if (signature.kind === "ShaderFunction" || signature.kind === "VirtualFunction") {
+    if (isMaterialFunctionCallableKind(signature.kind)) {
         const shortName = getCallableShortName(signature.name);
         const shortKey = normalizeSymbolKey(shortName);
         if (shortKey && shortKey !== key) {
@@ -3977,6 +4006,19 @@ function getCallableShortName(name) {
     const normalized = String(name || "").replace(/\\/g, "/");
     const slashIndex = normalized.lastIndexOf("/");
     return slashIndex >= 0 ? normalized.slice(slashIndex + 1) : normalized;
+}
+
+function getCallableKindDetail(kind) {
+    if (kind === "VirtualFunction") {
+        return "DreamShader VirtualFunction";
+    }
+    if (kind === "MaterialLayer") {
+        return "DreamShader MaterialLayer";
+    }
+    if (kind === "MaterialLayerBlend") {
+        return "DreamShader MaterialLayerBlend";
+    }
+    return "DreamShader ShaderFunction";
 }
 
 function collectReachableCallableSignatures(document) {
@@ -4013,6 +4055,8 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
 
     for (const block of [
         ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+        ...parseNamedLegacyBlocks(text, "MaterialLayer"),
+        ...parseNamedLegacyBlocks(text, "MaterialLayerBlend"),
         ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ]) {
         const sectionMap = new Map(parseLegacySections(text, block).map((section) => [section.name, section]));
@@ -4033,7 +4077,7 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
                 name: entry.name,
                 metadata: entry.metadata || {}
             })),
-            detail: block.kind === "VirtualFunction" ? "DreamShader VirtualFunction" : "DreamShader ShaderFunction",
+            detail: getCallableKindDetail(block.kind),
             fsPath: normalizedPath,
             nameOffset: block.startOffset
         });
@@ -4618,14 +4662,14 @@ function computeLocalDiagnostics(document) {
     const extension = path.extname(document.fileName).toLowerCase();
     const reachableCallables = collectReachableCallableSignatures(document);
 
-    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
+    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bMaterialLayer\s*\(/.test(text) && !/\bMaterialLayerBlend\s*\(/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), or VirtualFunction(Name=\"...\") block.",
+            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), MaterialLayer(Name=\"...\"), MaterialLayerBlend(Name=\"...\"), or VirtualFunction(Name=\"...\") block.",
             vscode.DiagnosticSeverity.Warning));
     }
 
-    if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text))) {
+    if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text) || /\bMaterialLayer\s*\(/.test(text) || /\bMaterialLayerBlend\s*\(/.test(text))) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
             "DreamShader header (.dsh) may only contain import statements, Function blocks, Namespace blocks, and VirtualFunction declarations.",
@@ -4743,6 +4787,8 @@ function computeDetailedBlockDiagnostics(document, text, reachableCallables) {
     const blocks = [
         ...parseNamedLegacyBlocks(text, "Shader"),
         ...parseNamedLegacyBlocks(text, "ShaderFunction"),
+        ...parseNamedLegacyBlocks(text, "MaterialLayer"),
+        ...parseNamedLegacyBlocks(text, "MaterialLayerBlend"),
         ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ].sort((a, b) => a.startOffset - b.startOffset);
 
@@ -4800,7 +4846,7 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
         if (outputsSection) {
             diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", true, reachableCallables));
         }
-    } else if (block.kind === "ShaderFunction") {
+    } else if (isGeneratedMaterialFunctionKind(block.kind)) {
         const propertiesSection = seenSections.get("Properties")?.[0];
         const inputsSection = seenSections.get("Inputs")?.[0];
         const outputsSection = seenSections.get("Outputs")?.[0];
@@ -4813,6 +4859,7 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
         if (outputsSection) {
             diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
         }
+        diagnostics.push(...validateMaterialLayerBlockShape(document, block, inputsSection, outputsSection));
 
     } else if (block.kind === "VirtualFunction") {
         const inputsSection = seenSections.get("Inputs")?.[0];
@@ -4862,6 +4909,40 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
     const codeSection = seenSections.get("Graph")?.[0];
     if (codeSection) {
         diagnostics.push(...analyzeCodeSection(document, codeSection, symbols, reachableCallables));
+    }
+
+    return diagnostics;
+}
+
+function validateMaterialLayerBlockShape(document, block, inputsSection, outputsSection) {
+    const diagnostics = [];
+    if (block.kind !== "MaterialLayer" && block.kind !== "MaterialLayerBlend") {
+        return diagnostics;
+    }
+
+    const outputs = outputsSection
+        ? parseTypedDeclarationsFromSection(outputsSection).declarations.filter((entry) => entry.kind === "declaration")
+        : [];
+    if (outputs.length !== 1 || !resolveTypeInfo(outputs[0]?.type)?.isMaterialAttributes) {
+        diagnostics.push(makeOffsetDiagnostic(
+            document,
+            outputsSection ? outputsSection.nameOffset : block.startOffset,
+            outputsSection ? outputsSection.nameOffset + outputsSection.name.length : block.startOffset + block.kind.length,
+            `${block.kind} '${block.name}' must declare exactly one MaterialAttributes output.`));
+    }
+
+    if (block.kind === "MaterialLayerBlend") {
+        const inputs = inputsSection
+            ? parseTypedDeclarationsFromSection(inputsSection).declarations.filter((entry) => entry.kind === "declaration")
+            : [];
+        const materialAttributesInputCount = inputs.filter((entry) => resolveTypeInfo(entry.type)?.isMaterialAttributes).length;
+        if (materialAttributesInputCount < 2) {
+            diagnostics.push(makeOffsetDiagnostic(
+                document,
+                inputsSection ? inputsSection.nameOffset : block.startOffset,
+                inputsSection ? inputsSection.nameOffset + inputsSection.name.length : block.startOffset + block.kind.length,
+                `MaterialLayerBlend '${block.name}' must declare at least two MaterialAttributes inputs.`));
+        }
     }
 
     return diagnostics;
@@ -5517,7 +5598,7 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
         }
     }
 
-    if (signature.kind === "ShaderFunction" || signature.kind === "VirtualFunction") {
+    if (isMaterialFunctionCallableKind(signature.kind)) {
         const positionalArguments = callExpression.arguments.filter((argument) => !argument.isNamed);
         if (positionalArguments.length > signature.inputs.length) {
             diagnostics.push(makeOffsetDiagnostic(
