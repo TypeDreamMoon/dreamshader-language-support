@@ -321,6 +321,29 @@ const DREAMSHADER_HELPER_ITEMS = [
     ["Path", "Path(\"${1:/Game/Textures/MyTexture.DefaultTexture}\")", "Resolves a fully qualified Unreal object path for texture defaults, Settings object references, and VirtualFunction assets."]
 ];
 
+const GRAPH_SNIPPET_ITEMS = [
+    ["uepanner", "UE.Panner(\n\tCoordinate=UE.TexCoord(Index=${1:0}),\n\tTime=UE.Time(Period=${2:4.0}),\n\tSpeed=float2(${3:0.05}, ${4:0.0}))", "Insert a UE.Panner call"],
+    ["ueexpr", "UE.Expression(\n\tClass=\"${1:Sine}\",\n\tOutputType=\"${2:float1}\",\n\t${3:Input}=${4:Value})", "Insert a generic reflected MaterialExpression call"],
+    ["collectionparam", "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")", "Insert a MaterialParameterCollection read"],
+    ["uetransform", "UE.TransformVector(\n\tInput=${1:NormalTS},\n\tSource=\"${2:Tangent}\",\n\tDestination=\"${3:World}\")", "Insert a UE.TransformVector call"]
+];
+
+const DECLARATION_SNIPPET_ITEMS = [
+    ["optinput", "opt ${1:float4} ${2:Color} = ${3:float4(1.0, 1.0, 1.0, 1.0)} [\n\tDescription=\"${4:Optional input}\";\n\tSortPriority=${5:32};\n];", "Insert an optional ShaderFunction / VirtualFunction input"],
+    ["staticswitch", "StaticSwitchParameter ${1:UseDetail} = ${2:true} [\n\tGroup=\"${3:Switches}\";\n\tSortPriority=${4:32};\n\tDescription=\"${5:Use detail branch}\";\n];", "Insert a StaticSwitchParameter property"],
+    ["constprop", "const ${1:float} ${2:Value} = ${3:0.0};", "Insert a const DreamShader Properties declaration"],
+    ["texparam", "TextureSampleParameter2D ${1:MetallicMap} = Path(${2:Game}, \"${3:Textures/T_White_Linear}\") [\n\tGroup=\"${4:11 - Specular}\";\n\tSortPriority=${5:51};\n\tSamplerType=\"${6:LinearColor}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n\tMipValueMode=\"${8:None}\";\n\tAutomaticViewMipBias=${9:true};\n\tConstCoordinate=${10:0};\n\tConstMipValue=${11:-1};\n];", "Insert a TextureSampleParameter2D with reflected properties"]
+];
+
+const OUTPUT_SNIPPET_ITEMS = [
+    ["matattrs", "MaterialAttributes ${1:Attrs};\nBase.MaterialAttributes = ${1:Attrs};", "Declare and fill a MaterialAttributes output"],
+    ["ueoutputpin", "Expression(Class=\"${1:ThinTranslucentMaterialOutput}\").Pin[${2:0}] = ${3:float3(0.8, 0.9, 1.0)};", "Insert an auxiliary material output node binding"]
+];
+
+const MATERIAL_ATTRIBUTES_SNIPPET_ITEMS = [
+    ["attrmember", "${1:Attrs}.${2|BaseColor,Roughness,Metallic,Specular,Normal,Opacity,EmissiveColor,AmbientOcclusion|} = ${3:Value};", "Assign a MaterialAttributes member in Graph"]
+];
+
 const HOVER_DOCS = new Map([
     ["shader", "Top-level DreamShader material declaration. DreamShader material implementation files use `.dsm`."],
     ["function", "Reusable shared function block. Define with `Function Name(in float Value, out vec3 Result) { ... }` and call with explicit out variables like `Name(Value, Result);`."],
@@ -1238,6 +1261,7 @@ function createCompletionProvider() {
             addOptionItems(items, context);
             addOutputItems(items, context);
             addBuiltinItems(items, context);
+            addContextSnippetItems(items, context);
             addHelperItems(items, context);
             addReachableFunctionItems(items, document, context);
             addDeclaredIdentifierItems(items, context);
@@ -2012,6 +2036,10 @@ function addImportItems(items, context) {
 }
 
 function addTypeItems(items, context) {
+    if (!context.inTypeCompletionContext) {
+        return;
+    }
+
     const typeItems = context.inRawHlslContext || context.inFunctionSignature ? HLSL_TYPE_ITEMS : GRAPH_TYPE_ITEMS;
     for (const [name, detail] of typeItems) {
         const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.TypeParameter);
@@ -2021,7 +2049,7 @@ function addTypeItems(items, context) {
 }
 
 function addDeclarationHelperItems(items, context) {
-    if (!["Properties", "Inputs", "Outputs"].includes(context.currentSection)) {
+    if (!context.inDeclarationSection) {
         return;
     }
 
@@ -2243,7 +2271,7 @@ function addOutputItems(items, context) {
 }
 
 function addBuiltinItems(items, context) {
-    if (!context.inGraphLikeContext) {
+    if (!context.inGraphExpressionContext) {
         return;
     }
 
@@ -2264,6 +2292,28 @@ function addBuiltinItems(items, context) {
     }
 }
 
+function addContextSnippetItems(items, context) {
+    const addSnippet = ([label, snippet, detail]) => {
+        const item = new vscode.CompletionItem(label, vscode.CompletionItemKind.Snippet);
+        item.insertText = new vscode.SnippetString(snippet);
+        item.detail = detail;
+        items.push(item);
+    };
+
+    if (context.inGraphExpressionContext) {
+        GRAPH_SNIPPET_ITEMS.forEach(addSnippet);
+        MATERIAL_ATTRIBUTES_SNIPPET_ITEMS.forEach(addSnippet);
+    }
+
+    if (context.inDeclarationSection) {
+        DECLARATION_SNIPPET_ITEMS.forEach(addSnippet);
+    }
+
+    if (context.inMaterialOutputs) {
+        OUTPUT_SNIPPET_ITEMS.forEach(addSnippet);
+    }
+}
+
 function addHelperItems(items, context) {
     if (context.currentSection !== "Properties" && !context.inOptions) {
         return;
@@ -2278,6 +2328,10 @@ function addHelperItems(items, context) {
 }
 
 function addReachableFunctionItems(items, document, context) {
+    if (!context.inCallableCompletionContext) {
+        return;
+    }
+
     const definitions = collectReachableFunctionDefinitions(document);
     const seenNames = new Set();
     const namespaceMatch = context?.linePrefix?.match(/([A-Za-z_][A-Za-z0-9_]*)::[A-Za-z0-9_]*$/);
@@ -2326,6 +2380,10 @@ function addReachableFunctionItems(items, document, context) {
     }
 }
 function addDeclaredIdentifierItems(items, context) {
+    if (!context.inIdentifierCompletionContext) {
+        return;
+    }
+
     for (const entry of collectVisibleIdentifierEntries(context)) {
         const item = new vscode.CompletionItem(entry.name, vscode.CompletionItemKind.Variable);
         item.detail = entry.detail;
@@ -2381,7 +2439,7 @@ function analyzeDocument(document, position) {
     const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction", "ShaderLayer", "ShaderLayerBlend", "VirtualFunction"]));
     const currentSectionInfo = currentLegacyBlock ? findEnclosingLegacySection(text, currentLegacyBlock, offset) : null;
     const currentBlock = currentLegacyBlock ? currentLegacyBlock.kind : findCurrentLegacyTopLevelBlock(prefix);
-    const currentSection = currentSectionInfo ? currentSectionInfo.name : findCurrentLegacySection(prefix);
+    const currentSection = currentSectionInfo ? currentSectionInfo.name : findOpenLegacySection(prefix);
     const currentFunction = findInnermostFunctionDefinition(text, offset);
     const topLevelAttributeKind = getTopLevelAttributeKindAtOffset(text, offset);
     const rootPluginValueInfo = getRootPluginValueCompletionInfo(text, offset);
@@ -2392,6 +2450,19 @@ function analyzeDocument(document, position) {
     const inRawHlslContext = Boolean(inFunctionBody && currentFunction.kind === "Function");
     const inGraphCode = currentSection === "Graph" || inGraphFunctionBody;
     const inShaderFunctionInputSection = isGeneratedMaterialFunctionKind(currentBlock) && currentSection === "Inputs";
+    const inDeclarationSection = ["Properties", "Inputs", "Outputs"].includes(currentSection);
+    const inTypeCompletionContext = inFunctionSignature
+        || inRawHlslContext
+        || inGraphCode
+        || inDeclarationSection;
+    const inGraphExpressionContext = inGraphCode
+        || currentSection === "Properties"
+        || inShaderFunctionInputSection;
+    const inCallableCompletionContext = inRawHlslContext
+        || inGraphExpressionContext;
+    const inIdentifierCompletionContext = inRawHlslContext
+        || inGraphExpressionContext
+        || currentSection === "Outputs";
     const inImportLine = /^\s*import\b/i.test(linePrefix.trimStart());
 
     return {
@@ -2412,12 +2483,17 @@ function analyzeDocument(document, position) {
         inGraphFunctionBody,
         inRawHlslContext,
         inGraphCode,
+        inDeclarationSection,
         inSettings: currentSection === "Settings" && currentBlock !== "VirtualFunction",
         inOptions: currentBlock === "VirtualFunction" && (currentSection === "Options" || currentSection === "Settings"),
         inProperties: currentSection === "Properties" || currentSection === "Inputs",
         inOutputs: currentSection === "Outputs",
         inMaterialOutputs: currentSection === "Outputs" && currentBlock === "Shader",
-        inGraphLikeContext: inGraphCode || currentSection === "Properties" || inShaderFunctionInputSection,
+        inGraphLikeContext: inGraphExpressionContext,
+        inGraphExpressionContext,
+        inTypeCompletionContext,
+        inCallableCompletionContext,
+        inIdentifierCompletionContext,
         inTopLevelAttributeList: Boolean(topLevelAttributeKind),
         inRootPluginValue: Boolean(rootPluginValueInfo),
         inPathPluginValue: Boolean(pathPluginValueInfo),
@@ -2536,6 +2612,49 @@ function findCurrentLegacySection(prefix) {
         current = match[1];
     }
     return current;
+}
+
+function findOpenLegacySection(prefix) {
+    const normalizedPrefix = stripCommentsPreserveLayout(prefix);
+    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Inputs|Options)\s*=\s*\{/g;
+    const matches = Array.from(normalizedPrefix.matchAll(sectionRegex));
+    for (let matchIndex = matches.length - 1; matchIndex >= 0; matchIndex -= 1) {
+        const match = matches[matchIndex];
+        const openIndex = match.index + match[0].lastIndexOf("{");
+        let depth = 0;
+        let inString = false;
+        for (let index = openIndex; index < normalizedPrefix.length; index += 1) {
+            const char = normalizedPrefix[index];
+            if (inString) {
+                if (char === "\\") {
+                    index += 1;
+                } else if (char === "\"") {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (char === "\"") {
+                inString = true;
+                continue;
+            }
+
+            if (char === "{") {
+                depth += 1;
+            } else if (char === "}") {
+                depth = Math.max(0, depth - 1);
+                if (depth === 0) {
+                    break;
+                }
+            }
+        }
+
+        if (depth > 0) {
+            return match[1];
+        }
+    }
+
+    return "";
 }
 
 function parseTopLevelBlocks(text) {

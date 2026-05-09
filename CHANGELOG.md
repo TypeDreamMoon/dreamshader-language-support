@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.3
+## 1.3.4
 
 - Updated built-in templates and snippets to generate more practical project-ready DreamShader skeletons.
 - Switched Material Layer language support and templates to the recommended `ShaderLayer` / `ShaderLayerBlend` keywords.
@@ -211,4 +211,3 @@
 - Added step-by-step DreamShader package scaffold creation
 - Added quick template commands for Material, Header, Texture Sample, and Noise Material files
 - Added TypeDreamMoon publisher metadata for the 1.0.0 release
-
