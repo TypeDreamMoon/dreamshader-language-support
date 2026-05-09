@@ -1,12 +1,12 @@
 {
-  "DreamShader Shader": {
+  "DreamShader ShaderTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "shader",
+    "prefix": "ShaderTemplate",
     "body": [
       "Shader(Name=\"Materials/${1:MyMaterial}\", Root=\"${2:Game}\")",
       "{",
       "\tProperties = {",
-      "\t\tTexture2D ${3:InTex} = Path(Engine, \"/EngineResources/DefaultTexture\");",
+      "\t\tTexture2D ${3:InTex} = Path(Engine, /EngineResources/DefaultTexture);",
       "\t\tfloat3 ${4:InTint} = float3(1.0, 1.0, 1.0);",
       "\t}",
       "",
@@ -28,19 +28,19 @@
     ],
     "description": "Create a DreamShader material block for a .dsm file"
   },
-  "DreamShader Shared Function": {
+  "DreamShader FunctionTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "function",
+    "prefix": "FunctionTemplate",
     "body": [
-      "Function ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {",
-      "\t${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);",
+      "Function NewFuntion(out float3 OutColor) {",
+      "\tOutColor = float3(1.0, 0.0, 0.0);",
       "}"
     ],
     "description": "Create a reusable DreamShader Function block"
   },
-  "DreamShader SelfContained Function": {
+  "DreamShader SelfContainedFunctionTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "selfcontained",
+    "prefix": "SelfContainedFunctionTemplate",
     "body": [
       "Function SelfContained ${1:MyFunction}(in ${2:vec2} ${3:uv}, out ${4:vec4} ${5:result}) {",
       "\t${5:result} = ${4:vec4}(0.0, 0.0, 0.0, 1.0);",
@@ -48,9 +48,9 @@
     ],
     "description": "Create a SelfContained DreamShader Function block"
   },
-  "DreamShader Namespace": {
+  "DreamShader NamespaceTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "namespace",
+    "prefix": "NamespaceTemplate",
     "body": [
       "Namespace(Name=\"${1:Common}\")",
       "{",
@@ -61,9 +61,9 @@
     ],
     "description": "Create a DreamShader Namespace block containing shared Functions"
   },
-  "DreamShader Import Header": {
+  "DreamShader ImportTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "import",
+    "prefix": "ImportTemplate",
     "body": [
       "import \"${1:Shared/Common.dsh}\";"
     ],
@@ -77,9 +77,9 @@
     ],
     "description": "Import a DreamShader package header file"
   },
-  "DreamShader ShaderFunction": {
+  "DreamShader ShaderFunctionTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "shaderfunction",
+    "prefix": "ShaderFunctionTemplate",
     "body": [
       "ShaderFunction(Name=\"Functions/${1:MyFunction}\", Root=\"${2:Game}\")",
       "{",
@@ -102,21 +102,19 @@
     ],
     "description": "Create a DreamShader MaterialFunction asset"
   },
-  "DreamShader GraphFunction": {
+  "DreamShader GraphFunctionTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "graphfunction",
+    "prefix": "GraphFunctionTemplate",
     "body": [
-      "GraphFunction ${1:BuildLayerInfo}(in Texture2D ${2:BaseTex}, out float3 ${3:Color}, out float ${4:Alpha}) {",
-      "\tfloat2 UV0 = UE.TexCoord(Index=0);",
-      "\t${3:Color} = Texture::Sample2DRGB(${2:BaseTex}, UV0);",
-      "\t${4:Alpha} = Texture::Sample2DAlpha(${2:BaseTex}, UV0);",
+      "GraphFunction NewGraphFunction(out float3 OutColor) {",
+      "\tOutColor = float3(1.0, 0.0, 0.0);",
       "}"
     ],
-    "description": "Create a GraphFunction that expands UE graph nodes at call sites"
+    "description": "Create a DreamShader GraphFunction Custom node helper"
   },
-  "DreamShader MaterialLayer": {
+  "DreamShader MaterialLayerTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "materiallayer",
+    "prefix": "MaterialLayerTemplate",
     "body": [
       "MaterialLayer(Name=\"Layers/${1:ML_MyLayer}\", Root=\"${2:Game}\")",
       "{",
@@ -137,9 +135,9 @@
     ],
     "description": "Create a native Unreal Material Layer function asset"
   },
-  "DreamShader MaterialLayerBlend": {
+  "DreamShader MaterialLayerBlendTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "materiallayerblend",
+    "prefix": "MaterialLayerBlendTemplate",
     "body": [
       "MaterialLayerBlend(Name=\"Layers/${1:MLB_MyBlend}\", Root=\"${2:Game}\")",
       "{",
@@ -160,14 +158,14 @@
     ],
     "description": "Create a native Unreal Material Layer Blend function asset"
   },
-  "DreamShader VirtualFunction": {
+  "DreamShader VirtualFunctionTemplate": {
     "scope": "dreamshaderlang",
-    "prefix": "virtualfunction",
+    "prefix": "VirtualFunctionTemplate",
     "body": [
       "VirtualFunction(Name=\"${1:MyFunction}\")",
       "{",
       "\tOptions = {",
-      "\t\tAsset = Path(Plugins.${2:PluginName}, \"${3:MaterialFunctions/MyFunction}\");",
+      "\t\tAsset = Path(Plugins.${2:PluginName}, ${3:MaterialFunctions/MyFunction});",
       "\t}",
       "",
       "\tInputs = {",
@@ -248,7 +246,7 @@
     "scope": "dreamshaderlang",
     "prefix": "collectionparam",
     "body": [
-      "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")"
+      "UE.CollectionParam(Collection=Path(${1:Game}, ${2:MaterialParameterCollections/MPC_Global}), Parameter=\"${3:Value}\")"
     ],
     "description": "Insert a MaterialParameterCollection read"
   },
@@ -268,7 +266,7 @@
     "scope": "dreamshaderlang",
     "prefix": "texparam",
     "body": [
-      "TextureSampleParameter2D ${1:MetallicMap} = Path(${2:Game}, \"${3:Textures/T_White_Linear}\") [",
+      "TextureSampleParameter2D ${1:MetallicMap} = Path(${2:Game}, ${3:Textures/T_White_Linear}) [",
       "\tGroup=\"${4:11 - Specular}\";",
       "\tSortPriority=${5:51};",
       "\tSamplerType=\"${6:LinearColor}\";",

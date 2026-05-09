@@ -1,8 +1,11 @@
 # Changelog
 
-## 1.3.1
+## 1.3.1 - 1.3.2
 
 - Added `GraphFunction` language support for reusable graph-node helpers that can call `UE.*` nodes and expand at the call site
+- Allowed single-output `Function` and `GraphFunction` calls to be used as value expressions in Graph diagnostics
+- Kept multi-output `Function` and `GraphFunction` calls on explicit out-variable syntax
+- Split top-level block templates into `templates.js`; keyword completions now insert only keywords, while `ShaderFunctionTemplate`, `GraphFunctionTemplate`, and related entries expand full templates
 - Added `GraphFunction` snippets, completion, hover, signature help, symbols, folding, and local diagnostics
 - Added local diagnostics that reject `UE.*` graph node calls inside plain HLSL `Function` blocks and recommend `GraphFunction`
 

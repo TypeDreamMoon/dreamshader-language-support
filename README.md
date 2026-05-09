@@ -4,7 +4,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 发布信息
 
-- Version：`1.3.1`
+- Version：`1.3.2`
 - Language：`DreamShaderLang`
 - Author：TypeDreamMoon
 - GitHub：<https://github.com/TypeDreamMoon>
@@ -17,6 +17,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `GraphFunction` 支持在可复用 Graph helper 中调用 `UE.*` 节点，并在调用点展开
+- 单返回值 `Function` / `GraphFunction` 支持在 Graph 中作为值表达式调用，多返回值仍要求显式 out 变量
 - `Graph` 支持基础 `if` / `else` 本地诊断、作用域补全和语句切分
 - `Graph` 表达式支持 `.rgba` / `.xyzw` 向量 swizzle，例如 `.rg`、`.rrr`、`.rgaa`、`.rgbb`
 - 支持 `Properties` 显式 Parameter 类型、`const` helper、`StaticSwitchParameter`、`UE.CollectionParam(...)`、声明反射属性块、`opt` 输入和 `default` 调用参数
@@ -56,6 +57,9 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 ### 1.3.1 更新
 
 - 新增 `GraphFunction` 补全、snippet、语义高亮、折叠、符号、Hover、Signature Help 和本地诊断
+- 单个 `out` 的 `Function` / `GraphFunction` 支持 `Color = Texture::Sample2DRGB(BaseTex, UV0);` 这种值表达式写法
+- 多个 `out` 的 `Function` / `GraphFunction` 继续要求 `Foo(Input, OutA, OutB);` 这种显式返回值写法
+- 顶层快速定义模板拆到 `templates.js`，关键字补全只插入关键字，完整骨架改为 `ShaderFunctionTemplate` / `GraphFunctionTemplate` 等模板项
 - `GraphFunction` 体内按 Graph 语义诊断，可调用 `UE.*`
 - 普通 `Function` 体内出现 `UE.*` 会被本地诊断标红，提示改用 `GraphFunction`
 
