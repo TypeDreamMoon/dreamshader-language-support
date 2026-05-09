@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm material files and .dsh shared headers.",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -215,7 +215,7 @@
         "dreamshader.enableCodeLens": {
           "type": "boolean",
           "default": true,
-          "description": "Show DreamShaderLang CodeLens actions such as Recompile Current / Recompile All above Shader, ShaderFunction, MaterialLayer, and MaterialLayerBlend blocks."
+          "description": "Show DreamShaderLang CodeLens actions such as Recompile Current / Recompile All above Shader, ShaderFunction, ShaderLayer, and ShaderLayerBlend blocks."
         }
       }
     },

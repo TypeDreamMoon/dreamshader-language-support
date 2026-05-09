@@ -55,8 +55,8 @@ const TOP_LEVEL_BLOCK_NAMES = [
     "GraphFunction",
     "Namespace",
     "ShaderFunction",
-    "MaterialLayer",
-    "MaterialLayerBlend",
+    "ShaderLayer",
+    "ShaderLayerBlend",
     "VirtualFunction"
 ];
 

@@ -13,8 +13,8 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ## 支持内容
 
-- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 使用 `Graph = { ... }` 作为图构建区块
-- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
+- `Shader` / `ShaderFunction` / `ShaderLayer` / `ShaderLayerBlend` 使用 `Graph = { ... }` 作为图构建区块
+- `Shader` / `ShaderFunction` / `ShaderLayer` / `ShaderLayerBlend` 支持 `Root="Game"` / `Root="Plugin.PluginName"` 顶层属性补全、高亮和 Hover
 - `VirtualFunction` 支持补全、语法高亮、Hover、Signature Help、本地诊断和 `Path(Plugins.)` 插件名补全
 - `GraphFunction` 支持在可复用 Graph helper 中调用 `UE.*` 节点，并在调用点展开
 - 单返回值 `Function` / `GraphFunction` 支持在 Graph 中作为值表达式调用，多返回值仍要求显式 out 变量
@@ -28,7 +28,7 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 - 作用域感知变量补全
 - 函数调用参数 Inlay Hints
 - `import` 路径可点击跳转
-- `Shader` / `ShaderFunction` / `MaterialLayer` / `MaterialLayerBlend` / `VirtualFunction` / `Function` / `GraphFunction` / `Namespace` 和区块折叠
+- `Shader` / `ShaderFunction` / `ShaderLayer` / `ShaderLayerBlend` / `VirtualFunction` / `Function` / `GraphFunction` / `Namespace` 和区块折叠
 - `Function` / `Namespace::Function` / `import` / `Path(...)` 联想
 - `UE.*` 内置材质节点补全、Hover、Signature Help
 - `Settings` 支持 `TranslucencyLightingMode` / `LightingMode`
@@ -65,10 +65,10 @@ VSCode 扩展，为 DreamShaderLang `.dsm` / `.dsh` 文件提供语言支持。
 
 ### 1.3.0 更新
 
-- 新增 `MaterialLayer` / `MaterialLayerBlend` 补全、snippet、语义高亮、折叠、符号、CodeLens、Hover、Signature Help 和本地诊断
-- `MaterialLayer` 本地诊断要求只输出一个 `MaterialAttributes`
-- `MaterialLayerBlend` 本地诊断要求只输出一个 `MaterialAttributes`，并至少声明两个 `MaterialAttributes` 输入
-- MaterialLayer snippet 使用显式 `.rgb`，Alpha 可通过 `.a` 继续读取
+- 新增 `ShaderLayer` / `ShaderLayerBlend` 补全、snippet、语义高亮、折叠、符号、CodeLens、Hover、Signature Help 和本地诊断
+- `ShaderLayer` 本地诊断要求只输出一个 `MaterialAttributes`
+- `ShaderLayerBlend` 本地诊断要求只输出一个 `MaterialAttributes`，并至少声明两个 `MaterialAttributes` 输入
+- ShaderLayer snippet 使用显式 `.rgb`，Alpha 可通过 `.a` 继续读取
 
 ### 1.2.27 更新
 

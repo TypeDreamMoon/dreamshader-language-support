@@ -364,8 +364,8 @@ const HOVER_DOCS = new Map([
 const BLOCK_SECTION_RULES = new Map([
     ["Shader", new Set(["Properties", "Settings", "Outputs", "Graph"])],
     ["ShaderFunction", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
-    ["MaterialLayer", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
-    ["MaterialLayerBlend", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
+    ["ShaderLayer", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
+    ["ShaderLayerBlend", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
     ["VirtualFunction", new Set(["Inputs", "Outputs", "Options", "Settings"])]
 ]);
 
@@ -679,8 +679,8 @@ function createCodeLensProvider(changeEmitter) {
             const topLevelBlocks = [
                 ...parseNamedLegacyBlocks(text, "Shader"),
                 ...parseNamedLegacyBlocks(text, "ShaderFunction"),
-                ...parseNamedLegacyBlocks(text, "MaterialLayer"),
-                ...parseNamedLegacyBlocks(text, "MaterialLayerBlend")
+                ...parseNamedLegacyBlocks(text, "ShaderLayer"),
+                ...parseNamedLegacyBlocks(text, "ShaderLayerBlend")
             ].sort((left, right) => left.startOffset - right.startOffset);
 
             for (const block of topLevelBlocks) {
@@ -904,8 +904,8 @@ function addLegacySectionSemanticTokens(tokens, text) {
     const blocks = [
         ...parseNamedLegacyBlocks(text, "Shader"),
         ...parseNamedLegacyBlocks(text, "ShaderFunction"),
-        ...parseNamedLegacyBlocks(text, "MaterialLayer"),
-        ...parseNamedLegacyBlocks(text, "MaterialLayerBlend"),
+        ...parseNamedLegacyBlocks(text, "ShaderLayer"),
+        ...parseNamedLegacyBlocks(text, "ShaderLayerBlend"),
         ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ];
     for (const block of blocks) {
@@ -1369,15 +1369,15 @@ function getBlockSymbolKind(kind) {
 
 function isMaterialFunctionCallableKind(kind) {
     return kind === "ShaderFunction"
-        || kind === "MaterialLayer"
-        || kind === "MaterialLayerBlend"
+        || kind === "ShaderLayer"
+        || kind === "ShaderLayerBlend"
         || kind === "VirtualFunction";
 }
 
 function isGeneratedMaterialFunctionKind(kind) {
     return kind === "ShaderFunction"
-        || kind === "MaterialLayer"
-        || kind === "MaterialLayerBlend";
+        || kind === "ShaderLayer"
+        || kind === "ShaderLayerBlend";
 }
 
 function isLegacySectionBlockKind(kind) {
@@ -2378,7 +2378,7 @@ function analyzeDocument(document, position) {
     const prefix = text.slice(0, offset);
     const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
     const topLevelBlocks = parseTopLevelBlocks(text);
-    const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction", "MaterialLayer", "MaterialLayerBlend", "VirtualFunction"]));
+    const currentLegacyBlock = findEnclosingTopLevelBlock(topLevelBlocks, offset, new Set(["Shader", "ShaderFunction", "ShaderLayer", "ShaderLayerBlend", "VirtualFunction"]));
     const currentSectionInfo = currentLegacyBlock ? findEnclosingLegacySection(text, currentLegacyBlock, offset) : null;
     const currentBlock = currentLegacyBlock ? currentLegacyBlock.kind : findCurrentLegacyTopLevelBlock(prefix);
     const currentSection = currentSectionInfo ? currentSectionInfo.name : findCurrentLegacySection(prefix);
@@ -2434,7 +2434,7 @@ function analyzeDocument(document, position) {
 
 function getRootPluginValueCompletionInfo(text, offset) {
     const prefix = text.slice(0, offset);
-    const matches = Array.from(prefix.matchAll(/\b(MaterialLayerBlend|MaterialLayer|ShaderFunction|Shader)\s*\(/g));
+    const matches = Array.from(prefix.matchAll(/\b(ShaderLayerBlend|ShaderLayer|ShaderFunction|Shader)\s*\(/g));
     if (matches.length === 0) {
         return undefined;
     }
@@ -2503,7 +2503,7 @@ function getMaterialExpressionClassValueCompletionInfo(text, offset) {
 
 function getTopLevelAttributeKindAtOffset(text, offset) {
     const prefix = text.slice(0, offset);
-    const matches = Array.from(prefix.matchAll(/\b(VirtualFunction|MaterialLayerBlend|MaterialLayer|ShaderFunction|Shader|Namespace)\s*\(/g));
+    const matches = Array.from(prefix.matchAll(/\b(VirtualFunction|ShaderLayerBlend|ShaderLayer|ShaderFunction|Shader|Namespace)\s*\(/g));
     if (matches.length === 0) {
         return "";
     }
@@ -2518,7 +2518,7 @@ function getTopLevelAttributeKindAtOffset(text, offset) {
 }
 
 function findCurrentLegacyTopLevelBlock(prefix) {
-    const blockRegex = /\b(?:Shader|ShaderFunction|MaterialLayer|MaterialLayerBlend|VirtualFunction)\s*\(/g;
+    const blockRegex = /\b(?:Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend|VirtualFunction)\s*\(/g;
     let current = "";
     for (const match of prefix.matchAll(blockRegex)) {
         const blockName = match[0].match(/[A-Za-z_][A-Za-z0-9_]*/);
@@ -2557,8 +2557,8 @@ function parseTopLevelBlocks(text) {
     }
 
     blocks.push(...parseNamedLegacyBlocks(text, "ShaderFunction"));
-    blocks.push(...parseNamedLegacyBlocks(text, "MaterialLayer"));
-    blocks.push(...parseNamedLegacyBlocks(text, "MaterialLayerBlend"));
+    blocks.push(...parseNamedLegacyBlocks(text, "ShaderLayer"));
+    blocks.push(...parseNamedLegacyBlocks(text, "ShaderLayerBlend"));
     blocks.push(...parseNamedLegacyBlocks(text, "VirtualFunction"));
 
     return blocks.filter(Boolean).sort((a, b) => a.startOffset - b.startOffset);
@@ -2800,7 +2800,7 @@ function parseImportStatements(text) {
 }
 
 function parseNamedLegacyBlocks(text, kind) {
-    if (kind !== "Shader" && kind !== "ShaderFunction" && kind !== "MaterialLayer" && kind !== "MaterialLayerBlend" && kind !== "VirtualFunction") {
+    if (kind !== "Shader" && kind !== "ShaderFunction" && kind !== "ShaderLayer" && kind !== "ShaderLayerBlend" && kind !== "VirtualFunction") {
         return [];
     }
 
@@ -3710,11 +3710,11 @@ function getCallableKindDetail(kind) {
     if (kind === "VirtualFunction") {
         return "DreamShader VirtualFunction";
     }
-    if (kind === "MaterialLayer") {
-        return "DreamShader MaterialLayer";
+    if (kind === "ShaderLayer") {
+        return "DreamShader ShaderLayer";
     }
-    if (kind === "MaterialLayerBlend") {
-        return "DreamShader MaterialLayerBlend";
+    if (kind === "ShaderLayerBlend") {
+        return "DreamShader ShaderLayerBlend";
     }
     return "DreamShader ShaderFunction";
 }
@@ -3755,8 +3755,8 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
 
     for (const block of [
         ...parseNamedLegacyBlocks(text, "ShaderFunction"),
-        ...parseNamedLegacyBlocks(text, "MaterialLayer"),
-        ...parseNamedLegacyBlocks(text, "MaterialLayerBlend"),
+        ...parseNamedLegacyBlocks(text, "ShaderLayer"),
+        ...parseNamedLegacyBlocks(text, "ShaderLayerBlend"),
         ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ]) {
         const sectionMap = new Map(parseLegacySections(text, block).map((section) => [section.name, section]));
@@ -4363,14 +4363,14 @@ function computeLocalDiagnostics(document) {
     const extension = path.extname(document.fileName).toLowerCase();
     const reachableCallables = collectReachableCallableSignatures(document);
 
-    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bMaterialLayer\s*\(/.test(text) && !/\bMaterialLayerBlend\s*\(/.test(text) && !/\bGraphFunction\b/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
+    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bShaderLayer\s*\(/.test(text) && !/\bShaderLayerBlend\s*\(/.test(text) && !/\bGraphFunction\b/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), MaterialLayer(Name=\"...\"), MaterialLayerBlend(Name=\"...\"), GraphFunction, or VirtualFunction(Name=\"...\") block.",
+            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), ShaderLayer(Name=\"...\"), ShaderLayerBlend(Name=\"...\"), GraphFunction, or VirtualFunction(Name=\"...\") block.",
             vscode.DiagnosticSeverity.Warning));
     }
 
-    if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text) || /\bMaterialLayer\s*\(/.test(text) || /\bMaterialLayerBlend\s*\(/.test(text))) {
+    if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text) || /\bShaderLayer\s*\(/.test(text) || /\bShaderLayerBlend\s*\(/.test(text))) {
         diagnostics.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
             "DreamShader header (.dsh) may only contain import statements, Function blocks, GraphFunction blocks, Namespace blocks, and VirtualFunction declarations.",
@@ -4524,8 +4524,8 @@ function computeDetailedBlockDiagnostics(document, text, reachableCallables) {
     const blocks = [
         ...parseNamedLegacyBlocks(text, "Shader"),
         ...parseNamedLegacyBlocks(text, "ShaderFunction"),
-        ...parseNamedLegacyBlocks(text, "MaterialLayer"),
-        ...parseNamedLegacyBlocks(text, "MaterialLayerBlend"),
+        ...parseNamedLegacyBlocks(text, "ShaderLayer"),
+        ...parseNamedLegacyBlocks(text, "ShaderLayerBlend"),
         ...parseNamedLegacyBlocks(text, "VirtualFunction")
     ].sort((a, b) => a.startOffset - b.startOffset);
 
@@ -4596,7 +4596,7 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
         if (outputsSection) {
             diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
         }
-        diagnostics.push(...validateMaterialLayerBlockShape(document, block, inputsSection, outputsSection));
+        diagnostics.push(...validateShaderLayerBlockShape(document, block, inputsSection, outputsSection));
 
     } else if (block.kind === "VirtualFunction") {
         const inputsSection = seenSections.get("Inputs")?.[0];
@@ -4651,9 +4651,9 @@ function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables
     return diagnostics;
 }
 
-function validateMaterialLayerBlockShape(document, block, inputsSection, outputsSection) {
+function validateShaderLayerBlockShape(document, block, inputsSection, outputsSection) {
     const diagnostics = [];
-    if (block.kind !== "MaterialLayer" && block.kind !== "MaterialLayerBlend") {
+    if (block.kind !== "ShaderLayer" && block.kind !== "ShaderLayerBlend") {
         return diagnostics;
     }
 
@@ -4668,7 +4668,7 @@ function validateMaterialLayerBlockShape(document, block, inputsSection, outputs
             `${block.kind} '${block.name}' must declare exactly one MaterialAttributes output.`));
     }
 
-    if (block.kind === "MaterialLayerBlend") {
+    if (block.kind === "ShaderLayerBlend") {
         const inputs = inputsSection
             ? parseTypedDeclarationsFromSection(inputsSection).declarations.filter((entry) => entry.kind === "declaration")
             : [];
@@ -4678,7 +4678,7 @@ function validateMaterialLayerBlockShape(document, block, inputsSection, outputs
                 document,
                 inputsSection ? inputsSection.nameOffset : block.startOffset,
                 inputsSection ? inputsSection.nameOffset + inputsSection.name.length : block.startOffset + block.kind.length,
-                `MaterialLayerBlend '${block.name}' must declare at least two MaterialAttributes inputs.`));
+                `ShaderLayerBlend '${block.name}' must declare at least two MaterialAttributes inputs.`));
         }
     }
 
@@ -6066,12 +6066,16 @@ function buildDreamShaderTemplate(kind, relativePath) {
     if (kind === "header") {
         return `Namespace(Name="${symbolName}")
 {
-    Function Identity(in vec3 input, out vec3 result) {
+    Function Identity(in float3 input, out float3 result) {
         result = input;
     }
 
-    Function ApplyTint(in vec3 color, in vec3 tint, out vec3 result) {
+    Function ApplyTint(in float3 color, in float3 tint, out float3 result) {
         result = color * tint;
+    }
+
+    Function Remap01(in float value, in float inMin, in float inMax, out float result) {
+        result = saturate((value - inMin) / max(inMax - inMin, 0.0001));
     }
 }
 `;
@@ -6083,8 +6087,23 @@ function buildDreamShaderTemplate(kind, relativePath) {
 Shader(Name="${shaderName}")
 {
     Properties = {
-        Texture2D InTexture = Path(Engine, "/EngineResources/DefaultTexture");
-        vec3 InTint = vec3(1.0, 1.0, 1.0);
+        TextureSampleParameter2D BaseMap = Path(Engine, "/EngineResources/DefaultTexture") [
+            Group="Textures";
+            SortPriority=10;
+            SamplerType="Color";
+        ];
+        VectorParameter Tint = float4(1.0, 1.0, 1.0, 1.0) [
+            Group="Surface";
+            SortPriority=20;
+        ];
+        ScalarParameter Tiling = 1.0 [
+            Group="UV";
+            SortPriority=30;
+        ];
+        ScalarParameter Roughness = 0.55 [
+            Group="Surface";
+            SortPriority=40;
+        ];
     }
 
     Settings = {
@@ -6095,14 +6114,17 @@ Shader(Name="${shaderName}")
 
     Outputs = {
         vec3 Color;
+        float Rough;
         Base.BaseColor = Color;
+        Base.Roughness = Rough;
     }
 
     Graph = {
-        vec2 uv = UE.TexCoord(Index=0);
+        vec2 uv = UE.TexCoord(Index=0) * Tiling;
         vec3 sampledColor;
-        Texture::Sample2DRGB(InTexture, uv, sampledColor);
-        Color = sampledColor * InTint;
+        Texture::Sample2DRGB(BaseMap, uv, sampledColor);
+        Color = sampledColor * Tint.rgb;
+        Rough = Roughness;
     }
 }
 `;
@@ -6115,8 +6137,15 @@ Shader(Name="${shaderName}")
 {
     Properties = {
         float Scale = 8.0;
-        vec3 LowColor = vec3(0.05, 0.08, 0.12);
-        vec3 HighColor = vec3(0.8, 0.95, 1.0);
+        float Contrast = 1.0;
+        VectorParameter LowColor = float4(0.05, 0.08, 0.12, 1.0) [
+            Group="Noise";
+            SortPriority=10;
+        ];
+        VectorParameter HighColor = float4(0.8, 0.95, 1.0, 1.0) [
+            Group="Noise";
+            SortPriority=20;
+        ];
     }
 
     Settings = {
@@ -6134,7 +6163,8 @@ Shader(Name="${shaderName}")
         vec2 uv = UE.TexCoord(Index=0) * Scale;
         float noiseValue;
         Noise::FBM2D(uv, 5.0, noiseValue);
-        Color = lerp(LowColor, HighColor, saturate(noiseValue));
+        float mask = saturate((noiseValue - 0.5) * Contrast + 0.5);
+        Color = lerp(LowColor.rgb, HighColor.rgb, mask);
     }
 }
 `;
@@ -6143,22 +6173,39 @@ Shader(Name="${shaderName}")
     return `Shader(Name="${shaderName}")
 {
     Properties = {
-        vec3 InColor = vec3(1.0, 0.45, 0.2);
+        VectorParameter BaseColor = float4(1.0, 0.45, 0.2, 1.0) [
+            Group="Surface";
+            SortPriority=10;
+        ];
+        ScalarParameter Roughness = 0.55 [
+            Group="Surface";
+            SortPriority=20;
+        ];
+        ScalarParameter Metallic = 0.0 [
+            Group="Surface";
+            SortPriority=30;
+        ];
     }
 
     Settings = {
         Domain = "Surface";
-        ShadingModel = "Unlit";
+        ShadingModel = "DefaultLit";
         BlendMode = "Opaque";
     }
 
     Outputs = {
         vec3 Color;
-        Base.EmissiveColor = Color;
+        float Rough;
+        float Metal;
+        Base.BaseColor = Color;
+        Base.Roughness = Rough;
+        Base.Metallic = Metal;
     }
 
     Graph = {
-        Color = InColor;
+        Color = BaseColor.rgb;
+        Rough = Roughness;
+        Metal = Metallic;
     }
 }
 `;
