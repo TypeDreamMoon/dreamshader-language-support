@@ -66,6 +66,28 @@
             { "include": "#functionQualifiers" },
             { "include": "#operators" }
           ]
+        },
+        {
+          "name": "meta.function.body.dreamshader",
+          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b[^\\{]*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.dreamshader" },
+            "2": { "name": "storage.modifier.function.dreamshader" },
+            "3": { "name": "entity.name.function.definition.dreamshader" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#shaderKeywords" },
+            { "include": "#types" },
+            { "include": "#hlslIntrinsics" },
+            { "include": "#namespaceCalls" },
+            { "include": "#functionCalls" },
+            { "include": "#booleans" },
+            { "include": "#operators" }
+          ]
         }
       ]
     },
@@ -90,6 +112,7 @@
             { "include": "#comments" },
             { "include": "#strings" },
             { "include": "#numbers" },
+            { "include": "#declarationLines" },
             { "include": "#types" },
             { "include": "#declarationMetadataKeys" },
             { "include": "#pathHelpers" },
@@ -110,6 +133,7 @@
             { "include": "#comments" },
             { "include": "#strings" },
             { "include": "#numbers" },
+            { "include": "#declarationLines" },
             { "include": "#types" },
             { "include": "#functionQualifiers" },
             { "include": "#declarationMetadataKeys" },
@@ -132,6 +156,7 @@
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#materialOutputs" },
+            { "include": "#declarationLines" },
             { "include": "#types" },
             { "include": "#booleans" },
             { "include": "#operators" }
@@ -153,6 +178,7 @@
             { "include": "#shaderKeywords" },
             { "include": "#types" },
             { "include": "#graphNestedBlock" },
+            { "include": "#hlslIntrinsics" },
             { "include": "#ueCalls" },
             { "include": "#namespaceCalls" },
             { "include": "#functionCalls" },
@@ -175,6 +201,7 @@
             { "include": "#shaderKeywords" },
             { "include": "#types" },
             { "include": "#graphNestedBlock" },
+            { "include": "#hlslIntrinsics" },
             { "include": "#ueCalls" },
             { "include": "#namespaceCalls" },
             { "include": "#functionCalls" },
@@ -232,14 +259,27 @@
         { "name": "storage.modifier.shadercode.dreamshader", "match": "\\b(?:in|out|inout|opt|const)\\b" }
       ]
     },
+    "declarationLines": {
+      "patterns": [
+        {
+          "name": "meta.declaration.dreamshader",
+          "match": "\\b(?:(opt|const)\\s+)?((?:float|float1|float2|float3|float4|float2x2|float3x3|float4x4|half|half1|half2|half3|half4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool|bool2|bool3|bool4|Texture2D|TextureCube|Texture2DArray|SamplerState|MaterialAttributes|Substrate|SubstrateBSDF|SubstrateMaterial|SubstrateSlab|SubstrateClosure|Strata|StrataBSDF|StrataMaterial|StrataSlab|StrataClosure|ScalarParameter|VectorParameter|DoubleVectorParameter|StaticBoolParameter|StaticSwitchParameter|TextureObjectParameter|TextureSampleParameter2D|TextureSampleParameter2DArray|TextureSampleParameterCube|TextureSampleParameterCubeArray|TextureSampleParameterVolume|TextureSampleParameterSubUV|RuntimeVirtualTextureSampleParameter|SparseVolumeTextureSampleParameter|SparseVolumeTextureObjectParameter|ChannelMaskParameter|StaticComponentMaskParameter|TextureCollectionParameter|CurveAtlasRowParameter|DynamicParameter|FontSampleParameter|SpriteTextureSampler|vec2|vec3|vec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|bvec2|bvec3|bvec4|mat2|mat3|mat4))\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "storage.modifier.shadercode.dreamshader" },
+            "2": { "name": "storage.type.dreamshader" },
+            "3": { "name": "variable.other.declaration.dreamshader" }
+          }
+        }
+      ]
+    },
     "types": {
       "patterns": [
-        { "name": "storage.type.dreamshader", "match": "\\b(?:float|float1|float2|float3|float4|float2x2|float3x3|float4x4|half|half1|half2|half3|half4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool|bool2|bool3|bool4|void|Texture2D|TextureCube|Texture2DArray|SamplerState|MaterialAttributes|ScalarParameter|VectorParameter|DoubleVectorParameter|StaticBoolParameter|StaticSwitchParameter|TextureObjectParameter|TextureSampleParameter2D|TextureSampleParameter2DArray|TextureSampleParameterCube|TextureSampleParameterCubeArray|TextureSampleParameterVolume|TextureSampleParameterSubUV|RuntimeVirtualTextureSampleParameter|SparseVolumeTextureSampleParameter|SparseVolumeTextureObjectParameter|ChannelMaskParameter|StaticComponentMaskParameter|TextureCollectionParameter|CurveAtlasRowParameter|DynamicParameter|FontSampleParameter|SpriteTextureSampler|vec2|vec3|vec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|bvec2|bvec3|bvec4|mat2|mat3|mat4)\\b" }
+        { "name": "storage.type.dreamshader", "match": "\\b(?:float|float1|float2|float3|float4|float2x2|float3x3|float4x4|half|half1|half2|half3|half4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool|bool2|bool3|bool4|void|Texture2D|TextureCube|Texture2DArray|SamplerState|MaterialAttributes|Substrate|SubstrateBSDF|SubstrateMaterial|SubstrateSlab|SubstrateClosure|Strata|StrataBSDF|StrataMaterial|StrataSlab|StrataClosure|ScalarParameter|VectorParameter|DoubleVectorParameter|StaticBoolParameter|StaticSwitchParameter|TextureObjectParameter|TextureSampleParameter2D|TextureSampleParameter2DArray|TextureSampleParameterCube|TextureSampleParameterCubeArray|TextureSampleParameterVolume|TextureSampleParameterSubUV|RuntimeVirtualTextureSampleParameter|SparseVolumeTextureSampleParameter|SparseVolumeTextureObjectParameter|ChannelMaskParameter|StaticComponentMaskParameter|TextureCollectionParameter|CurveAtlasRowParameter|DynamicParameter|FontSampleParameter|SpriteTextureSampler|vec2|vec3|vec4|ivec2|ivec3|ivec4|uvec2|uvec3|uvec4|bvec2|bvec3|bvec4|mat2|mat3|mat4)\\b" }
       ]
     },
     "declarationMetadataKeys": {
       "patterns": [
-        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Group|SortPriority|Description|SamplerType|SamplerSource|MipValueMode|AutomaticViewMipBias|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
+        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Group|SortPriority|Description|DisplayName|SamplerType|SamplerSource|MipValueMode|AutomaticViewMipBias|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
       ]
     },
     "pathHelpers": {
@@ -249,13 +289,13 @@
     },
     "settings": {
       "patterns": [
-        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|Description|Group|SortPriority|ExposeToLibrary|UserExposedCaption|LibraryCategories|Asset)\\b(?=\\s*=)" }
+        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|RefractionCoverageMode|SubstrateRoughnessTracking|Description|Group|SortPriority|ExposeToLibrary|UserExposedCaption|LibraryCategories|Asset)\\b(?=\\s*=)" }
       ]
     },
     "materialOutputs": {
       "patterns": [
         { "name": "support.class.output-root.dreamshader", "match": "\\bBase\\b(?=\\s*\\.)" },
-        { "name": "variable.language.output.dreamshader", "match": "\\bBase\\s*\\.\\s*(?:MaterialAttributes|Attributes|BaseColor|EmissiveColor|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|Anisotropy|Tangent)\\b(?=\\s*=)" },
+        { "name": "variable.language.output.dreamshader", "match": "\\bBase\\s*\\.\\s*(?:MaterialAttributes|Attributes|BaseColor|EmissiveColor|Emissive|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|CustomData0|CustomData1|DiffuseColor|SpecularColor|SurfaceThickness|Displacement|CustomizedUV0|CustomizedUV1|CustomizedUV2|CustomizedUV3|CustomizedUV4|CustomizedUV5|CustomizedUV6|CustomizedUV7|CustomizedUVs0|CustomizedUVs1|CustomizedUVs2|CustomizedUVs3|CustomizedUVs4|CustomizedUVs5|CustomizedUVs6|CustomizedUVs7|MooaEncodedAttribute0|MooaEncodedAttribute1|MooaEncodedAttribute2|MooaEncodedAttribute3|MooaEncodedAttribute4|Anisotropy|Tangent)\\b(?=\\s*=)" },
         { "name": "support.function.output-node.dreamshader", "match": "\\bExpression\\b(?=\\s*\\()" },
         { "name": "variable.parameter.output-pin.dreamshader", "match": "\\bPin\\b(?=\\s*\\[)" }
       ]
@@ -264,6 +304,11 @@
       "patterns": [
         { "name": "support.class.namespace.dreamshader", "match": "\\bUE\\b(?=\\.)" },
         { "name": "support.function.ue.dreamshader", "match": "(?<=\\bUE\\.)[A-Za-z_][A-Za-z0-9_]*\\b" }
+      ]
+    },
+    "hlslIntrinsics": {
+      "patterns": [
+        { "name": "support.function.hlsl.dreamshader", "match": "\\b(?:abs|acos|all|any|asin|atan|atan2|ceil|clamp|clip|cos|cosh|cross|ddx|ddx_coarse|ddx_fine|ddy|ddy_coarse|ddy_fine|degrees|determinant|distance|dot|exp|exp2|floor|fmod|frac|fract|frexp|fwidth|isfinite|isinf|isnan|ldexp|length|lerp|lit|log|log10|log2|max|min|mix|mod|modf|mul|normalize|pow|radians|reflect|refract|round|rsqrt|saturate|sign|sin|sincos|sinh|smoothstep|sqrt|step|tan|tanh|transpose|trunc)\\b(?=\\s*\\()" }
       ]
     },
     "namespaceCalls": {

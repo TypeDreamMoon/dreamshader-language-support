@@ -1,0 +1,607 @@
+"use strict";
+
+const { scan } = require("./scanner");
+const {
+    normalizeSymbolKey,
+    splitTopLevel,
+    splitTopLevelAssignment,
+    stripCommentsPreserveLayout
+} = require("./utils");
+
+const TOP_LEVEL_BLOCKS = new Set([
+    "Shader",
+    "ShaderFunction",
+    "ShaderLayer",
+    "ShaderLayerBlend",
+    "VirtualFunction",
+    "Function",
+    "GraphFunction",
+    "Namespace"
+]);
+
+const SECTION_NAMES = new Set(["Properties", "Inputs", "Outputs", "Results", "Settings", "Options", "Graph"]);
+const SECTION_NAME_ALIASES = new Map([
+    ["Results", "Outputs"]
+]);
+
+function parseDocument(text) {
+    const tokens = scan(text);
+    const parser = new Parser(text, tokens);
+    return parser.parse();
+}
+
+class Parser {
+    constructor(text, tokens) {
+        this.text = text;
+        this.tokens = tokens;
+        this.index = 0;
+        this.blocks = [];
+        this.imports = [];
+        this.errors = [];
+    }
+
+    parse() {
+        while (!this.isAtEnd()) {
+            const token = this.peek();
+            if (this.isTrivia(token)) {
+                this.index += 1;
+                continue;
+            }
+
+            if (token.type === "identifier" && token.value === "import") {
+                this.imports.push(this.parseImport());
+                continue;
+            }
+
+            if (token.type === "identifier" && TOP_LEVEL_BLOCKS.has(token.value)) {
+                const block = token.value === "Function" || token.value === "GraphFunction"
+                    ? this.parseFunctionBlock()
+                    : this.parseNamedBlock();
+                if (block) {
+                    this.blocks.push(block);
+                    continue;
+                }
+            }
+
+            this.index += 1;
+        }
+
+        return {
+            text: this.text,
+            tokens: this.tokens,
+            blocks: this.blocks,
+            imports: this.imports,
+            errors: this.errors
+        };
+    }
+
+    parseImport() {
+        const start = this.advance();
+        const pathToken = this.findNext((token) => token.type === "string", start.end + 512);
+        const lineEndOffset = findLineEnd(this.text, pathToken ? pathToken.end : start.end);
+        const semicolon = pathToken ? this.findNext((token) => token.value === ";", lineEndOffset) : null;
+        if (pathToken) {
+            this.index = semicolon ? this.tokens.indexOf(semicolon) + 1 : this.tokens.indexOf(pathToken) + 1;
+        }
+        return {
+            kind: "import",
+            startOffset: start.start,
+            endOffset: semicolon ? semicolon.end : pathToken ? pathToken.end : start.end,
+            path: pathToken ? trimQuotes(pathToken.value) : "",
+            pathOffset: pathToken ? pathToken.start + 1 : start.end
+        };
+    }
+
+    parseNamedBlock() {
+        const kindToken = this.advance();
+        const block = {
+            kind: kindToken.value,
+            name: kindToken.value,
+            localName: kindToken.value,
+            startOffset: kindToken.start,
+            nameOffset: kindToken.start,
+            nameRangeLength: kindToken.value.length,
+            attributes: [],
+            sections: [],
+            bodyOpenOffset: -1,
+            bodyCloseOffset: -1,
+            endOffset: kindToken.end
+        };
+
+        const openParen = this.skipTriviaAndPeek();
+        if (openParen && openParen.value === "(") {
+            const closeParenIndex = this.findMatchingTokenIndex(this.index, "(", ")");
+            block.attributeOpenOffset = openParen.start;
+            block.attributeCloseOffset = closeParenIndex >= 0 ? this.tokens[closeParenIndex].start : -1;
+            const attributeEnd = closeParenIndex >= 0 ? this.tokens[closeParenIndex].end : openParen.end;
+            const attributeText = this.text.slice(openParen.end, closeParenIndex >= 0 ? this.tokens[closeParenIndex].start : attributeEnd);
+            block.attributes = parseAssignments(attributeText, openParen.end);
+            const nameAttr = block.attributes.find((entry) => normalizeSymbolKey(entry.name) === "name");
+            if (nameAttr) {
+                block.name = trimQuotes(nameAttr.value);
+                block.localName = block.name.split(/[\\/]/).pop() || block.name;
+                block.nameOffset = nameAttr.valueOffset + (nameAttr.value.trim().startsWith("\"") ? 1 : 0);
+                block.nameRangeLength = block.name.length;
+            }
+            this.index = closeParenIndex >= 0 ? closeParenIndex + 1 : this.index + 1;
+        }
+
+        const openBrace = this.skipTriviaAndPeek();
+        if (!openBrace || openBrace.value !== "{") {
+            return block;
+        }
+
+        const closeBraceIndex = this.findMatchingTokenIndex(this.index, "{", "}");
+        block.bodyOpenOffset = openBrace.start;
+        block.bodyCloseOffset = closeBraceIndex >= 0 ? this.tokens[closeBraceIndex].start : this.text.length;
+        block.endOffset = closeBraceIndex >= 0 ? this.tokens[closeBraceIndex].end : this.text.length;
+        if (block.kind === "Namespace") {
+            block.children = parseDocument(this.text.slice(openBrace.end, block.bodyCloseOffset)).blocks
+                .map((child) => offsetBlock(child, openBrace.end, block.name));
+        } else {
+            block.sections = parseSections(this.text, openBrace.end, block.bodyCloseOffset);
+        }
+        this.index = closeBraceIndex >= 0 ? closeBraceIndex + 1 : this.tokens.length - 1;
+        return block;
+    }
+
+    parseFunctionBlock() {
+        const kindToken = this.advance();
+        const block = {
+            kind: kindToken.value,
+            name: "",
+            localName: "",
+            startOffset: kindToken.start,
+            nameOffset: kindToken.start,
+            nameRangeLength: 0,
+            params: [],
+            bodyOpenOffset: -1,
+            bodyCloseOffset: -1,
+            endOffset: kindToken.end
+        };
+
+        if (block.kind === "Function") {
+            const maybeModifier = this.skipTriviaAndPeek();
+            if (maybeModifier && maybeModifier.type === "identifier" && ["SelfContained", "Inline"].includes(maybeModifier.value)) {
+                block.modifier = maybeModifier.value;
+                this.index += 1;
+            }
+        }
+
+        const nameToken = this.skipTriviaAndPeek();
+        if (nameToken && nameToken.type === "identifier") {
+            block.name = nameToken.value;
+            block.localName = nameToken.value;
+            block.nameOffset = nameToken.start;
+            block.nameRangeLength = nameToken.value.length;
+            this.index += 1;
+        }
+
+        const openParen = this.skipTriviaAndPeek();
+        if (openParen && openParen.value === "(") {
+            const closeParenIndex = this.findMatchingTokenIndex(this.index, "(", ")");
+            block.paramOpenOffset = openParen.start;
+            block.paramCloseOffset = closeParenIndex >= 0 ? this.tokens[closeParenIndex].start : -1;
+            block.params = parseFunctionParams(
+                this.text.slice(openParen.end, closeParenIndex >= 0 ? this.tokens[closeParenIndex].start : openParen.end),
+                openParen.end);
+            this.index = closeParenIndex >= 0 ? closeParenIndex + 1 : this.index + 1;
+        }
+
+        const openBrace = this.skipTriviaAndPeek();
+        if (openBrace && openBrace.value === "{") {
+            const closeBraceIndex = this.findMatchingTokenIndex(this.index, "{", "}");
+            block.bodyOpenOffset = openBrace.start;
+            block.bodyCloseOffset = closeBraceIndex >= 0 ? this.tokens[closeBraceIndex].start : this.text.length;
+            block.bodyText = this.text.slice(openBrace.end, block.bodyCloseOffset);
+            block.bodyOffset = openBrace.end;
+            block.endOffset = closeBraceIndex >= 0 ? this.tokens[closeBraceIndex].end : this.text.length;
+            this.index = closeBraceIndex >= 0 ? closeBraceIndex + 1 : this.tokens.length - 1;
+        }
+
+        return block;
+    }
+
+    findMatchingTokenIndex(openIndex, openValue, closeValue) {
+        let depth = 0;
+        for (let index = openIndex; index < this.tokens.length; index += 1) {
+            const token = this.tokens[index];
+            if (token.type === "comment" || token.type === "whitespace" || token.type === "string") {
+                continue;
+            }
+            if (token.value === openValue) {
+                depth += 1;
+            } else if (token.value === closeValue) {
+                depth -= 1;
+                if (depth === 0) {
+                    return index;
+                }
+            }
+        }
+        return -1;
+    }
+
+    findNext(predicate, maxEndOffset = Infinity) {
+        for (let index = this.index; index < this.tokens.length; index += 1) {
+            const token = this.tokens[index];
+            if (token.start > maxEndOffset) {
+                return null;
+            }
+            if (predicate(token)) {
+                return token;
+            }
+        }
+        return null;
+    }
+
+    skipTriviaAndPeek() {
+        while (!this.isAtEnd() && this.isTrivia(this.peek())) {
+            this.index += 1;
+        }
+        return this.peek();
+    }
+
+    isTrivia(token) {
+        return token && (token.type === "whitespace" || token.type === "comment");
+    }
+
+    advance() {
+        const token = this.peek();
+        this.index += 1;
+        return token;
+    }
+
+    peek() {
+        return this.tokens[this.index];
+    }
+
+    isAtEnd() {
+        return this.peek().type === "eof";
+    }
+}
+
+function parseSections(text, startOffset, endOffset) {
+    const body = text.slice(startOffset, endOffset);
+    const tokens = scan(body).map((token) => ({
+        ...token,
+        start: token.start + startOffset,
+        end: token.end + startOffset
+    }));
+    const sections = [];
+    let index = 0;
+    while (index < tokens.length && tokens[index].type !== "eof") {
+        const token = tokens[index];
+        if (token.type !== "identifier" || !SECTION_NAMES.has(token.value)) {
+            index += 1;
+            continue;
+        }
+        let cursor = skipTrivia(tokens, index + 1);
+        if (!tokens[cursor] || tokens[cursor].value !== "=") {
+            index += 1;
+            continue;
+        }
+        cursor = skipTrivia(tokens, cursor + 1);
+        if (!tokens[cursor] || tokens[cursor].value !== "{") {
+            index += 1;
+            continue;
+        }
+        const closeIndex = findMatchingInTokenList(tokens, cursor, "{", "}");
+        const closeOffset = closeIndex >= 0 ? tokens[closeIndex].start : endOffset;
+        const canonicalName = SECTION_NAME_ALIASES.get(token.value) || token.value;
+        const section = {
+            name: canonicalName,
+            originalName: token.value,
+            nameOffset: token.start,
+            bodyOpenOffset: tokens[cursor].start,
+            bodyCloseOffset: closeOffset,
+            startOffset: token.start,
+            endOffset: closeIndex >= 0 ? tokens[closeIndex].end : endOffset,
+            bodyOffset: tokens[cursor].end,
+            bodyText: text.slice(tokens[cursor].end, closeOffset)
+        };
+        section.entries = parseSectionEntries(section);
+        sections.push(section);
+        index = closeIndex >= 0 ? closeIndex + 1 : tokens.length;
+    }
+    return sections;
+}
+
+function parseSectionEntries(section) {
+    if (section.name === "Settings" || section.name === "Options") {
+        return parseAssignments(section.bodyText, section.bodyOffset);
+    }
+
+    if (section.name === "Graph") {
+        return parseCodeStatements(section.bodyText, section.bodyOffset);
+    }
+
+    const entries = [];
+    for (const statement of splitTopLevel(section.bodyText, section.bodyOffset, ";")) {
+        const withoutMetadata = stripTrailingMetadata(statement.text);
+        const assignment = splitTopLevelAssignment(withoutMetadata.text);
+        const text = withoutMetadata.text.trim();
+        if (assignment) {
+            const declaration = parseDeclaration(assignment.left);
+            if (declaration) {
+                entries.push({
+                    kind: "declaration",
+                    ...statement,
+                    type: declaration.type,
+                    name: declaration.name,
+                    valueText: assignment.right,
+                    valueOffset: statement.startOffset + statement.text.indexOf(assignment.right),
+                    metadata: withoutMetadata.metadata
+                });
+            } else if (section.name === "Outputs") {
+                entries.push({
+                    kind: "binding",
+                    ...statement,
+                    target: assignment.left,
+                    valueText: assignment.right,
+                    valueOffset: statement.startOffset + statement.text.indexOf(assignment.right)
+                });
+            } else {
+                entries.push({ kind: "invalid", ...statement });
+            }
+            continue;
+        }
+        const declaration = parseDeclaration(text);
+        entries.push(declaration
+            ? { kind: "declaration", ...statement, ...declaration, valueText: "", metadata: withoutMetadata.metadata }
+            : { kind: "invalid", ...statement });
+    }
+    return entries;
+}
+
+function parseAssignments(text, baseOffset) {
+    return splitTopLevel(text, baseOffset, [";", ","]).map((segment) => {
+        const assignment = splitTopLevelAssignment(segment.text);
+        if (!assignment) {
+            return { kind: "invalid", ...segment };
+        }
+        return {
+            kind: "assignment",
+            ...segment,
+            name: assignment.left,
+            value: assignment.right,
+            valueOffset: segment.startOffset + segment.text.indexOf(assignment.right)
+        };
+    });
+}
+
+function parseCodeStatements(text, baseOffset) {
+    return splitTopLevel(text, baseOffset, ";").map((segment) => {
+        const declarations = parseCodeDeclarationEntries(segment.text, segment.startOffset);
+        if (declarations.length > 0) {
+            return { kind: "declarations", ...segment, declarations };
+        }
+        const assignment = splitTopLevelAssignment(segment.text);
+        if (assignment) {
+            return {
+                kind: "assignment",
+                ...segment,
+                target: assignment.left,
+                valueText: assignment.right,
+                valueOffset: segment.startOffset + segment.text.indexOf(assignment.right)
+            };
+        }
+        return { kind: "expression", ...segment };
+    });
+}
+
+function parseCodeDeclarationEntries(text, baseOffset) {
+    const segments = splitTopLevel(text, baseOffset, ",");
+    if (segments.length === 0) {
+        return [];
+    }
+    const firstAssignment = splitTopLevelAssignment(segments[0].text);
+    const firstDecl = parseDeclaration(firstAssignment ? firstAssignment.left : segments[0].text);
+    if (!firstDecl) {
+        return [];
+    }
+    const result = [{
+        ...firstDecl,
+        startOffset: segments[0].startOffset,
+        endOffset: segments[0].endOffset,
+        valueText: firstAssignment ? firstAssignment.right : "",
+        valueOffset: firstAssignment ? segments[0].startOffset + segments[0].text.indexOf(firstAssignment.right) : -1
+    }];
+    for (let index = 1; index < segments.length; index += 1) {
+        const assignment = splitTopLevelAssignment(segments[index].text);
+        const name = (assignment ? assignment.left : segments[index].text).trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+            return [];
+        }
+        result.push({
+            type: firstDecl.type,
+            name,
+            startOffset: segments[index].startOffset,
+            endOffset: segments[index].endOffset,
+            valueText: assignment ? assignment.right : "",
+            valueOffset: assignment ? segments[index].startOffset + segments[index].text.indexOf(assignment.right) : -1
+        });
+    }
+    return result;
+}
+
+function parseDeclaration(text) {
+    const trimmed = String(text || "").trim().replace(/^(opt|const)\s+/i, "");
+    const match = /^(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(trimmed);
+    return match ? { type: match[1].trim(), name: match[2].trim() } : null;
+}
+
+function parseFunctionParams(text, baseOffset) {
+    return splitTopLevel(text, baseOffset, ",").map((segment) => {
+        const parts = segment.text.trim().split(/\s+/).filter(Boolean);
+        if (parts.length < 2) {
+            return { kind: "invalid", ...segment };
+        }
+        let qualifier = "in";
+        let type = parts[0];
+        let name = parts[1];
+        if (parts.length >= 3 && ["in", "out", "inout"].includes(parts[0])) {
+            qualifier = parts[0];
+            type = parts[1];
+            name = parts[2];
+        }
+        return { kind: "param", ...segment, qualifier, type, name };
+    });
+}
+
+function stripTrailingMetadata(text) {
+    const source = String(text || "").trim();
+    if (!source.endsWith("]")) {
+        return { text: source, metadata: {} };
+    }
+    let depth = 0;
+    let metadataStart = -1;
+    let inString = false;
+    for (let index = source.length - 1; index >= 0; index -= 1) {
+        const char = source[index];
+        if (char === "\"" && source[index - 1] !== "\\") {
+            inString = !inString;
+        }
+        if (inString) {
+            continue;
+        }
+        if (char === "]") {
+            depth += 1;
+        } else if (char === "[") {
+            depth -= 1;
+            if (depth === 0) {
+                metadataStart = index;
+                break;
+            }
+        }
+    }
+    if (metadataStart < 0) {
+        return { text: source, metadata: {} };
+    }
+    const metadata = {};
+    for (const entry of parseAssignments(source.slice(metadataStart + 1, -1), 0)) {
+        if (entry.kind === "assignment") {
+            metadata[normalizeSymbolKey(entry.name)] = trimQuotes(entry.value);
+        }
+    }
+    return { text: source.slice(0, metadataStart).trim(), metadata };
+}
+
+function skipTrivia(tokens, index) {
+    let cursor = index;
+    while (tokens[cursor] && (tokens[cursor].type === "whitespace" || tokens[cursor].type === "comment")) {
+        cursor += 1;
+    }
+    return cursor;
+}
+
+function findMatchingInTokenList(tokens, openIndex, openValue, closeValue) {
+    let depth = 0;
+    for (let index = openIndex; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        if (token.type === "comment" || token.type === "whitespace" || token.type === "string") {
+            continue;
+        }
+        if (token.value === openValue) {
+            depth += 1;
+        } else if (token.value === closeValue) {
+            depth -= 1;
+            if (depth === 0) {
+                return index;
+            }
+        }
+    }
+    return -1;
+}
+
+function trimQuotes(text) {
+    const value = String(text || "").trim();
+    return value.startsWith("\"") && value.endsWith("\"") ? value.slice(1, -1) : value;
+}
+
+function findLineEnd(text, offset) {
+    const lineFeed = text.indexOf("\n", offset);
+    const carriageReturn = text.indexOf("\r", offset);
+    if (lineFeed < 0 && carriageReturn < 0) {
+        return text.length;
+    }
+    if (lineFeed < 0) {
+        return carriageReturn;
+    }
+    if (carriageReturn < 0) {
+        return lineFeed;
+    }
+    return Math.min(lineFeed, carriageReturn);
+}
+
+function offsetBlock(block, delta, namespace) {
+    const result = {
+        ...block,
+        namespace,
+        startOffset: offsetNumber(block.startOffset, delta),
+        endOffset: offsetNumber(block.endOffset, delta),
+        nameOffset: offsetNumber(block.nameOffset, delta),
+        bodyOpenOffset: offsetNumber(block.bodyOpenOffset, delta),
+        bodyCloseOffset: offsetNumber(block.bodyCloseOffset, delta),
+        attributeOpenOffset: offsetNumber(block.attributeOpenOffset, delta),
+        attributeCloseOffset: offsetNumber(block.attributeCloseOffset, delta),
+        paramOpenOffset: offsetNumber(block.paramOpenOffset, delta),
+        paramCloseOffset: offsetNumber(block.paramCloseOffset, delta),
+        bodyOffset: offsetNumber(block.bodyOffset, delta),
+        bodyText: block.bodyText
+    };
+
+    if (Array.isArray(block.params)) {
+        result.params = block.params.map((param) => offsetEntry(param, delta));
+    }
+    if (Array.isArray(block.attributes)) {
+        result.attributes = block.attributes.map((entry) => offsetEntry(entry, delta));
+    }
+    if (Array.isArray(block.sections)) {
+        result.sections = block.sections.map((section) => offsetSection(section, delta));
+    }
+    if (Array.isArray(block.children)) {
+        result.children = block.children.map((child) => offsetBlock(child, delta, namespace));
+    }
+    return result;
+}
+
+function offsetSection(section, delta) {
+    return {
+        ...section,
+        nameOffset: offsetNumber(section.nameOffset, delta),
+        bodyOpenOffset: offsetNumber(section.bodyOpenOffset, delta),
+        bodyCloseOffset: offsetNumber(section.bodyCloseOffset, delta),
+        startOffset: offsetNumber(section.startOffset, delta),
+        endOffset: offsetNumber(section.endOffset, delta),
+        bodyOffset: offsetNumber(section.bodyOffset, delta),
+        entries: (section.entries || []).map((entry) => offsetEntry(entry, delta))
+    };
+}
+
+function offsetEntry(entry, delta) {
+    const result = { ...entry };
+    for (const key of ["startOffset", "endOffset", "valueOffset", "pathOffset"]) {
+        result[key] = offsetNumber(result[key], delta);
+    }
+    if (Array.isArray(entry.declarations)) {
+        result.declarations = entry.declarations.map((declaration) => offsetEntry(declaration, delta));
+    }
+    return result;
+}
+
+function offsetNumber(value, delta) {
+    return typeof value === "number" && value >= 0 ? value + delta : value;
+}
+
+module.exports = {
+    parseDocument,
+    parseSections,
+    parseSectionEntries,
+    parseAssignments,
+    parseCodeDeclarationEntries,
+    parseCodeStatements,
+    parseFunctionParams,
+    parseDeclaration,
+    TOP_LEVEL_BLOCKS,
+    SECTION_NAMES
+};

@@ -1,6 +1,4 @@
 "use strict";
-
-const vscode = require("vscode");
 const {
     DREAMSHADER_KEYWORD_COMPLETIONS,
     DREAMSHADER_TEMPLATE_COMPLETIONS
@@ -38,7 +36,6 @@ const SEMANTIC_TOKEN_MODIFIERS = [
     "readonly",
     "defaultLibrary"
 ];
-const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS);
 
 const LEGACY_SECTION_NAMES = [
     "Properties",
@@ -561,7 +558,6 @@ module.exports = {
     DEFAULT_PACKAGE_INDEX_URL,
     SEMANTIC_TOKEN_TYPES,
     SEMANTIC_TOKEN_MODIFIERS,
-    SEMANTIC_TOKEN_LEGEND,
     LEGACY_SECTION_NAMES,
     TOP_LEVEL_BLOCK_NAMES,
     QUALIFIER_ITEMS,

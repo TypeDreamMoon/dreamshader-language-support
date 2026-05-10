@@ -5,14 +5,12 @@ const https = require("https");
 const childProcess = require("child_process");
 const path = require("path");
 const vscode = require("vscode");
+const languageCore = require("./language");
 const {
-    DREAMSHADER_KEYWORD_COMPLETIONS,
-    DREAMSHADER_TEMPLATE_COMPLETIONS,
     LANGUAGE_ID,
     BRIDGE_DIAGNOSTIC_COLLECTION_NAME,
     LOCAL_DIAGNOSTIC_COLLECTION_NAME,
     DREAMSHADER_EXTENSIONS,
-    INDENT,
     PACKAGE_MANIFEST_NAME,
     PACKAGE_LOCK_NAME,
     MATERIAL_EXPRESSION_MANIFEST_NAME,
@@ -20,23 +18,13 @@ const {
     DEFAULT_PACKAGE_INDEX_URL,
     SEMANTIC_TOKEN_TYPES,
     SEMANTIC_TOKEN_MODIFIERS,
-    SEMANTIC_TOKEN_LEGEND,
-    LEGACY_SECTION_NAMES,
-    TOP_LEVEL_BLOCK_NAMES,
-    QUALIFIER_ITEMS,
-    FUNCTION_MODIFIER_ITEMS,
-    GRAPH_TYPE_ITEMS,
-    HLSL_TYPE_ITEMS,
-    HLSL_KEYWORD_ITEMS,
     SETTINGS_ITEMS,
-    VIRTUAL_FUNCTION_OPTION_ITEMS,
     MATERIAL_OUTPUT_ITEMS,
-    MATERIAL_OUTPUT_NAME_SET,
-    MATERIAL_ATTRIBUTE_MEMBER_ITEMS,
     MATERIAL_ATTRIBUTE_MEMBER_NAME_SET,
-    OUTPUT_HELPER_ITEMS,
     UE_BUILTINS
 } = require("./languageData");
+
+const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS);
 
 const materialExpressionManifestCache = new Map();
 const dreamShaderSettingsManifestCache = new Map();
@@ -315,34 +303,45 @@ function getManifestPropertyPlaceholder(property) {
     return "0";
 }
 
-const DREAMSHADER_HELPER_ITEMS = [
-    ["Path", "Path(${1:Game}, \"${2:/Textures/MyTexture}\")", "Resolves a Game, Engine, or Plugin asset path for texture defaults, Settings object references, and VirtualFunction assets."],
-    ["Path", "Path(Plugins.${1:PluginName}, \"${2:MaterialFunctions/MyFunction}\")", "Resolves an asset under a project content plugin."],
-    ["Path", "Path(\"${1:/Game/Textures/MyTexture.DefaultTexture}\")", "Resolves a fully qualified Unreal object path for texture defaults, Settings object references, and VirtualFunction assets."]
-];
-
-const GRAPH_SNIPPET_ITEMS = [
-    ["uepanner", "UE.Panner(\n\tCoordinate=UE.TexCoord(Index=${1:0}),\n\tTime=UE.Time(Period=${2:4.0}),\n\tSpeed=float2(${3:0.05}, ${4:0.0}))", "Insert a UE.Panner call"],
-    ["ueexpr", "UE.Expression(\n\tClass=\"${1:Sine}\",\n\tOutputType=\"${2:float1}\",\n\t${3:Input}=${4:Value})", "Insert a generic reflected MaterialExpression call"],
-    ["collectionparam", "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")", "Insert a MaterialParameterCollection read"],
-    ["uetransform", "UE.TransformVector(\n\tInput=${1:NormalTS},\n\tSource=\"${2:Tangent}\",\n\tDestination=\"${3:World}\")", "Insert a UE.TransformVector call"]
-];
-
-const DECLARATION_SNIPPET_ITEMS = [
-    ["optinput", "opt ${1:float4} ${2:Color} = ${3:float4(1.0, 1.0, 1.0, 1.0)} [\n\tDescription=\"${4:Optional input}\";\n\tSortPriority=${5:32};\n];", "Insert an optional ShaderFunction / VirtualFunction input"],
-    ["staticswitch", "StaticSwitchParameter ${1:UseDetail} = ${2:true} [\n\tGroup=\"${3:Switches}\";\n\tSortPriority=${4:32};\n\tDescription=\"${5:Use detail branch}\";\n];", "Insert a StaticSwitchParameter property"],
-    ["constprop", "const ${1:float} ${2:Value} = ${3:0.0};", "Insert a const DreamShader Properties declaration"],
-    ["texparam", "TextureSampleParameter2D ${1:MetallicMap} = Path(${2:Game}, \"${3:Textures/T_White_Linear}\") [\n\tGroup=\"${4:11 - Specular}\";\n\tSortPriority=${5:51};\n\tSamplerType=\"${6:LinearColor}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n\tMipValueMode=\"${8:None}\";\n\tAutomaticViewMipBias=${9:true};\n\tConstCoordinate=${10:0};\n\tConstMipValue=${11:-1};\n];", "Insert a TextureSampleParameter2D with reflected properties"]
-];
-
-const OUTPUT_SNIPPET_ITEMS = [
-    ["matattrs", "MaterialAttributes ${1:Attrs};\nBase.MaterialAttributes = ${1:Attrs};", "Declare and fill a MaterialAttributes output"],
-    ["ueoutputpin", "Expression(Class=\"${1:ThinTranslucentMaterialOutput}\").Pin[${2:0}] = ${3:float3(0.8, 0.9, 1.0)};", "Insert an auxiliary material output node binding"]
-];
-
-const MATERIAL_ATTRIBUTES_SNIPPET_ITEMS = [
-    ["attrmember", "${1:Attrs}.${2|BaseColor,Roughness,Metallic,Specular,Normal,Opacity,EmissiveColor,AmbientOcclusion|} = ${3:Value};", "Assign a MaterialAttributes member in Graph"]
-];
+const SETTING_MAPPING_FALLBACKS = new Map([
+    ["MaterialDomain", [
+        "Surface",
+        "DeferredDecal",
+        "LightFunction",
+        "PostProcess",
+        "UserInterface",
+        "UI",
+        "VirtualTexture"
+    ]],
+    ["ShadingModel", [
+        "DefaultLit",
+        "Lit",
+        "Unlit",
+        "Subsurface",
+        "PreintegratedSkin",
+        "ClearCoat",
+        "SubsurfaceProfile",
+        "TwoSidedFoliage",
+        "Hair",
+        "Cloth",
+        "Eye",
+        "SingleLayerWater",
+        "ThinTranslucent",
+        "Substrate",
+        "Strata"
+    ]],
+    ["BlendMode", [
+        "Opaque",
+        "Masked",
+        "Cutout",
+        "Translucent",
+        "Transparent",
+        "Additive",
+        "Modulate",
+        "AlphaComposite",
+        "AlphaHoldout"
+    ]]
+]);
 
 const HOVER_DOCS = new Map([
     ["shader", "Top-level DreamShader material declaration. DreamShader material implementation files use `.dsm`."],
@@ -382,14 +381,6 @@ const HOVER_DOCS = new Map([
     ["path", "Resolves a texture, object, or VirtualFunction asset path. Use `Path(Game, \"Folder/Asset\")`, `Path(Engine, \"Folder/Asset\")`, `Path(Plugins.PluginName, \"Folder/Asset\")`, or a full `/Game/...` object path."],
     ["in", "Function input parameter qualifier."],
     ["out", "Function output parameter qualifier. Callers pass a target variable explicitly, for example `ApplyTint(Color, Tint, Result)`."]
-]);
-
-const BLOCK_SECTION_RULES = new Map([
-    ["Shader", new Set(["Properties", "Settings", "Outputs", "Graph"])],
-    ["ShaderFunction", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
-    ["ShaderLayer", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
-    ["ShaderLayerBlend", new Set(["Properties", "Inputs", "Outputs", "Settings", "Graph"])],
-    ["VirtualFunction", new Set(["Inputs", "Outputs", "Options", "Settings"])]
 ]);
 
 const SCALAR_TYPE_NAMES = new Set([
@@ -468,8 +459,6 @@ const SWIZZLE_CHANNEL_GROUPS = [
     "rgba",
     "xyzw"
 ];
-const SWIZZLE_COMPLETION_ITEMS = createSwizzleCompletionSpecs();
-
 const TYPE_LIKE_NAMES = new Set([
     ...SCALAR_TYPE_NAMES,
     ...VECTOR_TYPE_COMPONENTS.keys(),
@@ -750,7 +739,7 @@ function createSemanticTokensProvider() {
             }
 
             const text = document.getText();
-            const tokens = collectDreamShaderSemanticTokens(text)
+            const tokens = languageCore.getSemanticTokens(text)
                 .sort((left, right) => left.offset - right.offset || left.length - right.length);
             let lastEndOffset = -1;
             for (const token of tokens) {
@@ -852,13 +841,8 @@ function createFoldingRangeProvider() {
                 ranges.push(new vscode.FoldingRange(startLine, endLine, vscode.FoldingRangeKind.Region));
             };
 
-            for (const block of parseTopLevelBlocks(text)) {
-                addRange(block.bodyOpenOffset, block.bodyCloseOffset);
-                if (isLegacySectionBlockKind(block.kind)) {
-                    for (const section of parseLegacySections(text, block)) {
-                        addRange(section.bodyOpenOffset, section.bodyCloseOffset);
-                    }
-                }
+            for (const range of languageCore.getFoldingRanges(text)) {
+                addRange(range.startOffset, range.endOffset);
             }
 
             return ranges;
@@ -892,262 +876,6 @@ function createDocumentLinkProvider() {
     };
 }
 
-function collectDreamShaderSemanticTokens(text) {
-    const tokens = [];
-    addTopLevelSemanticTokens(tokens, text);
-    addLegacySectionSemanticTokens(tokens, text);
-    addFunctionParameterSemanticTokens(tokens, text);
-    addCallSemanticTokens(tokens, text);
-    addSwizzleSemanticTokens(tokens, text);
-    addKeywordAndTypeSemanticTokens(tokens, text);
-    return tokens;
-}
-
-function addTopLevelSemanticTokens(tokens, text) {
-    for (const block of parseTopLevelBlocks(text)) {
-        addSemanticToken(tokens, text, block.startOffset, block.kind.length, "keyword");
-        if (typeof block.nameOffset === "number") {
-            addSemanticToken(tokens, text, block.nameOffset, block.nameRangeLength || block.name.length, getSemanticTypeForBlockName(block.kind), ["declaration", "definition"]);
-        }
-
-        if (typeof block.attributeOpenOffset === "number" && typeof block.attributeCloseOffset === "number" && block.attributeCloseOffset > block.attributeOpenOffset) {
-            addAttributeSemanticTokens(tokens, text, block.attributeOpenOffset + 1, block.attributeCloseOffset);
-        }
-
-        if (block.kind === "Function" && typeof block.nameOffset === "number") {
-            const prefix = text.slice(block.startOffset, block.nameOffset);
-            for (const match of prefix.matchAll(/\b(SelfContained|Inline)\b/g)) {
-                addSemanticToken(tokens, text, block.startOffset + match.index, match[1].length, "modifier", ["declaration"]);
-            }
-        }
-    }
-}
-
-function addLegacySectionSemanticTokens(tokens, text) {
-    const blocks = [
-        ...parseNamedLegacyBlocks(text, "Shader"),
-        ...parseNamedLegacyBlocks(text, "ShaderFunction"),
-        ...parseNamedLegacyBlocks(text, "ShaderLayer"),
-        ...parseNamedLegacyBlocks(text, "ShaderLayerBlend"),
-        ...parseNamedLegacyBlocks(text, "VirtualFunction")
-    ];
-    for (const block of blocks) {
-        for (const section of parseLegacySections(text, block)) {
-            addSemanticToken(tokens, text, section.nameOffset, section.name.length, "property", ["declaration"]);
-
-            const allowBindings = section.name === "Outputs";
-            const parsed = parseTypedDeclarationsFromSection(section, allowBindings);
-            const declarationNameType = section.name === "Inputs" ? "parameter" : section.name === "Properties" ? "property" : "variable";
-            for (const declaration of parsed.declarations) {
-                if (declaration.kind === "declaration") {
-                    addDeclarationSemanticTokens(tokens, text, declaration, declarationNameType);
-                }
-            }
-
-            for (const binding of parsed.bindings) {
-                addOutputBindingSemanticTokens(tokens, text, binding);
-            }
-
-            if (section.name === "Settings" || section.name === "Options") {
-                addAssignmentPropertySemanticTokens(tokens, text, section);
-            }
-
-            if (section.name === "Graph") {
-                addGraphDeclarationSemanticTokens(tokens, text, section);
-            }
-        }
-    }
-}
-
-function addFunctionParameterSemanticTokens(tokens, text) {
-    for (const definition of parseFunctionDefinitionsFromText(text)) {
-        const parameterText = text.slice(definition.paramOpenOffset + 1, definition.paramCloseOffset);
-        const segments = splitTopLevelDelimitedWithOffsets(parameterText, definition.paramOpenOffset + 1, ",");
-        for (const segment of segments) {
-            const parts = segment.text.split(/\s+/).filter(Boolean);
-            if (parts.length < 2 || parts.length > 3) {
-                continue;
-            }
-
-            const hasQualifier = parts.length === 3;
-            const qualifier = hasQualifier ? parts[0] : "";
-            const typeText = hasQualifier ? parts[1] : parts[0];
-            const name = hasQualifier ? parts[2] : parts[1];
-            if (qualifier) {
-                const qualifierOffset = findIdentifierOffsetInRange(text, qualifier, segment.startOffset, segment.endOffset);
-                addSemanticToken(tokens, text, qualifierOffset, qualifier.length, "modifier", ["declaration"]);
-            }
-
-            const typeOffset = findIdentifierOffsetInRange(text, typeText, segment.startOffset, segment.endOffset);
-            const nameOffset = findIdentifierOffsetInRange(text, name, segment.startOffset, segment.endOffset);
-            addSemanticToken(tokens, text, typeOffset, typeText.length, "type");
-            addSemanticToken(tokens, text, nameOffset, name.length, "parameter", ["declaration"]);
-        }
-    }
-}
-
-function addCallSemanticTokens(tokens, text) {
-    for (const callExpression of findCallExpressionsInText(text, 0)) {
-        if (TOP_LEVEL_BLOCK_NAMES.includes(callExpression.callee)) {
-            continue;
-        }
-
-        addCalleeSemanticTokens(tokens, text, callExpression.callee, callExpression.calleeOffset);
-        for (const argument of callExpression.arguments) {
-            if (!argument.isNamed || !argument.name) {
-                continue;
-            }
-
-            const nameOffset = findIdentifierOffsetInRange(text, argument.name, argument.startOffset, argument.endOffset);
-            addSemanticToken(tokens, text, nameOffset, argument.name.length, "parameter");
-        }
-    }
-}
-
-function addSwizzleSemanticTokens(tokens, text) {
-    forEachIdentifierOutsideTrivia(text, (identifier, startOffset, endOffset) => {
-        if (isSwizzleMemberAccess(text, startOffset, identifier)) {
-            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "property");
-        }
-    });
-}
-
-function addKeywordAndTypeSemanticTokens(tokens, text) {
-    const hlslKeywords = new Set(HLSL_KEYWORD_ITEMS.map((item) => normalizeSymbolKey(item[0])));
-    const dreamShaderKeywords = new Set([
-        "import",
-        "shader",
-        "shaderfunction",
-        "virtualfunction",
-        "function",
-        "namespace",
-        "true",
-        "false"
-    ]);
-    const modifiers = new Set(["selfcontained", "inline", "in", "out", "const", "static"]);
-
-    forEachIdentifierOutsideTrivia(text, (identifier, startOffset, endOffset) => {
-        if (identifier.includes(".") || identifier.includes("::")) {
-            return;
-        }
-
-        const normalized = normalizeSymbolKey(identifier);
-        if (TYPE_LIKE_NAMES.has(normalized)) {
-            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "type");
-        } else if (modifiers.has(normalized)) {
-            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "modifier");
-        } else if (dreamShaderKeywords.has(normalized) || hlslKeywords.has(normalized)) {
-            addSemanticToken(tokens, text, startOffset, endOffset - startOffset, "keyword");
-        }
-    });
-}
-
-function addAttributeSemanticTokens(tokens, text, startOffset, endOffset) {
-    const attributeText = text.slice(startOffset, endOffset);
-    for (const match of attributeText.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*=/g)) {
-        addSemanticToken(tokens, text, startOffset + match.index, match[1].length, "property");
-    }
-}
-
-function addAssignmentPropertySemanticTokens(tokens, text, section) {
-    for (const statement of splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1)) {
-        const assignment = splitTopLevelAssignment(statement.text);
-        if (!assignment?.left) {
-            continue;
-        }
-
-        const propertyName = assignment.left.trim();
-        const propertyOffset = findIdentifierOffsetInRange(text, propertyName, statement.startOffset, statement.endOffset);
-        addSemanticToken(tokens, text, propertyOffset, propertyName.length, "property");
-    }
-}
-
-function addGraphDeclarationSemanticTokens(tokens, text, section) {
-    const statements = splitGraphStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
-    for (const statement of statements) {
-        for (const declaration of parseCodeDeclarationEntries(statement.text, statement.startOffset)) {
-            addDeclarationSemanticTokens(tokens, text, declaration, "variable");
-        }
-
-        const assignment = splitTopLevelAssignment(statement.text);
-        if (assignment?.left && !splitDeclarationTypeAndName(assignment.left)) {
-            addQualifiedIdentifierSemanticTokens(tokens, text, assignment.left.trim(), statement.startOffset, "variable");
-        }
-    }
-}
-
-function addDeclarationSemanticTokens(tokens, text, declaration, nameTokenType) {
-    const typeOffset = findTokenOffsetInRange(text, declaration.type, declaration.startOffset, declaration.endOffset);
-    const nameOffset = findIdentifierOffsetInRange(text, declaration.name, declaration.startOffset, declaration.endOffset);
-    addSemanticToken(tokens, text, typeOffset, declaration.type.length, "type");
-    addSemanticToken(tokens, text, nameOffset, declaration.name.length, nameTokenType, ["declaration"]);
-}
-
-function addOutputBindingSemanticTokens(tokens, text, binding) {
-    if (!binding.target) {
-        return;
-    }
-
-    addQualifiedIdentifierSemanticTokens(tokens, text, binding.target.trim(), binding.startOffset, "property");
-}
-
-function addCalleeSemanticTokens(tokens, text, callee, calleeOffset) {
-    if (isConstructorName(callee)) {
-        addSemanticToken(tokens, text, calleeOffset, callee.length, "type");
-        return;
-    }
-
-    const namespaceSeparatorIndex = callee.lastIndexOf("::");
-    if (namespaceSeparatorIndex >= 0) {
-        addSemanticToken(tokens, text, calleeOffset, namespaceSeparatorIndex, "namespace");
-        addSemanticToken(tokens, text, calleeOffset + namespaceSeparatorIndex + 2, callee.length - namespaceSeparatorIndex - 2, "function");
-        return;
-    }
-
-    const dotIndex = callee.indexOf(".");
-    if (dotIndex >= 0) {
-        const isDefaultLibrary = callee.slice(0, dotIndex) === "UE";
-        addSemanticToken(tokens, text, calleeOffset, dotIndex, "namespace", isDefaultLibrary ? ["defaultLibrary"] : []);
-        addSemanticToken(tokens, text, calleeOffset + dotIndex + 1, callee.length - dotIndex - 1, "method", isDefaultLibrary ? ["defaultLibrary"] : []);
-        return;
-    }
-
-    addSemanticToken(tokens, text, calleeOffset, callee.length, "function");
-}
-
-function addQualifiedIdentifierSemanticTokens(tokens, text, identifierText, baseOffset, fallbackType) {
-    const offset = text.indexOf(identifierText, baseOffset);
-    if (offset < 0) {
-        return;
-    }
-
-    const namespaceSeparatorIndex = identifierText.lastIndexOf("::");
-    if (namespaceSeparatorIndex >= 0) {
-        addSemanticToken(tokens, text, offset, namespaceSeparatorIndex, "namespace");
-        addSemanticToken(tokens, text, offset + namespaceSeparatorIndex + 2, identifierText.length - namespaceSeparatorIndex - 2, fallbackType);
-        return;
-    }
-
-    const dotIndex = identifierText.indexOf(".");
-    if (dotIndex >= 0) {
-        addSemanticToken(tokens, text, offset, dotIndex, "namespace");
-        addSemanticToken(tokens, text, offset + dotIndex + 1, identifierText.length - dotIndex - 1, "property");
-        return;
-    }
-
-    addSemanticToken(tokens, text, offset, identifierText.length, fallbackType);
-}
-
-function getSemanticTypeForBlockName(kind) {
-    if (kind === "Namespace") {
-        return "namespace";
-    }
-    if (kind === "Shader") {
-        return "class";
-    }
-    return "function";
-}
-
 function getInlayHintSignatureForCall(callExpression, reachableCallables) {
     const normalized = normalizeSymbolKey(callExpression.callee);
     const signatures = reachableCallables.get(normalized) || [];
@@ -1176,99 +904,101 @@ function getInlayHintParametersForSignature(signature) {
     return signature.inputs || [];
 }
 
-function addSemanticToken(tokens, text, offset, length, type, modifiers = []) {
-    if (typeof offset !== "number" || offset < 0 || !length || offset + length > text.length) {
-        return;
-    }
-
-    const tokenText = text.slice(offset, offset + length);
-    if (!tokenText || tokenText.includes("\n") || /^\s+$/.test(tokenText)) {
-        return;
-    }
-
-    if (!tokens._seen) {
-        Object.defineProperty(tokens, "_seen", { value: new Set(), enumerable: false });
-    }
-
-    const key = `${offset}:${length}`;
-    if (tokens._seen.has(key)) {
-        return;
-    }
-
-    tokens._seen.add(key);
-    tokens.push({
-        offset,
-        length,
-        type,
-        modifiers
-    });
-}
-
 function createCompletionProvider() {
     return {
         provideCompletionItems(document, position) {
-            const context = analyzeDocument(document, position);
-            const items = [];
-
-            addRootPluginValueItems(items, document, context);
-            addPathPluginValueItems(items, document, context);
-            if (context.inRootPluginValue || context.inPathPluginValue) {
-                return items;
+            if (!isDreamShaderDocument(document)) {
+                return [];
             }
 
-            const materialExpressionClassValueInfo = getMaterialExpressionClassValueCompletionInfo(context.text, context.offset);
-            if (materialExpressionClassValueInfo) {
-                addMaterialExpressionClassValueItems(items, document, materialExpressionClassValueInfo);
-                return items;
-            }
-
-            if (context.afterUEAccessor && context.inGraphLikeContext) {
-                for (const builtin of getUEBuiltinItemsForDocument(document)) {
-                    const item = new vscode.CompletionItem(builtin.name, vscode.CompletionItemKind.Function);
-                    item.insertText = new vscode.SnippetString(builtin.memberSnippet);
-                    item.detail = builtin.detail;
-                    items.push(item);
-                }
-                return items;
-            }
-
-            if (context.afterOutputExpressionAccessor) {
-                const item = new vscode.CompletionItem("Pin", vscode.CompletionItemKind.Field);
-                item.insertText = new vscode.SnippetString("Pin[${1:0}] = $0;");
-                item.detail = "Auxiliary material output node pin binding";
-                items.push(item);
-                return items;
-            }
-
-            if (isAfterMaterialAttributesAccessor(context)) {
-                addMaterialAttributeMemberItems(items);
-                return items;
-            }
-
-            if (context.afterSwizzleAccessor) {
-                addSwizzleItems(items);
-                return items;
-            }
-
-            addKeywordItems(items, context);
-            addTopLevelAttributeItems(items, context);
-            addImportItems(items, context);
-            addTypeItems(items, context);
-            addDeclarationHelperItems(items, context);
-            addQualifierItems(items, context);
-            addHlslKeywordItems(items, context);
-            addSettingItems(items, context);
-            addOptionItems(items, context);
-            addOutputItems(items, context);
-            addBuiltinItems(items, context);
-            addContextSnippetItems(items, context);
-            addHelperItems(items, context);
-            addReachableFunctionItems(items, document, context);
-            addDeclaredIdentifierItems(items, context);
-
-            return items;
+            const text = document.getText();
+            const offset = document.offsetAt(position);
+            return languageCore
+                .getCompletionSpecs(text, offset, createLanguageServiceAdapters(document))
+                .map((spec) => completionSpecToVscodeItem(document, spec));
         }
     };
+}
+
+function completionSpecToVscodeItem(document, spec) {
+    const item = new vscode.CompletionItem(spec.label, getCompletionItemKind(spec.kind));
+    if (typeof spec.insertText === "string") {
+        item.insertText = spec.insertText.includes("$")
+            ? new vscode.SnippetString(spec.insertText)
+            : spec.insertText;
+    }
+    if (spec.detail) {
+        item.detail = spec.detail;
+    }
+    if (spec.documentation) {
+        item.documentation = new vscode.MarkdownString(spec.documentation);
+    }
+    if (Array.isArray(spec.range) && spec.range.length === 2) {
+        item.range = new vscode.Range(document.positionAt(spec.range[0]), document.positionAt(spec.range[1]));
+    }
+    return item;
+}
+
+function getCompletionItemKind(kind) {
+    switch (kind) {
+        case "Class":
+            return vscode.CompletionItemKind.Class;
+        case "EnumMember":
+            return vscode.CompletionItemKind.EnumMember;
+        case "Field":
+            return vscode.CompletionItemKind.Field;
+        case "File":
+            return vscode.CompletionItemKind.File;
+        case "Function":
+            return vscode.CompletionItemKind.Function;
+        case "Keyword":
+            return vscode.CompletionItemKind.Keyword;
+        case "Module":
+            return vscode.CompletionItemKind.Module;
+        case "Property":
+            return vscode.CompletionItemKind.Property;
+        case "Snippet":
+            return vscode.CompletionItemKind.Snippet;
+        case "TypeParameter":
+            return vscode.CompletionItemKind.TypeParameter;
+        case "Value":
+            return vscode.CompletionItemKind.Value;
+        case "Variable":
+            return vscode.CompletionItemKind.Variable;
+        default:
+            return vscode.CompletionItemKind.Text;
+    }
+}
+
+function createLanguageServiceAdapters(document) {
+    const fsPath = document?.uri?.fsPath || document?.fileName || "";
+    const projectRoot = fsPath ? findProjectRoot(fsPath) : "";
+    return {
+        getUEBuiltinItems: () => getUEBuiltinItemsForDocument(document),
+        collectMaterialExpressionSymbols: () => collectMaterialExpressionSymbols(document),
+        collectDreamShaderSettingMappings: (mappingName) => collectDreamShaderSettingMappings(document, mappingName),
+        collectReachableCallableSignatures: () => getLanguageIndexForDocument(document).callables,
+        collectReachableFunctionDefinitions: () => getLanguageIndexForDocument(document).functionDefinitions,
+        collectFunctionCycles: () => getLanguageIndexForDocument(document).cycles,
+        collectAvailableHeaderImports: () => collectAvailableHeaderImports(document),
+        collectProjectContentPluginNames: () => collectProjectContentPluginNames(projectRoot),
+        resolveImportPath: (importSpecifier) => {
+            const resolvedPath = resolveImportPath(document.fileName, importSpecifier);
+            return resolvedPath && fs.existsSync(resolvedPath) ? resolvedPath : "";
+        }
+    };
+}
+
+function getLanguageIndexForDocument(document) {
+    return languageCore.buildDocumentIndex({
+        fileName: document.fileName,
+        text: document.getText(),
+        resolveImportPath: (importSpecifier, fromPath) => {
+            const resolvedPath = resolveImportPath(fromPath || document.fileName, importSpecifier);
+            return resolvedPath && fs.existsSync(resolvedPath) ? resolvedPath : "";
+        },
+        readFileText: (targetPath) => fs.readFileSync(targetPath, "utf8")
+    });
 }
 
 function createHoverProvider() {
@@ -1357,38 +1087,46 @@ function createDocumentSymbolProvider() {
     return {
         provideDocumentSymbols(document) {
             const text = document.getText();
-            const symbols = [];
-
-            for (const block of parseTopLevelBlocks(text)) {
-                const range = makeRangeFromOffsets(document, block.startOffset, block.endOffset);
-                const selectionRange = typeof block.nameOffset === "number"
-                    ? makeRangeFromOffsets(document, block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length))
-                    : range;
-                const symbol = new vscode.DocumentSymbol(block.name, block.kind, getBlockSymbolKind(block.kind), range, selectionRange);
-
-                if (isLegacySectionBlockKind(block.kind)) {
-                    symbol.children.push(...createLegacySectionDocumentSymbols(document, text, block));
-                }
-
-                symbols.push(symbol);
-            }
-
-            return symbols;
+            return languageCore.getDocumentSymbols(text).map((symbol) => documentSymbolSpecToVscode(document, symbol));
         }
     };
 }
 
-function getBlockSymbolKind(kind) {
-    if (kind === "Shader") {
-        return vscode.SymbolKind.Object;
+function documentSymbolSpecToVscode(document, spec) {
+    const symbol = new vscode.DocumentSymbol(
+        spec.name,
+        spec.detail || "",
+        getDocumentSymbolKind(spec.kind),
+        makeRangeFromOffsets(document, spec.startOffset, spec.endOffset),
+        makeRangeFromOffsets(document, spec.selectionStartOffset, spec.selectionEndOffset));
+    for (const child of spec.children || []) {
+        symbol.children.push(documentSymbolSpecToVscode(document, child));
     }
-    if (isMaterialFunctionCallableKind(kind) || kind === "Function") {
-        return vscode.SymbolKind.Function;
+    return symbol;
+}
+
+function getDocumentSymbolKind(kind) {
+    switch (kind) {
+        case "Namespace":
+            return vscode.SymbolKind.Namespace;
+        case "Shader":
+            return vscode.SymbolKind.Object;
+        case "Function":
+        case "GraphFunction":
+        case "ShaderFunction":
+        case "ShaderLayer":
+        case "ShaderLayerBlend":
+        case "VirtualFunction":
+            return vscode.SymbolKind.Function;
+        case "Section":
+            return vscode.SymbolKind.Property;
+        case "Property":
+            return vscode.SymbolKind.Property;
+        case "Variable":
+            return vscode.SymbolKind.Variable;
+        default:
+            return vscode.SymbolKind.Module;
     }
-    if (kind === "Namespace") {
-        return vscode.SymbolKind.Namespace;
-    }
-    return vscode.SymbolKind.Module;
 }
 
 function isMaterialFunctionCallableKind(kind) {
@@ -1402,52 +1140,6 @@ function isGeneratedMaterialFunctionKind(kind) {
     return kind === "ShaderFunction"
         || kind === "ShaderLayer"
         || kind === "ShaderLayerBlend";
-}
-
-function isLegacySectionBlockKind(kind) {
-    return kind === "Shader" || isMaterialFunctionCallableKind(kind);
-}
-
-function createLegacySectionDocumentSymbols(document, text, block) {
-    const symbols = [];
-    for (const section of parseLegacySections(text, block)) {
-        const closeOffset = section.bodyCloseOffset >= section.bodyOpenOffset ? section.bodyCloseOffset + 1 : section.bodyOpenOffset + 1;
-        const range = makeRangeFromOffsets(document, section.nameOffset, closeOffset);
-        const selectionRange = makeRangeFromOffsets(document, section.nameOffset, section.nameOffset + section.name.length);
-        const sectionSymbol = new vscode.DocumentSymbol(section.name, "", vscode.SymbolKind.Property, range, selectionRange);
-        const allowBindings = section.name === "Outputs";
-        const parsed = parseTypedDeclarationsFromSection(section, allowBindings);
-
-        for (const declaration of parsed.declarations) {
-            if (declaration.kind !== "declaration") {
-                continue;
-            }
-
-            const nameOffset = findIdentifierOffsetInRange(text, declaration.name, declaration.startOffset, declaration.endOffset);
-            const declarationRange = makeRangeFromOffsets(document, declaration.startOffset, declaration.endOffset);
-            const declarationSelection = nameOffset >= 0
-                ? makeRangeFromOffsets(document, nameOffset, nameOffset + declaration.name.length)
-                : declarationRange;
-            sectionSymbol.children.push(new vscode.DocumentSymbol(declaration.name, declaration.type, vscode.SymbolKind.Variable, declarationRange, declarationSelection));
-        }
-
-        for (const binding of parsed.bindings) {
-            if (!binding.target) {
-                continue;
-            }
-
-            const bindingName = binding.target.trim();
-            const bindingOffset = text.indexOf(bindingName, binding.startOffset);
-            const bindingRange = makeRangeFromOffsets(document, binding.startOffset, binding.endOffset);
-            const bindingSelection = bindingOffset >= 0 && bindingOffset <= binding.endOffset
-                ? makeRangeFromOffsets(document, bindingOffset, bindingOffset + bindingName.length)
-                : bindingRange;
-            sectionSymbol.children.push(new vscode.DocumentSymbol(bindingName, "binding", vscode.SymbolKind.Property, bindingRange, bindingSelection));
-        }
-
-        symbols.push(sectionSymbol);
-    }
-    return symbols;
 }
 
 function createDefinitionProvider() {
@@ -1713,30 +1405,6 @@ function makeRangeFromOffsets(document, startOffset, endOffset) {
     return new vscode.Range(document.positionAt(safeStart), document.positionAt(safeEnd));
 }
 
-function findIdentifierOffsetInRange(text, identifier, startOffset, endOffset) {
-    if (!identifier || typeof startOffset !== "number" || typeof endOffset !== "number" || endOffset <= startOffset) {
-        return -1;
-    }
-
-    const regex = new RegExp(`\\b${escapeRegExp(identifier)}\\b`, "g");
-    const slice = text.slice(startOffset, endOffset);
-    const match = regex.exec(slice);
-    return match ? startOffset + match.index : -1;
-}
-
-function findTokenOffsetInRange(text, token, startOffset, endOffset) {
-    if (!token || typeof startOffset !== "number" || typeof endOffset !== "number" || endOffset <= startOffset) {
-        return -1;
-    }
-
-    const index = text.slice(startOffset, endOffset).indexOf(token);
-    return index >= 0 ? startOffset + index : -1;
-}
-
-function escapeRegExp(text) {
-    return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function forEachIdentifierOutsideTrivia(text, callback) {
     let index = 0;
     let stringQuote = "";
@@ -1882,7 +1550,7 @@ function createFormattingProvider() {
     return {
         provideDocumentFormattingEdits(document) {
             const originalText = document.getText();
-            const formattedText = formatDreamShaderDocument(originalText);
+            const formattedText = languageCore.formatDocument(originalText);
             if (formattedText === originalText) {
                 return [];
             }
@@ -1891,236 +1559,6 @@ function createFormattingProvider() {
             return [vscode.TextEdit.replace(fullRange, formattedText)];
         }
     };
-}
-
-function addKeywordItems(items, context) {
-    if (context.inTopLevelAttributeList || context.inFunctionBody || context.inFunctionSignature || context.currentSection) {
-        return;
-    }
-
-    if (!context.currentLegacyBlock) {
-        for (const entry of DREAMSHADER_KEYWORD_COMPLETIONS) {
-            const item = new vscode.CompletionItem(entry.label, vscode.CompletionItemKind.Keyword);
-            item.insertText = entry.insertText;
-            item.detail = entry.detail;
-            items.push(item);
-        }
-
-        for (const entry of DREAMSHADER_TEMPLATE_COMPLETIONS) {
-            const item = new vscode.CompletionItem(entry.label, vscode.CompletionItemKind.Snippet);
-            item.insertText = new vscode.SnippetString(entry.snippet);
-            item.detail = entry.detail;
-            items.push(item);
-        }
-
-        for (const entry of FUNCTION_MODIFIER_ITEMS) {
-            const label = `Function ${entry[0]}`;
-            const item = new vscode.CompletionItem(label, vscode.CompletionItemKind.Keyword);
-            item.insertText = new vscode.SnippetString(`Function ${entry[0]} $0`);
-            item.detail = entry[1];
-            items.push(item);
-        }
-        return;
-    }
-
-    const allowedSections = BLOCK_SECTION_RULES.get(context.currentLegacyBlock.kind);
-    if (!allowedSections) {
-        return;
-    }
-
-    for (const sectionName of LEGACY_SECTION_NAMES) {
-        if (!allowedSections.has(sectionName)) {
-            continue;
-        }
-
-        const item = new vscode.CompletionItem(sectionName, vscode.CompletionItemKind.Module);
-        item.insertText = new vscode.SnippetString(`${sectionName} = {\n    $0\n}`);
-        items.push(item);
-    }
-}
-
-function addTopLevelAttributeItems(items, context) {
-    if (!context.inTopLevelAttributeList) {
-        return;
-    }
-
-    const attributes = context.topLevelAttributeKind === "Namespace"
-        ? [
-            ["Name", "Name=\"${1:Common}\"", "Required Namespace name."]
-        ]
-        : context.topLevelAttributeKind === "VirtualFunction"
-            ? [
-                ["Name", "Name=\"${1:MyFunction}\"", "Required callable VirtualFunction name."]
-            ]
-        : [
-            ["Name", "Name=\"${1:Materials/MyMaterial}\"", "Required generated asset path relative to Root."],
-            ["Root", "Root=\"${1:Game}\"", "Optional generated asset root. Use Game or Plugin.PluginName; Plugins.PluginName is also accepted."]
-        ];
-
-    for (const [name, snippet, detail] of attributes) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Property);
-        item.insertText = new vscode.SnippetString(snippet);
-        item.detail = detail;
-        items.push(item);
-    }
-}
-
-function addRootPluginValueItems(items, document, context) {
-    if (!context.inRootPluginValue || !context.rootPluginValueInfo) {
-        return;
-    }
-
-    const projectRoot = findProjectRoot(document.uri.fsPath);
-    const pluginNames = collectProjectContentPluginNames(projectRoot);
-    const range = new vscode.Range(
-        document.positionAt(context.rootPluginValueInfo.replaceStartOffset),
-        document.positionAt(context.rootPluginValueInfo.replaceEndOffset));
-
-    for (const pluginName of pluginNames) {
-        const item = new vscode.CompletionItem(pluginName, vscode.CompletionItemKind.Module);
-        item.insertText = pluginName;
-        item.range = range;
-        item.detail = "Project content plugin";
-        item.documentation = new vscode.MarkdownString(`Maps to \`[Project]/Plugins/${pluginName}/Content\`.`);
-        items.push(item);
-    }
-}
-
-function addPathPluginValueItems(items, document, context) {
-    if (!context.inPathPluginValue || !context.pathPluginValueInfo) {
-        return;
-    }
-
-    const projectRoot = findProjectRoot(document.uri.fsPath);
-    const pluginNames = collectProjectContentPluginNames(projectRoot);
-    const range = new vscode.Range(
-        document.positionAt(context.pathPluginValueInfo.replaceStartOffset),
-        document.positionAt(context.pathPluginValueInfo.replaceEndOffset));
-
-    for (const pluginName of pluginNames) {
-        const item = new vscode.CompletionItem(pluginName, vscode.CompletionItemKind.Module);
-        item.insertText = pluginName;
-        item.range = range;
-        item.detail = "Project content plugin";
-        item.documentation = new vscode.MarkdownString(`Maps to \`[Project]/Plugins/${pluginName}/Content\`.`);
-        items.push(item);
-    }
-}
-
-function addMaterialExpressionClassValueItems(items, document, classValueInfo) {
-    const range = new vscode.Range(
-        document.positionAt(classValueInfo.replaceStartOffset),
-        document.positionAt(classValueInfo.replaceEndOffset));
-
-    for (const expression of collectMaterialExpressionSymbols(document)) {
-        const item = new vscode.CompletionItem(expression.name, vscode.CompletionItemKind.Class);
-        item.insertText = expression.name;
-        item.range = range;
-        item.detail = expression.className || `MaterialExpression${expression.name}`;
-        item.documentation = new vscode.MarkdownString(`Reflected Unreal material expression class \`${expression.className || expression.name}\`.`);
-        items.push(item);
-    }
-}
-
-function addImportItems(items, context) {
-    if (!context.inImportLine) {
-        return;
-    }
-
-    for (const headerPath of collectAvailableHeaderImports(context.document)) {
-        const item = new vscode.CompletionItem(headerPath, vscode.CompletionItemKind.File);
-        item.insertText = headerPath;
-        item.detail = headerPath.startsWith("@") ? "DreamShader package header import" : "DreamShader header import";
-        items.push(item);
-    }
-}
-
-function addTypeItems(items, context) {
-    if (!context.inTypeCompletionContext) {
-        return;
-    }
-
-    const typeItems = context.inRawHlslContext || context.inFunctionSignature ? HLSL_TYPE_ITEMS : GRAPH_TYPE_ITEMS;
-    for (const [name, detail] of typeItems) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.TypeParameter);
-        item.detail = detail;
-        items.push(item);
-    }
-}
-
-function addDeclarationHelperItems(items, context) {
-    if (!context.inDeclarationSection) {
-        return;
-    }
-
-    const metadata = new vscode.CompletionItem("[reflection block]", vscode.CompletionItemKind.Snippet);
-    metadata.insertText = new vscode.SnippetString("[\n\tGroup=\"${1:General}\";\n\tSortPriority=${2:32};\n\tDescription=\"${3:Description}\";\n]");
-    metadata.detail = "DreamShader reflected parameter properties";
-    items.push(metadata);
-
-    if (context.currentSection === "Inputs") {
-        const optional = new vscode.CompletionItem("opt", vscode.CompletionItemKind.Keyword);
-        optional.insertText = new vscode.SnippetString("opt ${1:float} ${2:Value} = ${3:0.0};");
-        optional.detail = "Optional ShaderFunction / VirtualFunction input";
-        items.push(optional);
-    }
-
-    if (context.currentSection === "Properties") {
-        const constItem = new vscode.CompletionItem("const", vscode.CompletionItemKind.Keyword);
-        constItem.insertText = new vscode.SnippetString("const ${1:float} ${2:Value} = ${3:0.0};");
-        constItem.detail = "Const helper node, not an externally adjustable parameter";
-        items.push(constItem);
-    }
-
-    if (context.inGraphLikeContext || context.currentSection === "Graph") {
-        const defaultItem = new vscode.CompletionItem("default", vscode.CompletionItemKind.Keyword);
-        defaultItem.detail = "Use an optional function input default";
-        items.push(defaultItem);
-    }
-}
-
-function addQualifierItems(items, context) {
-    if (!context.inFunctionSignature) {
-        return;
-    }
-
-    for (const [name, detail] of QUALIFIER_ITEMS) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Keyword);
-        item.detail = detail;
-        items.push(item);
-    }
-}
-
-function addHlslKeywordItems(items, context) {
-    if (!context.inRawHlslContext && !context.inFunctionSignature) {
-        return;
-    }
-
-    for (const [name, detail] of HLSL_KEYWORD_ITEMS) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Keyword);
-        item.detail = detail;
-        items.push(item);
-    }
-}
-
-function addDreamShaderSettingMappingValueItems(items, context, valueInfo) {
-    const range = new vscode.Range(
-        context.document.positionAt(valueInfo.replaceStartOffset),
-        context.document.positionAt(valueInfo.replaceEndOffset));
-
-    for (const mapping of collectDreamShaderSettingMappings(context.document, valueInfo.mappingName)) {
-        const insertText = valueInfo.isQuoted
-            ? escapeSnippetText(mapping.alias)
-            : `"${escapeSnippetText(mapping.alias)}"`;
-        const item = new vscode.CompletionItem(mapping.alias, vscode.CompletionItemKind.EnumMember);
-        item.insertText = new vscode.SnippetString(insertText);
-        item.range = range;
-        item.detail = mapping.displayName || mapping.name || valueInfo.mappingName;
-        if (mapping.name) {
-            item.documentation = new vscode.MarkdownString(`Maps to Unreal enum \`${mapping.name}\`.`);
-        }
-        items.push(item);
-    }
 }
 
 function collectDreamShaderSettingMappings(document, mappingName) {
@@ -2138,11 +1576,18 @@ function collectDreamShaderSettingMappings(document, mappingName) {
     }
 
     const mappingsByKey = new Map();
+    for (const alias of SETTING_MAPPING_FALLBACKS.get(mappingName) || []) {
+        const key = normalizeSymbolKey(alias);
+        if (key) {
+            mappingsByKey.set(key, { alias, name: alias, displayName: alias });
+        }
+    }
+
     for (const root of roots) {
         const manifest = readDreamShaderSettingsManifest(root);
         for (const mapping of manifest.mappings[mappingName] || []) {
             const key = normalizeSymbolKey(mapping.alias);
-            if (key && !mappingsByKey.has(key)) {
+            if (key) {
                 mappingsByKey.set(key, mapping);
             }
         }
@@ -2150,284 +1595,6 @@ function collectDreamShaderSettingMappings(document, mappingName) {
 
     return Array.from(mappingsByKey.values()).sort((left, right) =>
         String(left.alias || "").localeCompare(String(right.alias || "")));
-}
-
-function getSettingValueCompletionInfo(context) {
-    if (!context.inSettings) {
-        return null;
-    }
-
-    const equalsIndex = context.linePrefix.lastIndexOf("=");
-    if (equalsIndex < 0) {
-        return null;
-    }
-
-    const leftText = context.linePrefix.slice(0, equalsIndex).trim();
-    const keyMatch = /([A-Za-z_][A-Za-z0-9_]*)$/.exec(leftText);
-    if (!keyMatch) {
-        return null;
-    }
-
-    const mappingName = getSettingMappingNameForKey(keyMatch[1]);
-    if (!mappingName) {
-        return null;
-    }
-
-    const valuePrefix = context.linePrefix.slice(equalsIndex + 1);
-    if (/[;{}]/.test(valuePrefix)) {
-        return null;
-    }
-
-    const lastDoubleQuoteIndex = valuePrefix.lastIndexOf("\"");
-    if (lastDoubleQuoteIndex >= 0) {
-        const replaceStartInLine = equalsIndex + 1 + lastDoubleQuoteIndex + 1;
-        return {
-            mappingName,
-            isQuoted: true,
-            replaceStartOffset: context.offset - (context.linePrefix.length - replaceStartInLine),
-            replaceEndOffset: context.offset
-        };
-    }
-
-    const typedValueMatch = /([^\s"',)]*)$/.exec(valuePrefix);
-    const typedValue = typedValueMatch ? typedValueMatch[1] : "";
-    return {
-        mappingName,
-        isQuoted: false,
-        replaceStartOffset: context.offset - typedValue.length,
-        replaceEndOffset: context.offset
-    };
-}
-
-function getSettingMappingNameForKey(settingName) {
-    switch (normalizeSymbolKey(settingName)) {
-        case "shadingmodel":
-            return "ShadingModel";
-        case "blendmode":
-        case "rendertype":
-            return "BlendMode";
-        case "materialdomain":
-        case "domain":
-            return "MaterialDomain";
-        default:
-            return "";
-    }
-}
-
-function escapeSnippetText(value) {
-    return String(value || "").replace(/[\\$}]/g, "\\$&");
-}
-
-function addSettingItems(items, context) {
-    if (!context.inSettings) {
-        return;
-    }
-
-    const valueInfo = getSettingValueCompletionInfo(context);
-    if (valueInfo) {
-        addDreamShaderSettingMappingValueItems(items, context, valueInfo);
-        return;
-    }
-
-    for (const setting of SETTINGS_ITEMS) {
-        const item = new vscode.CompletionItem(setting.name, vscode.CompletionItemKind.Property);
-        item.insertText = new vscode.SnippetString(setting.insertText);
-        item.detail = setting.detail;
-        items.push(item);
-    }
-}
-
-function addOptionItems(items, context) {
-    if (!context.inOptions) {
-        return;
-    }
-
-    for (const option of VIRTUAL_FUNCTION_OPTION_ITEMS) {
-        const item = new vscode.CompletionItem(option.name, vscode.CompletionItemKind.Property);
-        item.insertText = new vscode.SnippetString(option.insertText);
-        item.detail = option.detail;
-        items.push(item);
-    }
-}
-
-function addOutputItems(items, context) {
-    if (!context.inMaterialOutputs) {
-        return;
-    }
-
-    for (const helper of OUTPUT_HELPER_ITEMS) {
-        const item = new vscode.CompletionItem(helper.name, vscode.CompletionItemKind.Module);
-        item.insertText = new vscode.SnippetString(helper.snippet);
-        item.detail = helper.detail;
-        items.push(item);
-    }
-
-    for (const output of MATERIAL_OUTPUT_ITEMS) {
-        const item = new vscode.CompletionItem(output.qualifiedName, vscode.CompletionItemKind.Field);
-        item.insertText = new vscode.SnippetString(output.insertText);
-        item.detail = output.detail;
-        items.push(item);
-    }
-}
-
-function addBuiltinItems(items, context) {
-    if (!context.inGraphExpressionContext) {
-        return;
-    }
-
-    const defaultItem = new vscode.CompletionItem("default", vscode.CompletionItemKind.Keyword);
-    defaultItem.detail = "Use an optional ShaderFunction / VirtualFunction input default";
-    items.push(defaultItem);
-
-    const ueRoot = new vscode.CompletionItem("UE", vscode.CompletionItemKind.Module);
-    ueRoot.insertText = new vscode.SnippetString("UE.$0");
-    ueRoot.detail = "DreamShader UE material expression namespace";
-    items.push(ueRoot);
-
-    for (const builtin of getUEBuiltinItemsForDocument(context.document)) {
-        const item = new vscode.CompletionItem(builtin.qualifiedName, vscode.CompletionItemKind.Function);
-        item.insertText = new vscode.SnippetString(builtin.snippet);
-        item.detail = builtin.detail;
-        items.push(item);
-    }
-}
-
-function addContextSnippetItems(items, context) {
-    const addSnippet = ([label, snippet, detail]) => {
-        const item = new vscode.CompletionItem(label, vscode.CompletionItemKind.Snippet);
-        item.insertText = new vscode.SnippetString(snippet);
-        item.detail = detail;
-        items.push(item);
-    };
-
-    if (context.inGraphExpressionContext) {
-        GRAPH_SNIPPET_ITEMS.forEach(addSnippet);
-        MATERIAL_ATTRIBUTES_SNIPPET_ITEMS.forEach(addSnippet);
-    }
-
-    if (context.inDeclarationSection) {
-        DECLARATION_SNIPPET_ITEMS.forEach(addSnippet);
-    }
-
-    if (context.inMaterialOutputs) {
-        OUTPUT_SNIPPET_ITEMS.forEach(addSnippet);
-    }
-}
-
-function addHelperItems(items, context) {
-    if (context.currentSection !== "Properties" && !context.inOptions) {
-        return;
-    }
-
-    for (const [name, snippet, detail] of DREAMSHADER_HELPER_ITEMS) {
-        const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-        item.insertText = new vscode.SnippetString(snippet);
-        item.detail = detail;
-        items.push(item);
-    }
-}
-
-function addReachableFunctionItems(items, document, context) {
-    if (!context.inCallableCompletionContext) {
-        return;
-    }
-
-    const definitions = collectReachableFunctionDefinitions(document);
-    const seenNames = new Set();
-    const namespaceMatch = context?.linePrefix?.match(/([A-Za-z_][A-Za-z0-9_]*)::[A-Za-z0-9_]*$/);
-    const namespacePrefix = namespaceMatch ? `${namespaceMatch[1]}::` : "";
-
-    for (const [name, entries] of definitions.entries()) {
-        if (namespacePrefix && !name.startsWith(namespacePrefix)) {
-            continue;
-        }
-
-        const entry = entries[0];
-        const localName = namespacePrefix ? (entry.localName || name.slice(namespacePrefix.length)) : name;
-        const item = new vscode.CompletionItem(localName, vscode.CompletionItemKind.Function);
-        item.insertText = new vscode.SnippetString(localName);
-        const kindLabel = entry.kind === "GraphFunction" ? "GraphFunction" : "function";
-        item.detail = entry.sourceKind === "imported" ? `Imported DreamShader ${kindLabel}` : `DreamShader ${kindLabel}`;
-        if (namespacePrefix) {
-            item.documentation = new vscode.MarkdownString(`Namespace function \`${name}\``);
-        }
-        seenNames.add(normalizeSymbolKey(localName));
-        items.push(item);
-    }
-
-    if (namespacePrefix) {
-        return;
-    }
-
-    for (const signatures of collectReachableCallableSignatures(document).values()) {
-        const signature = signatures[0];
-        if (!signature || !isMaterialFunctionCallableKind(signature.kind)) {
-            continue;
-        }
-
-        const localName = getCallableShortName(signature.localName || signature.name);
-        const key = normalizeSymbolKey(localName);
-        if (!key || seenNames.has(key)) {
-            continue;
-        }
-
-        const item = new vscode.CompletionItem(localName, vscode.CompletionItemKind.Function);
-        item.insertText = new vscode.SnippetString(localName);
-        item.detail = getCallableKindDetail(signature.kind);
-        item.documentation = new vscode.MarkdownString(`Callable \`${signature.name}\``);
-        seenNames.add(key);
-        items.push(item);
-    }
-}
-function addDeclaredIdentifierItems(items, context) {
-    if (!context.inIdentifierCompletionContext) {
-        return;
-    }
-
-    for (const entry of collectVisibleIdentifierEntries(context)) {
-        const item = new vscode.CompletionItem(entry.name, vscode.CompletionItemKind.Variable);
-        item.detail = entry.detail;
-        items.push(item);
-    }
-}
-
-function addSwizzleItems(items) {
-    for (const spec of SWIZZLE_COMPLETION_ITEMS) {
-        const item = new vscode.CompletionItem(spec.label, vscode.CompletionItemKind.Field);
-        item.detail = spec.detail;
-        item.documentation = spec.documentation;
-        items.push(item);
-    }
-}
-
-function addMaterialAttributeMemberItems(items) {
-    for (const member of MATERIAL_ATTRIBUTE_MEMBER_ITEMS) {
-        const item = new vscode.CompletionItem(member.name, vscode.CompletionItemKind.Field);
-        item.insertText = member.name;
-        item.detail = `MaterialAttributes.${member.name}`;
-        item.documentation = new vscode.MarkdownString(member.detail);
-        items.push(item);
-    }
-}
-
-function getAccessorBaseName(linePrefix) {
-    const match = /([A-Za-z_][A-Za-z0-9_]*)\.\w*$/.exec(linePrefix || "");
-    return match ? match[1] : "";
-}
-
-function isAfterMaterialAttributesAccessor(context) {
-    if (!context.afterSwizzleAccessor || !(context.inGraphCode || context.currentSection === "Outputs")) {
-        return false;
-    }
-
-    const baseName = getAccessorBaseName(context.linePrefix);
-    if (!baseName) {
-        return false;
-    }
-
-    const entry = collectVisibleIdentifierEntries(context)
-        .find((candidate) => normalizeSymbolKey(candidate.name) === normalizeSymbolKey(baseName));
-    return Boolean(entry?.typeInfo?.isMaterialAttributes);
 }
 
 function analyzeDocument(document, position) {
@@ -2457,7 +1624,8 @@ function analyzeDocument(document, position) {
         || inDeclarationSection;
     const inGraphExpressionContext = inGraphCode
         || currentSection === "Properties"
-        || inShaderFunctionInputSection;
+        || inShaderFunctionInputSection
+        || currentSection === "Outputs";
     const inCallableCompletionContext = inRawHlslContext
         || inGraphExpressionContext;
     const inIdentifierCompletionContext = inRawHlslContext
@@ -2560,23 +1728,6 @@ function getPathPluginValueCompletionInfo(text, offset) {
     };
 }
 
-function getMaterialExpressionClassValueCompletionInfo(text, offset) {
-    const prefix = stripCommentsPreserveLayout(text.slice(0, offset));
-    const lineStart = Math.max(prefix.lastIndexOf("\n"), prefix.lastIndexOf("\r")) + 1;
-    const linePrefix = prefix.slice(lineStart);
-    const match = /(?:UE\.[A-Za-z_][A-Za-z0-9_]*|Expression)\s*\([^()\r\n]*\bClass\s*=\s*"([^"]*)$/i.exec(linePrefix);
-    if (!match) {
-        return undefined;
-    }
-
-    const typedClassName = match[1] || "";
-    return {
-        typedClassName,
-        replaceStartOffset: offset - typedClassName.length,
-        replaceEndOffset: offset
-    };
-}
-
 function getTopLevelAttributeKindAtOffset(text, offset) {
     const prefix = text.slice(0, offset);
     const matches = Array.from(prefix.matchAll(/\b(VirtualFunction|ShaderLayerBlend|ShaderLayer|ShaderFunction|Shader|Namespace)\s*\(/g));
@@ -2601,15 +1752,6 @@ function findCurrentLegacyTopLevelBlock(prefix) {
         if (blockName) {
             current = blockName[0];
         }
-    }
-    return current;
-}
-
-function findCurrentLegacySection(prefix) {
-    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Inputs|Options)\s*=\s*\{/g;
-    let current = "";
-    for (const match of prefix.matchAll(sectionRegex)) {
-        current = match[1];
     }
     return current;
 }
@@ -2945,11 +2087,6 @@ function parseNamedLegacyBlocks(text, kind) {
         }
     }
     return blocks;
-}
-
-function extractStringAttribute(attributeText, attributeName) {
-    const info = extractStringAttributeInfo(attributeText, attributeName);
-    return info ? info.value : "";
 }
 
 function extractStringAttributeInfo(attributeText, attributeName) {
@@ -3741,56 +2878,6 @@ function parseTypedDeclarationsFromSection(section, allowBindings = false) {
     return { declarations, bindings, statements };
 }
 
-function parseOutputBindingTarget(text) {
-    const trimmed = String(text || "").trim();
-    const materialMatch = trimmed.match(/^Base\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)$/);
-    if (materialMatch) {
-        const propertyName = materialMatch[1];
-        if (!MATERIAL_OUTPUT_NAME_SET.has(normalizeSymbolKey(propertyName))) {
-            return {
-                kind: "invalid",
-                message: `Unknown material output 'Base.${propertyName}'.`
-            };
-        }
-
-        return {
-            kind: "material",
-            propertyName
-        };
-    }
-
-    const pinMatch = trimmed.match(/^(.*)\.\s*Pin\s*\[\s*(\d+)\s*\]$/);
-    if (pinMatch) {
-        const callText = pinMatch[1].trim();
-        const callExpression = parseCallExpressionText(callText, 0);
-        if (!callExpression || normalizeSymbolKey(callExpression.callee) !== "expression") {
-            return {
-                kind: "invalid",
-                message: "Auxiliary output nodes must use Expression(...).Pin[n]."
-            };
-        }
-
-        const classArgument = callExpression.arguments.find((argument) => argument.isNamed && normalizeSymbolKey(argument.name) === "class");
-        if (!classArgument || !classArgument.valueText.trim()) {
-            return {
-                kind: "invalid",
-                message: "Output node bindings must specify Expression(Class=\"...\").Pin[n]."
-            };
-        }
-
-        return {
-            kind: "outputNode",
-            pinIndex: Number(pinMatch[2]),
-            callExpression
-        };
-    }
-
-    return {
-        kind: "invalid",
-        message: "Material Outputs bindings must target Base.<Property> or Expression(...).Pin[n]."
-    };
-}
-
 function addCallableSignature(map, signature) {
     const key = normalizeSymbolKey(signature.name);
     if (!key) {
@@ -3917,13 +3004,6 @@ function collectReachableCallableSignaturesFromFile(fsPath, text, results, visit
     }
 }
 
-function collectReachableFunctionDefinitionEntries(document) {
-    const results = [];
-    const visited = new Set();
-    collectReachableFunctionDefinitionEntriesFromFile(document.fileName, document.getText(), results, visited);
-    return results;
-}
-
 function collectReachableFunctionDefinitionEntriesFromFile(fsPath, text, results, visited) {
     const normalizedPath = normalizeFsPath(fsPath);
     if (visited.has(normalizedPath)) {
@@ -3958,212 +3038,6 @@ function collectReachableFunctionDefinitionEntriesFromFile(fsPath, text, results
             // Ignore unreadable imports here; diagnostics handle reporting separately.
         }
     }
-}
-
-function collectDreamShaderFunctionCallNames(text) {
-    const names = [];
-    const seen = new Set();
-    let index = 0;
-    let inString = false;
-    let inLineComment = false;
-    let inBlockComment = false;
-
-    while (index < text.length) {
-        const char = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : "\0";
-
-        if (inLineComment) {
-            if (char === "\n") {
-                inLineComment = false;
-            }
-            index += 1;
-            continue;
-        }
-
-        if (inBlockComment) {
-            if (char === "*" && next === "/") {
-                inBlockComment = false;
-                index += 2;
-            } else {
-                index += 1;
-            }
-            continue;
-        }
-
-        if (inString) {
-            if (char === "\\") {
-                index += 2;
-            } else {
-                if (char === "\"") {
-                    inString = false;
-                }
-                index += 1;
-            }
-            continue;
-        }
-
-        if (char === "\"") {
-            inString = true;
-            index += 1;
-            continue;
-        }
-
-        if (char === "/" && next === "/") {
-            inLineComment = true;
-            index += 2;
-            continue;
-        }
-
-        if (char === "/" && next === "*") {
-            inBlockComment = true;
-            index += 2;
-            continue;
-        }
-
-        const identifier = readQualifiedIdentifier(text, index);
-        if (!identifier) {
-            index += 1;
-            continue;
-        }
-
-        const afterIdentifier = skipWhitespace(text, identifier.end);
-        if (text[afterIdentifier] === "(") {
-            const normalizedName = normalizeSymbolKey(identifier.name);
-            if (!normalizedName.startsWith("ue.") && !isConstructorName(identifier.name) && !seen.has(normalizedName)) {
-                seen.add(normalizedName);
-                names.push(identifier.name);
-            }
-            index = afterIdentifier + 1;
-            continue;
-        }
-
-        index = identifier.end;
-    }
-
-    return names;
-}
-
-function computeFunctionCycleDiagnostics(document, text) {
-    const diagnostics = [];
-    const currentPath = normalizeFsPath(document.fileName);
-    const definitions = collectReachableFunctionDefinitionEntries(document);
-    if (definitions.length === 0) {
-        return diagnostics;
-    }
-
-    const definitionsByName = new Map();
-    for (const definition of definitions) {
-        const key = normalizeSymbolKey(definition.name);
-        if (!definitionsByName.has(key)) {
-            definitionsByName.set(key, []);
-        }
-        definitionsByName.get(key).push(definition);
-    }
-
-    const dependencies = new Map();
-    for (const definition of definitions) {
-        const localDependencies = [];
-        const seenDependencies = new Set();
-        for (const callName of collectDreamShaderFunctionCallNames(definition.bodyText)) {
-            const matches = definitionsByName.get(normalizeSymbolKey(callName)) || [];
-            for (const match of matches) {
-                const dependencyKey = `${match.fsPath}:${match.nameOffset}`;
-                if (!seenDependencies.has(dependencyKey)) {
-                    seenDependencies.add(dependencyKey);
-                    localDependencies.push(match);
-                }
-            }
-        }
-        dependencies.set(definition, localDependencies);
-    }
-
-    const visitState = new Map();
-    const visitStack = [];
-    const emittedDiagnostics = new Set();
-
-    const emitCycleDiagnostic = (cycle) => {
-        if (!Array.isArray(cycle) || cycle.length === 0) {
-            return;
-        }
-
-        const uniqueCycle = cycle.slice(0, -1);
-        const cyclePath = cycle.map((entry) => entry.name).join(" -> ");
-        const hasSelfContained = uniqueCycle.some((entry) => entry.selfContained);
-        const message = hasSelfContained
-            ? `SelfContained DreamShader Function cycle detected: ${cyclePath}. HLSL Custom nodes cannot compile recursive DreamShader functions.`
-            : `DreamShader Function cycle detected: ${cyclePath}. HLSL cannot compile recursive DreamShader functions.`;
-
-        let emittedInCurrentDocument = false;
-        for (const definition of uniqueCycle) {
-            if (definition.fsPath !== currentPath) {
-                continue;
-            }
-
-            emittedInCurrentDocument = true;
-            const diagnosticKey = `${definition.fsPath}:${definition.nameOffset}:${message}`;
-            if (emittedDiagnostics.has(diagnosticKey)) {
-                continue;
-            }
-            emittedDiagnostics.add(diagnosticKey);
-            diagnostics.push(makeFunctionDiagnostic(document, definition, message));
-        }
-
-        if (emittedInCurrentDocument) {
-            return;
-        }
-
-        const diagnosticKey = `import:${message}`;
-        if (emittedDiagnostics.has(diagnosticKey)) {
-            return;
-        }
-        emittedDiagnostics.add(diagnosticKey);
-
-        const importStatements = parseImportStatements(text);
-        if (importStatements.length > 0) {
-            const importStatement = importStatements[0];
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                importStatement.startOffset,
-                importStatement.endOffset,
-                `Imported ${message}`));
-        } else {
-            diagnostics.push(new vscode.Diagnostic(
-                new vscode.Range(0, 0, 0, 1),
-                `Imported ${message}`,
-                vscode.DiagnosticSeverity.Error));
-        }
-    };
-
-    const visit = (definition) => {
-        const state = visitState.get(definition) || "unvisited";
-        if (state === "visited") {
-            return;
-        }
-
-        if (state === "visiting") {
-            const cycleStart = visitStack.findIndex((entry) => entry === definition);
-            if (cycleStart >= 0) {
-                emitCycleDiagnostic([...visitStack.slice(cycleStart), definition]);
-            }
-            return;
-        }
-
-        visitState.set(definition, "visiting");
-        visitStack.push(definition);
-
-        for (const dependency of dependencies.get(definition) || []) {
-            visit(dependency);
-        }
-
-        visitStack.pop();
-        visitState.set(definition, "visited");
-    };
-
-    for (const definition of definitions) {
-        visit(definition);
-    }
-
-    return diagnostics;
 }
 
 function collectReachableFunctionDefinitions(document) {
@@ -4477,462 +3351,28 @@ function refreshLocalDiagnosticsForDocument(document, collection) {
 }
 
 function computeLocalDiagnostics(document) {
-    const diagnostics = [];
-    const text = document.getText();
-    const extension = path.extname(document.fileName).toLowerCase();
-    const reachableCallables = collectReachableCallableSignatures(document);
-
-    if (extension === ".dsm" && !/\bShader\s*\(/.test(text) && !/\bShaderFunction\s*\(/.test(text) && !/\bShaderLayer\s*\(/.test(text) && !/\bShaderLayerBlend\s*\(/.test(text) && !/\bGraphFunction\b/.test(text) && !/\bVirtualFunction\s*\(/.test(text)) {
-        diagnostics.push(new vscode.Diagnostic(
-            new vscode.Range(0, 0, 0, 1),
-            "DreamShader implementation (.dsm) should declare a top-level Shader(Name=\"...\"), ShaderFunction(Name=\"...\"), ShaderLayer(Name=\"...\"), ShaderLayerBlend(Name=\"...\"), GraphFunction, or VirtualFunction(Name=\"...\") block.",
-            vscode.DiagnosticSeverity.Warning));
-    }
-
-    if (extension === ".dsh" && (/\bShader\s*\(/.test(text) || /\bShaderFunction\s*\(/.test(text) || /\bShaderLayer\s*\(/.test(text) || /\bShaderLayerBlend\s*\(/.test(text))) {
-        diagnostics.push(new vscode.Diagnostic(
-            new vscode.Range(0, 0, 0, 1),
-            "DreamShader header (.dsh) may only contain import statements, Function blocks, GraphFunction blocks, Namespace blocks, and VirtualFunction declarations.",
-            vscode.DiagnosticSeverity.Error));
-    }
-
-    for (const importStatement of parseImportStatements(text)) {
-        const resolvedPath = resolveImportPath(document.fileName, importStatement.path);
-        if (resolvedPath && fs.existsSync(resolvedPath)) {
-            continue;
-        }
-
-        const start = document.positionAt(importStatement.pathOffset);
-        const end = document.positionAt(importStatement.pathOffset + importStatement.path.length);
-        diagnostics.push(new vscode.Diagnostic(
-            new vscode.Range(start, end),
-            `DreamShader import '${importStatement.path}' could not be resolved.`,
-            vscode.DiagnosticSeverity.Error));
-    }
-
-    const seenFunctions = new Map();
-    for (const definition of parseFunctionDefinitionsFromText(text)) {
-        if (!seenFunctions.has(definition.name)) {
-            seenFunctions.set(definition.name, []);
-        }
-        seenFunctions.get(definition.name).push(definition);
-    }
-
-    for (const [name, definitions] of seenFunctions.entries()) {
-        if (definitions.length < 2) {
-            continue;
-        }
-
-        for (const definition of definitions) {
-            const start = document.positionAt(definition.nameOffset);
-            const end = new vscode.Position(start.line, start.character + (definition.nameRangeLength || definition.localName?.length || name.length));
-            diagnostics.push(new vscode.Diagnostic(
-                new vscode.Range(start, end),
-                `DreamShader function '${name}' is declared more than once in this file.`,
-                vscode.DiagnosticSeverity.Error));
-        }
-    }
-
-    for (const definition of parseFunctionDefinitionsFromText(text)) {
-        diagnostics.push(...computeFunctionSignatureDiagnostics(document, text, definition));
-        diagnostics.push(...computeFunctionBodyDiagnostics(document, text, definition, reachableCallables));
-    }
-
-    diagnostics.push(...computeFunctionCycleDiagnostics(document, text));
-    diagnostics.push(...computeDetailedBlockDiagnostics(document, text, reachableCallables));
-    diagnostics.push(...computeBraceDiagnostics(document, text));
-    return diagnostics;
+    return languageCore
+        .getDiagnostics(document.getText(), document.fileName, createLanguageServiceAdapters(document))
+        .map((diagnostic) => diagnosticSpecToVscodeDiagnostic(document, diagnostic));
 }
 
-function computeFunctionSignatureDiagnostics(document, text, definition) {
-    const diagnostics = [];
-    const parameterText = text.slice(definition.paramOpenOffset + 1, definition.paramCloseOffset);
-    const parameters = splitTopLevelParameters(parameterText);
-    let sawOutParameter = false;
-
-    for (const parameter of parameters) {
-        const trimmed = parameter.trim();
-        if (!trimmed) {
-            continue;
-        }
-
-        const parts = trimmed.split(/\s+/).filter(Boolean);
-        if (parts.length < 2 || parts.length > 3) {
-            diagnostics.push(makeFunctionDiagnostic(
-                document,
-                definition,
-                `${definition.kind} '${definition.name}' has an invalid parameter declaration '${trimmed}'.`));
-            continue;
-        }
-
-        let qualifier = "in";
-        if (parts.length === 3) {
-            qualifier = parts[0].toLowerCase();
-        }
-
-        if (!["in", "out"].includes(qualifier)) {
-            diagnostics.push(makeFunctionDiagnostic(
-                document,
-                definition,
-                `${definition.kind} '${definition.name}' parameter '${trimmed}' uses unsupported qualifier '${parts[0]}'. Supported qualifiers are in and out.`));
-            continue;
-        }
-
-        if (qualifier === "out") {
-            sawOutParameter = true;
-        }
-    }
-
-    if (!sawOutParameter) {
-        diagnostics.push(makeFunctionDiagnostic(
-            document,
-            definition,
-            `${definition.kind} '${definition.name}' must declare at least one out parameter.`));
-    }
-
-    return diagnostics;
+function diagnosticSpecToVscodeDiagnostic(document, diagnostic) {
+    return new vscode.Diagnostic(
+        new vscode.Range(document.positionAt(diagnostic.startOffset), document.positionAt(diagnostic.endOffset)),
+        diagnostic.message,
+        getDiagnosticSeverity(diagnostic.severity));
 }
 
-function computeFunctionBodyDiagnostics(document, text, definition, reachableCallables) {
-    const diagnostics = [];
-    const bodyText = text.slice(definition.bodyOpenOffset + 1, definition.bodyCloseOffset);
-    const bodyOffset = definition.bodyOpenOffset + 1;
-
-    if (definition.kind === "Function") {
-        const ueCallRegex = /\bUE\s*\./g;
-        for (const match of bodyText.matchAll(ueCallRegex)) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                bodyOffset + match.index,
-                bodyOffset + match.index + match[0].length,
-                "UE.* material graph nodes are not valid inside Function. Use GraphFunction when you need to call UE graph nodes.",
-                vscode.DiagnosticSeverity.Error));
-        }
-        return diagnostics;
+function getDiagnosticSeverity(severity) {
+    switch (severity) {
+        case "Error":
+            return vscode.DiagnosticSeverity.Error;
+        case "Information":
+            return vscode.DiagnosticSeverity.Information;
+        case "Warning":
+        default:
+            return vscode.DiagnosticSeverity.Warning;
     }
-
-    if (definition.kind === "GraphFunction") {
-        const symbols = new Map();
-        const parameters = parseFunctionSignatureParameters(definition, text);
-        for (const input of parameters.inputs) {
-            symbols.set(normalizeSymbolKey(input.name), {
-                name: input.name,
-                typeInfo: resolveTypeInfo(input.type)
-            });
-        }
-        for (const output of parameters.outputs) {
-            symbols.set(normalizeSymbolKey(output.name), {
-                name: output.name,
-                typeInfo: resolveTypeInfo(output.type)
-            });
-        }
-        diagnostics.push(...analyzeGraphStatements(document, bodyText, bodyOffset, symbols, reachableCallables));
-    }
-
-    return diagnostics;
-}
-
-function makeFunctionDiagnostic(document, definition, message) {
-    const start = document.positionAt(definition.nameOffset);
-    const end = new vscode.Position(start.line, start.character + (definition.nameRangeLength || definition.localName?.length || definition.name.length));
-    return new vscode.Diagnostic(new vscode.Range(start, end), message, vscode.DiagnosticSeverity.Error);
-}
-
-function computeDetailedBlockDiagnostics(document, text, reachableCallables) {
-    const diagnostics = [];
-    const blocks = [
-        ...parseNamedLegacyBlocks(text, "Shader"),
-        ...parseNamedLegacyBlocks(text, "ShaderFunction"),
-        ...parseNamedLegacyBlocks(text, "ShaderLayer"),
-        ...parseNamedLegacyBlocks(text, "ShaderLayerBlend"),
-        ...parseNamedLegacyBlocks(text, "VirtualFunction")
-    ].sort((a, b) => a.startOffset - b.startOffset);
-
-    for (const block of blocks) {
-        diagnostics.push(...analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables));
-    }
-
-    return diagnostics;
-}
-
-function analyzeLegacyBlockDiagnostics(document, block, text, reachableCallables) {
-    const diagnostics = [];
-    const sections = parseLegacySections(text, block);
-    const allowedSections = BLOCK_SECTION_RULES.get(block.kind) || new Set();
-    const seenSections = new Map();
-
-    for (const section of sections) {
-        if (!allowedSections.has(section.name)) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                section.nameOffset,
-                section.nameOffset + section.name.length,
-                `${block.kind} block '${block.name}' does not support section '${section.name}'.`));
-            continue;
-        }
-
-        if (!seenSections.has(section.name)) {
-            seenSections.set(section.name, []);
-        }
-        seenSections.get(section.name).push(section);
-    }
-
-    for (const [sectionName, entries] of seenSections.entries()) {
-        if (entries.length < 2) {
-            continue;
-        }
-
-        for (const entry of entries) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                entry.nameOffset,
-                entry.nameOffset + sectionName.length,
-                `${block.kind} block '${block.name}' declares section '${sectionName}' more than once.`));
-        }
-    }
-
-    const symbols = new Map();
-
-    if (block.kind === "Shader") {
-        const propertiesSection = seenSections.get("Properties")?.[0];
-        const outputsSection = seenSections.get("Outputs")?.[0];
-        if (propertiesSection) {
-            diagnostics.push(...validateDeclarationSection(document, propertiesSection, symbols, "Properties", false, reachableCallables));
-        }
-        if (outputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", true, reachableCallables));
-        }
-    } else if (isGeneratedMaterialFunctionKind(block.kind)) {
-        const propertiesSection = seenSections.get("Properties")?.[0];
-        const inputsSection = seenSections.get("Inputs")?.[0];
-        const outputsSection = seenSections.get("Outputs")?.[0];
-        if (propertiesSection) {
-            diagnostics.push(...validateDeclarationSection(document, propertiesSection, symbols, "Properties", false, reachableCallables));
-        }
-        if (inputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, inputsSection, symbols, "Inputs", false, reachableCallables));
-        }
-        if (outputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
-        }
-        diagnostics.push(...validateShaderLayerBlockShape(document, block, inputsSection, outputsSection));
-
-    } else if (block.kind === "VirtualFunction") {
-        const inputsSection = seenSections.get("Inputs")?.[0];
-        const outputsSection = seenSections.get("Outputs")?.[0];
-        if (inputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, inputsSection, symbols, "Inputs", false, reachableCallables));
-        }
-        if (outputsSection) {
-            diagnostics.push(...validateDeclarationSection(document, outputsSection, symbols, "Outputs", false, reachableCallables));
-        } else {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                block.startOffset,
-                block.startOffset + block.kind.length,
-                `VirtualFunction '${block.name}' must declare an Outputs section.`));
-        }
-
-        const optionsSection = seenSections.get("Options")?.[0] || seenSections.get("Settings")?.[0];
-        if (optionsSection) {
-            diagnostics.push(...validateSettingsSection(document, optionsSection, optionsSection.name));
-            const hasAsset = splitStatementsWithOffsets(optionsSection.bodyText, optionsSection.bodyOpenOffset + 1)
-                .some((statement) => {
-                    const assignment = splitTopLevelAssignment(statement.text);
-                    return assignment && normalizeSymbolKey(assignment.left) === "asset";
-                });
-            if (!hasAsset) {
-                diagnostics.push(makeOffsetDiagnostic(
-                    document,
-                    optionsSection.nameOffset,
-                    optionsSection.nameOffset + optionsSection.name.length,
-                    `VirtualFunction '${block.name}' Options must include Asset = Path(...);`));
-            }
-        } else {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                block.startOffset,
-                block.startOffset + block.kind.length,
-                `VirtualFunction '${block.name}' must declare Options = { Asset = Path(...); }.`));
-        }
-    }
-
-    const settingsSection = seenSections.get("Settings")?.[0];
-    if (settingsSection && block.kind !== "VirtualFunction") {
-        diagnostics.push(...validateSettingsSection(document, settingsSection));
-    }
-
-    const codeSection = seenSections.get("Graph")?.[0];
-    if (codeSection) {
-        diagnostics.push(...analyzeCodeSection(document, codeSection, symbols, reachableCallables));
-    }
-
-    return diagnostics;
-}
-
-function validateShaderLayerBlockShape(document, block, inputsSection, outputsSection) {
-    const diagnostics = [];
-    if (block.kind !== "ShaderLayer" && block.kind !== "ShaderLayerBlend") {
-        return diagnostics;
-    }
-
-    const outputs = outputsSection
-        ? parseTypedDeclarationsFromSection(outputsSection).declarations.filter((entry) => entry.kind === "declaration")
-        : [];
-    if (outputs.length !== 1 || !resolveTypeInfo(outputs[0]?.type)?.isMaterialAttributes) {
-        diagnostics.push(makeOffsetDiagnostic(
-            document,
-            outputsSection ? outputsSection.nameOffset : block.startOffset,
-            outputsSection ? outputsSection.nameOffset + outputsSection.name.length : block.startOffset + block.kind.length,
-            `${block.kind} '${block.name}' must declare exactly one MaterialAttributes output.`));
-    }
-
-    if (block.kind === "ShaderLayerBlend") {
-        const inputs = inputsSection
-            ? parseTypedDeclarationsFromSection(inputsSection).declarations.filter((entry) => entry.kind === "declaration")
-            : [];
-        const materialAttributesInputCount = inputs.filter((entry) => resolveTypeInfo(entry.type)?.isMaterialAttributes).length;
-        if (materialAttributesInputCount < 2) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                inputsSection ? inputsSection.nameOffset : block.startOffset,
-                inputsSection ? inputsSection.nameOffset + inputsSection.name.length : block.startOffset + block.kind.length,
-                `ShaderLayerBlend '${block.name}' must declare at least two MaterialAttributes inputs.`));
-        }
-    }
-
-    return diagnostics;
-}
-
-function validateDeclarationSection(document, section, symbols, sectionLabel, allowBindings, reachableCallables = new Map()) {
-    const diagnostics = [];
-    const parsed = parseTypedDeclarationsFromSection(section, allowBindings);
-    const localNames = new Map();
-
-    for (const statement of parsed.statements) {
-        if (!statement.terminated) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                statement.startOffset,
-                statement.endOffset,
-                `${sectionLabel} statement is missing a trailing ';'.`));
-        }
-    }
-
-    for (const declaration of parsed.declarations) {
-        if (declaration.kind === "invalid") {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                declaration.startOffset,
-                declaration.endOffset,
-                `Invalid ${sectionLabel} statement '${declaration.text}'.`));
-            continue;
-        }
-
-        const resolvedType = resolveTypeInfo(declaration.type);
-        if (!resolvedType && !/^UE\./i.test(declaration.type)) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                declaration.startOffset,
-                declaration.endOffset,
-                `Unsupported ${sectionLabel} type '${declaration.type}'.`));
-            continue;
-        }
-
-        if (sectionLabel === "Properties" && (resolvedType?.isTexture || resolvedType?.expectsTextureDefault) && declaration.valueText) {
-            const valueOffset = declaration.startOffset + declaration.text.indexOf(declaration.valueText);
-            const texturePathResult = parseTexturePathReferenceText(declaration.valueText);
-            if (texturePathResult.error) {
-                diagnostics.push(makeOffsetDiagnostic(
-                    document,
-                    valueOffset,
-                    valueOffset + declaration.valueText.length,
-                    texturePathResult.error));
-            }
-        }
-
-        const nameKey = normalizeSymbolKey(declaration.name);
-        if (localNames.has(nameKey)) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                declaration.startOffset,
-                declaration.endOffset,
-                `${sectionLabel} variable '${declaration.name}' is declared more than once.`));
-            continue;
-        }
-
-        localNames.set(nameKey, declaration.name);
-        if (symbols) {
-            symbols.set(nameKey, {
-                name: declaration.name,
-                typeInfo: resolvedType
-            });
-        }
-    }
-
-    for (const binding of parsed.bindings) {
-        if (!binding.terminated) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                binding.startOffset,
-                binding.endOffset,
-                `${sectionLabel} binding is missing a trailing ';'.`));
-        }
-
-        if (!binding.target || !binding.valueText) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                binding.startOffset,
-                binding.endOffset,
-                `Invalid ${sectionLabel} binding '${binding.text}'.`));
-            continue;
-        }
-
-        if (allowBindings && sectionLabel === "Outputs") {
-            const targetInfo = parseOutputBindingTarget(binding.target);
-            if (!targetInfo || targetInfo.kind === "invalid") {
-                diagnostics.push(makeOffsetDiagnostic(
-                    document,
-                    binding.startOffset,
-                    binding.startOffset + binding.target.length,
-                    targetInfo?.message || `Invalid ${sectionLabel} binding target '${binding.target}'.`));
-                continue;
-            }
-        }
-
-        const valueOffset = binding.startOffset + binding.text.indexOf(binding.valueText);
-        diagnostics.push(...analyzeExpressionText(document, binding.valueText, valueOffset, symbols || new Map(), reachableCallables, "value"));
-    }
-
-    return diagnostics;
-}
-
-function validateSettingsSection(document, section, sectionLabel = "Settings") {
-    const diagnostics = [];
-    const statements = splitStatementsWithOffsets(section.bodyText, section.bodyOpenOffset + 1);
-    for (const statement of statements) {
-        if (!statement.terminated) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                statement.startOffset,
-                statement.endOffset,
-                `${sectionLabel} statement is missing a trailing ';'.`));
-        }
-
-        const assignment = splitTopLevelAssignment(statement.text);
-        if (!assignment || !assignment.left || !assignment.right) {
-            diagnostics.push(makeOffsetDiagnostic(
-                document,
-                statement.startOffset,
-                statement.endOffset,
-                `Invalid ${sectionLabel} statement '${statement.text}'.`));
-        }
-    }
-    return diagnostics;
-}
-
-function analyzeCodeSection(document, section, symbols, reachableCallables) {
-    return analyzeGraphStatements(document, section.bodyText, section.bodyOpenOffset + 1, symbols, reachableCallables);
 }
 
 function isGraphIfStatementText(text) {
@@ -5519,80 +3959,6 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
     return diagnostics;
 }
 
-function parseTexturePathReferenceText(text) {
-    const callExpression = parseCallExpressionText(text, 0);
-    if (!callExpression || normalizeSymbolKey(callExpression.callee) !== "path") {
-        return {
-            error: "Texture defaults must use Path(Game|Engine|Plugin.PluginName, \"/Folder/Asset\") or Path(\"/Game/Folder/Asset\")."
-        };
-    }
-
-    if (callExpression.arguments.some((argument) => argument.isNamed)) {
-        return {
-            error: "Texture Path(...) does not support named arguments."
-        };
-    }
-
-    if (callExpression.arguments.length !== 1 && callExpression.arguments.length !== 2) {
-        return {
-            error: "Texture Path(...) expects either 1 argument (absolute asset path) or 2 arguments (Game|Engine|Plugin.PluginName, asset path)."
-        };
-    }
-
-    if (callExpression.arguments.length === 1) {
-        const assetPath = readTexturePathArgumentText(callExpression.arguments[0].valueText);
-        if (!assetPath || !/^\/[A-Za-z0-9_][A-Za-z0-9_]*\//.test(assetPath)) {
-            return {
-                error: "Single-argument Path(...) must use an absolute /Game/..., /Engine/..., or plugin mount asset path."
-            };
-        }
-
-        return { error: "" };
-    }
-
-    const rootText = readTexturePathArgumentText(callExpression.arguments[0].valueText);
-    if (!isSupportedAssetPathRoot(rootText)) {
-        return {
-            error: `Unsupported texture Path root '${rootText}'. Use Game, Engine, or Plugin.PluginName.`
-        };
-    }
-
-    const assetPath = readTexturePathArgumentText(callExpression.arguments[1].valueText);
-    if (!assetPath) {
-        return {
-            error: "Texture Path(...) requires a non-empty asset path."
-        };
-    }
-
-    return { error: "" };
-}
-
-function isSupportedAssetPathRoot(text) {
-    const root = String(text || "").trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-    if (/^(Game|Engine)$/i.test(root)) {
-        return true;
-    }
-
-    if (/^Plugins?\.[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)*$/i.test(root)) {
-        return true;
-    }
-
-    return /^Plugins?\/[A-Za-z0-9_]+(?:\/[A-Za-z0-9_]+)*$/i.test(root);
-}
-
-function readTexturePathArgumentText(text) {
-    const trimmed = String(text || "").trim();
-    if (!trimmed) {
-        return "";
-    }
-
-    if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-        return trimmed.slice(1, -1).trim();
-    }
-
-    return trimmed;
-}
-
 function parseCallExpressionText(text, baseOffset) {
     const trimmed = text.trim();
     const leadingWhitespace = text.search(/\S|$/);
@@ -5691,32 +4057,6 @@ function isConstructorName(name) {
         || normalized === "mat4";
 }
 
-function createSwizzleCompletionSpecs() {
-    const specs = [];
-    for (const group of SWIZZLE_CHANNEL_GROUPS) {
-        collectSwizzleCombinations(group, "", specs);
-    }
-    return specs;
-}
-
-function collectSwizzleCombinations(group, prefix, specs) {
-    if (prefix.length > 0) {
-        specs.push({
-            label: prefix,
-            detail: `${group.toUpperCase()} vector swizzle`,
-            documentation: `Selects the \`${prefix}\` vector channel${prefix.length === 1 ? "" : "s"}.`
-        });
-    }
-
-    if (prefix.length >= 4) {
-        return;
-    }
-
-    for (const channel of group) {
-        collectSwizzleCombinations(group, prefix + channel, specs);
-    }
-}
-
 function isSwizzleName(name) {
     const normalized = String(name || "").trim().toLowerCase();
     return normalized.length >= 1
@@ -5752,87 +4092,6 @@ function makeOffsetDiagnostic(document, startOffset, endOffset, message, severit
     const safeEndOffset = Math.max(startOffset + 1, endOffset);
     const end = document.positionAt(safeEndOffset);
     return new vscode.Diagnostic(new vscode.Range(start, end), message, severity);
-}
-
-function computeBraceDiagnostics(document, text) {
-    const diagnostics = [];
-    const stack = [];
-    let inString = false;
-    let inLineComment = false;
-    let inBlockComment = false;
-
-    for (let index = 0; index < text.length; index += 1) {
-        const char = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : "\0";
-
-        if (inLineComment) {
-            if (char === "\n") {
-                inLineComment = false;
-            }
-            continue;
-        }
-
-        if (inBlockComment) {
-            if (char === "*" && next === "/") {
-                inBlockComment = false;
-                index += 1;
-            }
-            continue;
-        }
-
-        if (inString) {
-            if (char === "\\") {
-                index += 1;
-            } else if (char === "\"") {
-                inString = false;
-            }
-            continue;
-        }
-
-        if (char === "\"") {
-            inString = true;
-            continue;
-        }
-
-        if (char === "/" && next === "/") {
-            inLineComment = true;
-            index += 1;
-            continue;
-        }
-
-        if (char === "/" && next === "*") {
-            inBlockComment = true;
-            index += 1;
-            continue;
-        }
-
-        if (char === "{") {
-            stack.push(index);
-            continue;
-        }
-
-        if (char === "}") {
-            if (stack.length === 0) {
-                const position = document.positionAt(index);
-                diagnostics.push(new vscode.Diagnostic(
-                    new vscode.Range(position, new vscode.Position(position.line, position.character + 1)),
-                    "Unexpected closing brace.",
-                    vscode.DiagnosticSeverity.Error));
-            } else {
-                stack.pop();
-            }
-        }
-    }
-
-    for (const openIndex of stack) {
-        const position = document.positionAt(openIndex);
-        diagnostics.push(new vscode.Diagnostic(
-            new vscode.Range(position, new vscode.Position(position.line, position.character + 1)),
-            "Unclosed opening brace.",
-            vscode.DiagnosticSeverity.Error));
-    }
-
-    return diagnostics;
 }
 
 async function installPackageFromGitHubCommand() {
@@ -8597,133 +6856,12 @@ function mapSeverity(severity) {
     }
 }
 
-function formatDreamShaderDocument(text) {
-    const normalizedText = text.replace(/\r\n/g, "\n");
-    const lines = normalizedText.split("\n");
-    const formatted = [];
-    let indentLevel = 0;
-
-    for (const originalLine of lines) {
-        const trimmed = originalLine.trim();
-        if (trimmed.length === 0) {
-            formatted.push("");
-            continue;
-        }
-
-        const stripped = stripStringsAndComments(trimmed);
-        const startsWithClosingBrace = stripped.startsWith("}");
-        if (startsWithClosingBrace) {
-            indentLevel = Math.max(0, indentLevel - 1);
-        }
-
-        formatted.push(`${INDENT.repeat(indentLevel)}${trimmed}`);
-
-        const openCount = countCharactersOutsideStrings(stripped, "{");
-        const closeCount = countCharactersOutsideStrings(stripped, "}");
-        indentLevel = Math.max(0, indentLevel + openCount - closeCount);
-    }
-
-    return `${formatted.join("\n").replace(/[ \t]+$/gm, "")}\n`;
-}
-
-function stripStringsAndComments(text) {
-    let result = "";
-    let inString = false;
-    for (let index = 0; index < text.length; index += 1) {
-        const char = text[index];
-        const next = index + 1 < text.length ? text[index + 1] : "\0";
-
-        if (!inString && char === "/" && next === "/") {
-            break;
-        }
-
-        if (char === "\"") {
-            inString = !inString;
-            result += " ";
-            continue;
-        }
-
-        if (inString && char === "\\") {
-            result += "  ";
-            index += 1;
-            continue;
-        }
-
-        result += inString ? " " : char;
-    }
-    return result;
-}
-
-function countCharactersOutsideStrings(text, needle) {
-    let count = 0;
-    for (const char of text) {
-        if (char === needle) {
-            count += 1;
-        }
-    }
-    return count;
-}
-
-function splitTopLevelParameters(text) {
-    const parameters = [];
-    let current = "";
-    let depth = 0;
-    let inString = false;
-
-    for (let index = 0; index < text.length; index += 1) {
-        const char = text[index];
-
-        if (inString) {
-            current += char;
-            if (char === "\\") {
-                index += 1;
-                if (index < text.length) {
-                    current += text[index];
-                }
-            } else if (char === "\"") {
-                inString = false;
-            }
-            continue;
-        }
-
-        if (char === "\"") {
-            inString = true;
-            current += char;
-            continue;
-        }
-
-        if (char === "(") {
-            depth += 1;
-            current += char;
-            continue;
-        }
-
-        if (char === ")") {
-            depth = Math.max(0, depth - 1);
-            current += char;
-            continue;
-        }
-
-        if (char === "," && depth === 0) {
-            if (current.trim()) {
-                parameters.push(current.trim());
-            }
-            current = "";
-            continue;
-        }
-
-        current += char;
-    }
-
-    if (current.trim()) {
-        parameters.push(current.trim());
-    }
-
-    return parameters;
-}
-
 function resolveImportPath(currentFilePath, importSpecifier) {
     const normalizedImport = normalizeImportSpecifier(importSpecifier);
+    const packageRootCandidate = resolvePackageImportCandidate(currentFilePath, normalizedImport);
+    if (packageRootCandidate) {
+        return packageRootCandidate;
+    }
     const relativeCandidate = normalizeFsPath(path.resolve(path.dirname(currentFilePath), normalizedImport));
     if (fs.existsSync(relativeCandidate)) {
         return relativeCandidate;
@@ -8762,6 +6900,21 @@ function resolveImportPath(currentFilePath, importSpecifier) {
         const builtinCandidate = normalizeFsPath(path.join(projectRoot, "Plugins", "DreamShader", "Library", normalizedImport));
         if (fs.existsSync(builtinCandidate)) {
             return builtinCandidate;
+        }
+    }
+
+    return "";
+}
+
+function resolvePackageImportCandidate(currentFilePath, normalizedImport) {
+    if (!String(normalizedImport || "").startsWith("@")) {
+        return "";
+    }
+
+    for (const root of collectKnownProjectRoots(currentFilePath)) {
+        const candidate = normalizeFsPath(path.join(getPackagesDirectory(root), normalizedImport));
+        if (fs.existsSync(candidate)) {
+            return candidate;
         }
     }
 
@@ -9047,7 +7200,11 @@ function offsetToPosition(text, offset) {
 
 module.exports = {
     activate,
-    deactivate
+    deactivate,
+    __test: {
+        analyzeDocument,
+        createCompletionProvider
+    }
 };
 
 

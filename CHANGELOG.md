@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+- Rebuilt the DreamShaderLang language service around scanner, parser, context, symbol, completion, diagnostic, and provider modules.
+- Routed completion, diagnostics, semantic tokens, folding, and document symbols through the new language core.
+- Fixed broad completion scope leaks across `Inputs`, `Graph`, `Function`, `Settings`, `Outputs`, and metadata contexts.
+- Fixed `Base.` output completion so applying `BaseColor` no longer inserts `Base.BaseColor`.
+- Added parser-based formatting, cross-file import indexing, and function-cycle detection in the new language core.
+- Restored deeper local diagnostics for ShaderLayer/ShaderLayerBlend shape, VirtualFunction options, Graph callable argument counts, Graph out variables, and MaterialAttributes member writes.
+- Added Substrate/Strata type, syntax, completion, and diagnostic hints.
+- Added language smoke tests for section-aware completion and diagnostics.
+- Rewrote the README with English as the primary document and added `README.zh-CN.md`.
+
 ## 1.3.4
 
 - Updated built-in templates and snippets to generate more practical project-ready DreamShader skeletons.
