@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.1
+
+- Added `.dsf` Dream Shader Function file association, command-palette template creation, import completion, clickable import handling, and workspace indexing.
+- Added `.dsf` diagnostics that allow reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations while rejecting material/layer asset blocks.
+- Added local diagnostics for standalone multi-output `ShaderFunction` / `VirtualFunction` calls using positional inputs followed by out variables.
+- Preserved explicit import extensions so `import "Functions/F_Tint.dsf";` resolves as a function file instead of being rewritten as a `.dsh` import.
+- Updated README, snippets, and templates for `.dsf` authoring.
+
 ## 1.4.0
 
 - Rebuilt the DreamShaderLang language service around scanner, parser, context, symbol, completion, diagnostic, and provider modules.

@@ -202,11 +202,16 @@ function getCompletionSpecs(text, offset, services = {}) {
 
     if (isImportContext(text, offset)) {
         for (const headerPath of callService(services, "collectAvailableHeaderImports", [])) {
+            const lowerPath = String(headerPath || "").toLowerCase();
             add({
                 label: headerPath,
                 kind: "File",
                 insertText: headerPath,
-                detail: headerPath.startsWith("@") ? "DreamShader package header import" : "DreamShader header import"
+                detail: headerPath.startsWith("@")
+                    ? "DreamShader package import"
+                    : lowerPath.endsWith(".dsf")
+                        ? "DreamShader function file import"
+                        : "DreamShader header import"
             });
         }
         return dedupe(specs);

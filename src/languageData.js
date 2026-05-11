@@ -11,7 +11,7 @@ function normalizeSymbolKey(name) {
 const LANGUAGE_ID = "dreamshaderlang";
 const BRIDGE_DIAGNOSTIC_COLLECTION_NAME = "dreamshader";
 const LOCAL_DIAGNOSTIC_COLLECTION_NAME = "dreamshader-local";
-const DREAMSHADER_EXTENSIONS = new Set([".dsm", ".dsh"]);
+const DREAMSHADER_EXTENSIONS = new Set([".dsm", ".dsf", ".dsh"]);
 const INDENT = "    ";
 const PACKAGE_MANIFEST_NAME = "dreamshader.package.json";
 const PACKAGE_LOCK_NAME = "dreamshader.lock.json";

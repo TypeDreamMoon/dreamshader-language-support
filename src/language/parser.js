@@ -328,6 +328,8 @@ function parseSectionEntries(section) {
                     ...statement,
                     type: declaration.type,
                     name: declaration.name,
+                    optional: declaration.optional,
+                    constant: declaration.constant,
                     valueText: assignment.right,
                     valueOffset: statement.startOffset + statement.text.indexOf(assignment.right),
                     metadata: withoutMetadata.metadata
@@ -425,9 +427,17 @@ function parseCodeDeclarationEntries(text, baseOffset) {
 }
 
 function parseDeclaration(text) {
-    const trimmed = String(text || "").trim().replace(/^(opt|const)\s+/i, "");
+    let trimmed = String(text || "").trim();
+    let optional = false;
+    let constant = false;
+    while (/^(opt|const)\s+/i.test(trimmed)) {
+        const match = /^(opt|const)\s+/i.exec(trimmed);
+        optional = optional || match[1].toLowerCase() === "opt";
+        constant = constant || match[1].toLowerCase() === "const";
+        trimmed = trimmed.slice(match[0].length).trim();
+    }
     const match = /^(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(trimmed);
-    return match ? { type: match[1].trim(), name: match[2].trim() } : null;
+    return match ? { type: match[1].trim(), name: match[2].trim(), optional, constant } : null;
 }
 
 function parseFunctionParams(text, baseOffset) {

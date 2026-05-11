@@ -78,7 +78,7 @@ const services = {
     collectReachableCallableSignatures: () => new Map([
         ["importedtint", [{ kind: "Function", name: "ImportedTint", localName: "ImportedTint", inputs: [], outputs: [] }]]
     ]),
-    collectAvailableHeaderImports: () => ["Shared/Common.dsh", "@typedreammoon/dream-noise/Library/Noise.dsh"],
+    collectAvailableHeaderImports: () => ["Shared/Common.dsh", "Functions/F_PulseTint.dsf", "@typedreammoon/dream-noise/Library/Noise.dsh"],
     collectDreamShaderSettingMappings: (mappingName) => {
         const values = {
             MaterialDomain: ["Surface", "PostProcess"],
@@ -94,6 +94,10 @@ const services = {
 };
 
 assert(labelsAt("        fl").includes("float"), "Inputs section should offer type completions");
+const importItems = language.getCompletionSpecs("import \"", "import \"".length, services);
+const dsfImport = importItems.find((item) => item.label === "Functions/F_PulseTint.dsf");
+assert(dsfImport, "Import completion should include .dsf function files");
+assert.strictEqual(dsfImport.detail, "DreamShader function file import", ".dsf import completion should be labeled as a function file");
 assert(labelsAt("        My", services).includes("MyGraph"), "Graph should offer local GraphFunction completions");
 assert(labelsAt("        My", services).includes("ImportedTint"), "Graph should offer imported function completions");
 const graphSymbolLabels = labelsAt("        My", services);
@@ -155,6 +159,39 @@ assert(semanticTokens.some((token) => token.text === "mix" && token.type === "fu
 
 const diagnostics = language.getDiagnostics(source, "M_Test.dsm", services);
 assert(!diagnostics.some((diagnostic) => /Unclosed/.test(diagnostic.message)), "Valid braces should not report unclosed delimiters");
+
+const dsfSource = `ShaderFunction(Name="Functions/F_PulseTint")
+{
+    Inputs = {
+        vec3 Color;
+        vec3 Tint;
+        float Pulse;
+        opt float Strength = 1.0;
+    }
+
+    Outputs = {
+        vec3 OutColor;
+        float OutMask;
+    }
+
+    Graph = {
+        OutMask = saturate(Pulse * Strength);
+        OutColor = Color * Tint * OutMask;
+    }
+}`;
+const dsfDiagnostics = language.getDiagnostics(dsfSource, "F_PulseTint.dsf", { resolveImportPath: () => "ok" });
+assert(!dsfDiagnostics.some((diagnostic) => /should declare|may not declare/.test(diagnostic.message)), ".dsf files should accept ShaderFunction declarations");
+const badDsfDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_Bad")
+{
+    Outputs = {
+        float3 Color;
+        Base.BaseColor = Color;
+    }
+    Graph = {
+        Color = float3(1, 1, 1);
+    }
+}`, "Bad.dsf", {});
+assert(badDsfDiagnostics.some((diagnostic) => /may not declare Shader/.test(diagnostic.message)), ".dsf files should reject material Shader blocks");
 
 const importWithoutSemicolon = `import "@typedreammoon/dreamshader-texture/Library/Texture.dsh"
 
@@ -305,6 +342,49 @@ GraphFunction MyGraph(in float A, out float B) {
     B = A;
 }`, "M_Call.dsm", {});
 assert(callDiagnostics.some((diagnostic) => /expects 2 arguments/.test(diagnostic.message)), "GraphFunction statement calls should validate out arguments");
+
+const dsfIndexed = language.buildDocumentIndex({
+    fileName: "Materials/M_UsesFunction.dsm",
+    text: `import "Functions/F_PulseTint.dsf";
+Shader(Name="Materials/M_UsesFunction")
+{
+    Properties = {
+        VectorParameter BaseColor = float4(1, 1, 1, 1);
+        VectorParameter Tint = float4(0.2, 0.6, 1.0, 1.0);
+    }
+    Outputs = {
+        vec3 Color;
+        float Mask;
+        Base.EmissiveColor = Color;
+    }
+    Graph = {
+        F_PulseTint(BaseColor.rgb, Tint.rgb, 1.0, Color, Mask);
+    }
+}`,
+    resolveImportPath: (specifier) => specifier === "Functions/F_PulseTint.dsf" ? "Functions/F_PulseTint.dsf" : "",
+    readFileText: () => dsfSource
+});
+assert(dsfIndexed.callables.has("f_pulsetint"), "Document index should collect ShaderFunction callables from imported .dsf files");
+const dsfCallDiagnostics = language.getDiagnostics(`import "Functions/F_PulseTint.dsf";
+Shader(Name="Materials/M_UsesFunction")
+{
+    Properties = {
+        VectorParameter BaseColor = float4(1, 1, 1, 1);
+        VectorParameter Tint = float4(0.2, 0.6, 1.0, 1.0);
+    }
+    Outputs = {
+        vec3 Color;
+        float Mask;
+        Base.EmissiveColor = Color;
+    }
+    Graph = {
+        F_PulseTint(BaseColor.rgb, Tint.rgb, 1.0, Color, Mask);
+    }
+}`, "M_UsesFunction.dsm", {
+    resolveImportPath: () => "Functions/F_PulseTint.dsf",
+    collectReachableCallableSignatures: () => dsfIndexed.callables
+});
+assert(!dsfCallDiagnostics.some((diagnostic) => /expects|out argument|not declared/.test(diagnostic.message)), "Standalone ShaderFunction calls should allow inputs followed by multiple output variables and optional tail inputs");
 
 const substrateSource = `Shader(Name="Materials/M_Substrate")
 {

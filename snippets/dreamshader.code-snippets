@@ -83,7 +83,15 @@
     "body": [
       "import \"${1:Shared/Common.dsh}\";"
     ],
-    "description": "Import a DreamShader header file"
+    "description": "Import a DreamShader .dsh header or .dsf function file"
+  },
+  "DreamShader Import Function File": {
+    "scope": "dreamshaderlang",
+    "prefix": "importdsf",
+    "body": [
+      "import \"${1:Functions/F_Tint.dsf}\";"
+    ],
+    "description": "Import a DreamShader function file"
   },
   "DreamShader Import Package": {
     "scope": "dreamshaderlang",
@@ -91,7 +99,7 @@
     "body": [
       "import \"@${1:scope}/${2:package}/Library/${3:Header}.dsh\";"
     ],
-    "description": "Import a DreamShader package header file"
+    "description": "Import a DreamShader package file"
   },
   "DreamShader ShaderFunctionTemplate": {
     "scope": "dreamshaderlang",

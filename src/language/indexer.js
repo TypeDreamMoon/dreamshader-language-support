@@ -202,7 +202,8 @@ function collectHeaderFiles(rootDirectory, currentDirectory, outHeaders, options
             collectHeaderFiles(rootDirectory, absolutePath, outHeaders, options);
             continue;
         }
-        if (path.extname(entry.name).toLowerCase() !== ".dsh") {
+        const extension = path.extname(entry.name).toLowerCase();
+        if (extension !== ".dsh" && extension !== ".dsf") {
             continue;
         }
         outHeaders.add(normalizeFsPath(path.relative(rootDirectory, absolutePath)));

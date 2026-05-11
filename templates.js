@@ -40,8 +40,13 @@ const DREAMSHADER_TEMPLATE_COMPLETIONS = [
     },
     {
         label: "ImportTemplate",
-        detail: "Create a DreamShader import statement",
+        detail: "Create a DreamShader .dsh/.dsf import statement",
         snippet: "import \"${1:Shared/Common.dsh}\";"
+    },
+    {
+        label: "ImportFunctionFileTemplate",
+        detail: "Import a DreamShader function file",
+        snippet: "import \"${1:Functions/F_Tint.dsf}\";"
     },
     {
         label: "ShaderFunctionTemplate",

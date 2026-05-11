@@ -39,6 +39,14 @@ function addFileShapeDiagnostics(diagnostics, ast, text, extension) {
         diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader implementation (.dsm) should declare a top-level Shader, ShaderFunction, ShaderLayer, ShaderLayerBlend, GraphFunction, or VirtualFunction block.", SEVERITY.Warning));
     }
 
+    if (extension === ".dsf" && !["ShaderFunction", "Function", "GraphFunction", "Namespace", "VirtualFunction"].some((kind) => topLevelKinds.has(kind))) {
+        diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader function file (.dsf) should declare ShaderFunction assets or reusable Function, GraphFunction, Namespace, or VirtualFunction blocks.", SEVERITY.Warning));
+    }
+
+    if (extension === ".dsf" && ["Shader", "ShaderLayer", "ShaderLayerBlend"].some((kind) => topLevelKinds.has(kind))) {
+        diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader function file (.dsf) may not declare Shader, ShaderLayer, or ShaderLayerBlend blocks.", SEVERITY.Error));
+    }
+
     if (extension === ".dsh" && ["Shader", "ShaderFunction", "ShaderLayer", "ShaderLayerBlend"].some((kind) => topLevelKinds.has(kind))) {
         diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader header (.dsh) may only contain import statements, Function blocks, GraphFunction blocks, Namespace blocks, and VirtualFunction declarations.", SEVERITY.Error));
     }
@@ -496,18 +504,24 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
 
     const inputs = signature.inputs || [];
     const outputs = signature.outputs || [];
+    const optionalTailCount = countOptionalTailInputs(inputs);
+    const minInputs = inputs.length - optionalTailCount;
     const expected = standalone ? inputs.length + outputs.length : inputs.length;
+    const minExpected = standalone ? minInputs + outputs.length : minInputs;
     const received = callExpression.arguments.length;
-    if (received !== expected) {
+    if (received < minExpected || received > expected) {
         diagnostics.push(makeDiagnostic(
             callExpression.calleeOffset,
             callExpression.endOffset,
-            `${signature.kind || "DreamShader callable"} '${signature.name || callExpression.callee}' expects ${expected} argument${expected === 1 ? "" : "s"} but got ${received}.`,
+            expected === minExpected
+                ? `${signature.kind || "DreamShader callable"} '${signature.name || callExpression.callee}' expects ${expected} argument${expected === 1 ? "" : "s"} but got ${received}.`
+                : `${signature.kind || "DreamShader callable"} '${signature.name || callExpression.callee}' expects ${minExpected}-${expected} arguments but got ${received}.`,
             SEVERITY.Warning));
         return;
     }
 
-    for (let index = 0; index < inputs.length; index += 1) {
+    const inputArgumentCount = standalone ? received - outputs.length : received;
+    for (let index = 0; index < inputArgumentCount; index += 1) {
         const arg = callExpression.arguments[index];
         if (arg && !isDefaultArgumentText(arg.valueText)) {
             addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables);
@@ -519,7 +533,7 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     }
 
     for (let index = 0; index < outputs.length; index += 1) {
-        const arg = callExpression.arguments[inputs.length + index];
+        const arg = callExpression.arguments[inputArgumentCount + index];
         const expectedOutput = outputs[index];
         if (!arg || arg.isNamed || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(arg.valueText)) {
             diagnostics.push(makeDiagnostic(
@@ -541,6 +555,17 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
             typeInfo: resolveTypeInfo(expectedOutput.type)
         });
     }
+}
+
+function countOptionalTailInputs(inputs) {
+    let count = 0;
+    for (let index = inputs.length - 1; index >= 0; index -= 1) {
+        if (!inputs[index]?.optional) {
+            break;
+        }
+        count += 1;
+    }
+    return count;
 }
 
 function addCycleDiagnostics(diagnostics, services, fileName) {

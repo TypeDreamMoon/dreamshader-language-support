@@ -349,7 +349,7 @@ const HOVER_DOCS = new Map([
     ["selfcontained", "Function modifier that embeds the Function and its DreamShader dependency closure directly into generated Custom nodes. Use `Function SelfContained Name(...) { ... }`."],
     ["inline", "Alias of `SelfContained` in DreamShader Function declarations."],
     ["namespace", "Groups shared Function blocks. Define with `Namespace(Name=\"Texture\") { ... }` and call with `Texture::Sample(...)`."],
-    ["import", "Imports a DreamShader header. Use `import \"Common/MyHeader.dsh\";` or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
+    ["import", "Imports a DreamShader header or function file. Use `import \"Common/MyHeader.dsh\";`, `import \"Functions/F_Tint.dsf\";`, or a package import such as `import \"@typedreammoon/dream-noise/Library/Noise.dsh\";`."],
     ["package", "DreamShader package installed under `DShader/Packages` from a GitHub repository with `dreamshader.package.json`."],
     ["shaderfunction", "Top-level DreamShader MaterialFunction asset declaration."],
     ["virtualfunction", "Declares an existing Unreal MaterialFunction asset so Graph code can call it without generating or overwriting the asset."],
@@ -566,6 +566,9 @@ function activate(context) {
         }),
         vscode.commands.registerCommand("dreamshader.createMaterial", async () => {
             await createDreamShaderTemplateCommand("material");
+        }),
+        vscode.commands.registerCommand("dreamshader.createFunctionFile", async () => {
+            await createDreamShaderTemplateCommand("functionFile");
         }),
         vscode.commands.registerCommand("dreamshader.createHeader", async () => {
             await createDreamShaderTemplateCommand("header");
@@ -1193,7 +1196,7 @@ function createReferenceProvider() {
                     }
                 }
 
-                uris = await vscode.workspace.findFiles("**/*.{dsm,dsh}", "**/{node_modules,.git}/**", 2000);
+                uris = await vscode.workspace.findFiles("**/*.{dsm,dsf,dsh}", "**/{node_modules,.git}/**", 2000);
                 if (!uris.some((uri) => normalizeFsPath(uri.fsPath) === normalizeFsPath(document.uri.fsPath))) {
                     uris.push(document.uri);
                 }
@@ -3126,7 +3129,8 @@ function collectHeaderFiles(rootDirectory, currentDirectory, outHeaders, options
             continue;
         }
 
-        if (path.extname(entry.name).toLowerCase() !== ".dsh") {
+        const extension = path.extname(entry.name).toLowerCase();
+        if (extension !== ".dsh" && extension !== ".dsf") {
             continue;
         }
 
@@ -3606,7 +3610,7 @@ function analyzeGraphStatements(document, bodyText, baseOffset, symbols, reachab
                 document,
                 statement.startOffset,
                 statement.endOffset,
-                `Graph statement '${statement.text}' must use assignment syntax, if/else syntax, or a standalone Function call.`));
+            `Graph statement '${statement.text}' must use assignment syntax, if/else syntax, or a standalone Function/ShaderFunction call.`));
             continue;
         }
 
@@ -3619,34 +3623,40 @@ function analyzeGraphStatements(document, bodyText, baseOffset, symbols, reachab
 function analyzeStandaloneFunctionCall(document, callExpression, symbols, reachableCallables) {
     const diagnostics = [];
     const signatures = reachableCallables.get(normalizeSymbolKey(callExpression.callee)) || [];
-    const signature = signatures.find((entry) => entry.kind === "Function" || entry.kind === "GraphFunction");
+    const signature = signatures.find((entry) => entry.kind === "Function" || entry.kind === "GraphFunction" || entry.kind === "ShaderFunction" || entry.kind === "VirtualFunction");
 
     if (!signature) {
         diagnostics.push(makeOffsetDiagnostic(
             document,
             callExpression.calleeOffset,
             callExpression.calleeOffset + callExpression.callee.length,
-            `Standalone Graph call '${callExpression.callee}(...)' is unsupported. Only DreamShader Function or GraphFunction calls may use statement syntax.`));
+            `Standalone Graph call '${callExpression.callee}(...)' is unsupported. Only DreamShader Function, GraphFunction, ShaderFunction, or VirtualFunction calls may use statement syntax.`));
         return diagnostics;
     }
 
+    const optionalTailCount = countOptionalTailInputs(signature.inputs || []);
+    const minInputCount = signature.inputs.length - optionalTailCount;
     const expectedArgumentCount = signature.inputs.length + signature.outputs.length;
-    if (callExpression.arguments.length !== expectedArgumentCount) {
+    const minArgumentCount = minInputCount + signature.outputs.length;
+    if (callExpression.arguments.length < minArgumentCount || callExpression.arguments.length > expectedArgumentCount) {
         diagnostics.push(makeOffsetDiagnostic(
             document,
             callExpression.calleeOffset,
             callExpression.endOffset,
-            `DreamShader ${signature.kind} '${signature.name}' expects ${expectedArgumentCount} arguments (${signature.inputs.length} inputs, ${signature.outputs.length} out targets) but got ${callExpression.arguments.length}.`));
+            expectedArgumentCount === minArgumentCount
+                ? `DreamShader ${signature.kind} '${signature.name}' expects ${expectedArgumentCount} arguments (${signature.inputs.length} inputs, ${signature.outputs.length} out targets) but got ${callExpression.arguments.length}.`
+                : `DreamShader ${signature.kind} '${signature.name}' expects ${minArgumentCount}-${expectedArgumentCount} arguments (${minInputCount}-${signature.inputs.length} inputs, ${signature.outputs.length} out targets) but got ${callExpression.arguments.length}.`));
         return diagnostics;
     }
 
-    for (let index = 0; index < signature.inputs.length; index += 1) {
+    const inputArgumentCount = callExpression.arguments.length - signature.outputs.length;
+    for (let index = 0; index < inputArgumentCount; index += 1) {
         const argument = callExpression.arguments[index];
         diagnostics.push(...analyzeExpressionText(document, argument.valueText, argument.valueOffset, symbols, reachableCallables, "value"));
     }
 
     for (let index = 0; index < signature.outputs.length; index += 1) {
-        const argument = callExpression.arguments[signature.inputs.length + index];
+        const argument = callExpression.arguments[inputArgumentCount + index];
         const expectedOutput = signature.outputs[index];
         if (argument.isNamed) {
             diagnostics.push(makeOffsetDiagnostic(
@@ -3684,6 +3694,17 @@ function analyzeStandaloneFunctionCall(document, callExpression, symbols, reacha
     }
 
     return diagnostics;
+}
+
+function countOptionalTailInputs(inputs) {
+    let count = 0;
+    for (let index = inputs.length - 1; index >= 0; index -= 1) {
+        if (!inputs[index] || !inputs[index].optional) {
+            break;
+        }
+        count += 1;
+    }
+    return count;
 }
 
 function analyzeExpressionText(document, text, baseOffset, symbols, reachableCallables, mode) {
@@ -4383,6 +4404,12 @@ function getDreamShaderTemplateSpec(kind) {
             placeHolder: "Materials/M_NewMaterial.dsm",
             extension: ".dsm"
         },
+        functionFile: {
+            title: "Create DreamShader Function File",
+            prompt: "Relative .dsf path under DShader.",
+            placeHolder: "Functions/F_NewFunction.dsf",
+            extension: ".dsf"
+        },
         header: {
             title: "Create DreamShader Header",
             prompt: "Relative .dsh path under DShader.",
@@ -4432,7 +4459,7 @@ function getTemplateSymbolName(relativePath, fallback) {
 }
 
 function getTemplateShaderAssetPath(relativePath) {
-    const withoutExtension = normalizeFsPath(relativePath).replace(/\.(dsm|dsh)$/i, "");
+    const withoutExtension = normalizeFsPath(relativePath).replace(/\.(dsm|dsf|dsh)$/i, "");
     return withoutExtension.includes("/")
         ? withoutExtension
         : `Materials/${withoutExtension}`;
@@ -4454,6 +4481,25 @@ function buildDreamShaderTemplate(kind, relativePath) {
 
     Function Remap01(in float value, in float inMin, in float inMax, out float result) {
         result = saturate((value - inMin) / max(inMax - inMin, 0.0001));
+    }
+}
+`;
+    }
+
+    if (kind === "functionFile") {
+        return `ShaderFunction(Name="Functions/${symbolName}")
+{
+    Inputs = {
+        vec3 Color;
+        float Strength;
+    }
+
+    Outputs = {
+        vec3 Result;
+    }
+
+    Graph = {
+        Result = Color * Strength;
     }
 }
 `;
@@ -6121,7 +6167,7 @@ async function requestRecompile(scope, targetUri) {
 
     if (scope === "file") {
         if (!document || !isDreamShaderDocument(document)) {
-            vscode.window.showWarningMessage("DreamShader recompile needs an active .dsm or .dsh document.");
+            vscode.window.showWarningMessage("DreamShader recompile needs an active .dsm, .dsf, or .dsh document.");
             return;
         }
 
@@ -6923,7 +6969,7 @@ function resolvePackageImportCandidate(currentFilePath, normalizedImport) {
 
 function normalizeImportSpecifier(importSpecifier) {
     let normalized = importSpecifier.trim().replace(/\\/g, "/");
-    if (!normalized.toLowerCase().endsWith(".dsh")) {
+    if (!path.extname(normalized)) {
         normalized += ".dsh";
     }
     return normalized;

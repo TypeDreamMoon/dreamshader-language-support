@@ -82,7 +82,7 @@ function addCallable(result, callable) {
 function declarationsToParams(section) {
     return (section?.entries || [])
         .filter((entry) => entry.kind === "declaration")
-        .map((entry) => ({ qualifier: "in", type: entry.type, name: entry.name }));
+        .map((entry) => ({ qualifier: "in", type: entry.type, name: entry.name, optional: Boolean(entry.optional) }));
 }
 
 function addSectionSymbols(symbols, section, cutoffOffset, detail) {
