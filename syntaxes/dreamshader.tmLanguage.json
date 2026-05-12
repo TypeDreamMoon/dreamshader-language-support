@@ -279,7 +279,7 @@
     },
     "declarationMetadataKeys": {
       "patterns": [
-        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Group|SortPriority|Description|DisplayName|SamplerType|SamplerSource|MipValueMode|AutomaticViewMipBias|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
+        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Group|Category|SortPriority|Sort|Description|Desc|Tooltip|DisplayName|ParameterName|DefaultValue|Curve|Atlas|CurveTime|UseCustomPrimitiveData|PrimitiveDataIndex|SamplerType|SamplerSource|MipValueMode|GatherMode|AutomaticViewMipBias|AutomaticViewMipBiasValue|Coordinates|MipValue|CoordinatesDX|CoordinatesDY|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
       ]
     },
     "pathHelpers": {
@@ -289,7 +289,7 @@
     },
     "settings": {
       "patterns": [
-        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|RefractionCoverageMode|SubstrateRoughnessTracking|Description|Group|SortPriority|ExposeToLibrary|UserExposedCaption|LibraryCategories|Asset)\\b(?=\\s*=)" }
+        { "name": "support.type.property-name.dreamshader", "match": "\\b(?:MaterialDomain|Domain|ShadingModel|BlendMode|RenderType|TwoSided|Wireframe|DitheredLODTransition|DitherOpacityMask|AllowNegativeEmissiveColor|CastDynamicShadowAsMasked|ResponsiveAA|ScreenSpaceReflections|ContactShadows|DisableDepthTest|OutputTranslucentVelocity|TangentSpaceNormal|FullyRough|IsSky|ThinSurface|HasPixelAnimation|OpacityMaskClipValue|NumCustomizedUVs|RefractionCoverageMode|SubstrateRoughnessTracking|Description|Desc|Group|Category|SortPriority|Sort|ExposeToLibrary|UserExposedCaption|LibraryCategories|Asset|OutputType|ResultType|Output|OutputName|OutputIndex|Class|ParameterName|DefaultValue|True|False|Default|DynamicBranch|Curve|Atlas|CurveTime|UseCustomPrimitiveData|PrimitiveDataIndex|SamplerType|SamplerSource|MipValueMode|GatherMode|AutomaticViewMipBias|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
       ]
     },
     "materialOutputs": {

@@ -8,7 +8,7 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.4.1` adds `.dsf` Dream Shader Function file support on top of the rebuilt language service core. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
+Version `1.4.2` syncs the extension with the current DreamShader plugin reflection metadata. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
 
 ## Highlights
 
@@ -22,7 +22,7 @@ Version `1.4.1` adds `.dsf` Dream Shader Function file support on top of the reb
 - `Base.` output completion that inserts only the selected material output member.
 - `MaterialAttributes` member completion such as `BaseColor`, `Roughness`, `Metallic`, `Normal`, and `Opacity`.
 - Settings value completion for `Domain`, `MaterialDomain`, `ShadingModel`, `BlendMode`, and `RenderType`.
-- Metadata completion for declaration reflection blocks such as `Group`, `SortPriority`, `Description`, `SamplerType`, and texture sampling options.
+- Metadata completion for declaration reflection blocks such as `Group`, `SortPriority`, `Description`, `SamplerType`, `GatherMode`, and texture sampling options.
 - Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files.
 - `.dsf` file-shape diagnostics for reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations.
 - Go to Definition, Find References, Hover, Signature Help, Inlay Hints, document formatting, folding, and document symbols.
@@ -200,7 +200,7 @@ npm run package
 The packaged VSIX is generated as:
 
 ```text
-dreamshaderlang-language-support-1.4.1.vsix
+dreamshaderlang-language-support-1.4.2.vsix
 ```
 
 ## License

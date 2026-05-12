@@ -228,6 +228,48 @@
       "}"
     ],
     "description": "Create a Graph block"
+  },
+  "DreamShader UE TextureSample": {
+    "scope": "dreamshaderlang",
+    "prefix": "uetexturesample",
+    "body": [
+      "UE.Expression(",
+      "\tClass=\"${1:TextureSample}\",",
+      "\tOutputType=\"${2:float4}\",",
+      "\tCoordinates=${3:UV},",
+      "\tTexture=Path(${4:Game}, \"${5:Textures/T_Texture}\"),",
+      "\tSamplerType=\"${6:SAMPLERTYPE_Color}\")"
+    ],
+    "description": "Create a reflected TextureSample expression"
+  },
+  "DreamShader UE StaticComponentMaskParameter": {
+    "scope": "dreamshaderlang",
+    "prefix": "uestaticmask",
+    "body": [
+      "UE.StaticComponentMaskParameter(",
+      "\tOutputType=\"${1:float3}\",",
+      "\tInput=${2:Value},",
+      "\tParameterName=\"${3:Mask}\",",
+      "\tDefaultR=${4:true},",
+      "\tDefaultG=${5:true},",
+      "\tDefaultB=${6:true},",
+      "\tDefaultA=${7:false})"
+    ],
+    "description": "Create a reflected StaticComponentMaskParameter expression"
+  },
+  "DreamShader UE CurveAtlasRowParameter": {
+    "scope": "dreamshaderlang",
+    "prefix": "uecurveatlas",
+    "body": [
+      "UE.CurveAtlasRowParameter(",
+      "\tOutputType=\"${1:float3}\",",
+      "\tParameterName=\"${2:CurveColor}\",",
+      "\tDefaultValue=${3:0.0},",
+      "\tCurve=Path(${4:Game}, \"${5:Curves/C_Color}\"),",
+      "\tAtlas=Path(${6:Game}, \"${7:Curves/CA_Atlas}\"),",
+      "\tCurveTime=${8:0.0})"
+    ],
+    "description": "Create a reflected CurveAtlasRowParameter expression"
   }
 }
 

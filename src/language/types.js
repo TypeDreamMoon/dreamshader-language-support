@@ -76,6 +76,30 @@ const PARAMETER_TYPES = new Set([
     "channelmaskparameter", "staticcomponentmaskparameter", "texturecollectionparameter", "curveatlasrowparameter",
     "dynamicparameter", "fontsampleparameter", "spritetexturesampler"
 ]);
+const PARAMETER_TYPE_INFOS = new Map([
+    ["scalarparameter", { type: "scalarparameter", componentCount: 1, isParameter: true }],
+    ["staticboolparameter", { type: "staticboolparameter", componentCount: 1, isParameter: true }],
+    ["staticswitchparameter", { type: "staticswitchparameter", componentCount: 1, isParameter: true, isStaticSwitch: true }],
+    ["vectorparameter", { type: "vectorparameter", componentCount: 4, isParameter: true }],
+    ["doublevectorparameter", { type: "doublevectorparameter", componentCount: 4, isParameter: true }],
+    ["channelmaskparameter", { type: "channelmaskparameter", componentCount: 1, isParameter: true }],
+    ["staticcomponentmaskparameter", { type: "staticcomponentmaskparameter", componentCount: 4, isParameter: true }],
+    ["dynamicparameter", { type: "dynamicparameter", componentCount: 4, isParameter: true }],
+    ["fontsampleparameter", { type: "fontsampleparameter", componentCount: 4, isParameter: true }],
+    ["curveatlasrowparameter", { type: "curveatlasrowparameter", componentCount: 3, isParameter: true }],
+    ["spritetexturesampler", { type: "spritetexturesampler", componentCount: 4, isParameter: true }],
+    ["textureobjectparameter", { type: "textureobjectparameter", isParameter: true, isTexture: true }],
+    ["texturecollectionparameter", { type: "texturecollectionparameter", isParameter: true, isTexture: true }],
+    ["sparsevolumetextureobjectparameter", { type: "sparsevolumetextureobjectparameter", isParameter: true, isTexture: true }],
+    ["texturesampleparameter2d", { type: "texturesampleparameter2d", componentCount: 4, isParameter: true }],
+    ["texturesampleparameter2darray", { type: "texturesampleparameter2darray", componentCount: 4, isParameter: true }],
+    ["texturesampleparametercube", { type: "texturesampleparametercube", componentCount: 4, isParameter: true }],
+    ["texturesampleparametercubearray", { type: "texturesampleparametercubearray", componentCount: 4, isParameter: true }],
+    ["texturesampleparametervolume", { type: "texturesampleparametervolume", componentCount: 4, isParameter: true }],
+    ["texturesampleparametersubuv", { type: "texturesampleparametersubuv", componentCount: 4, isParameter: true }],
+    ["runtimevirtualtexturesampleparameter", { type: "runtimevirtualtexturesampleparameter", componentCount: 4, isParameter: true }],
+    ["sparsevolumetexturesampleparameter", { type: "sparsevolumetexturesampleparameter", componentCount: 4, isParameter: true }]
+]);
 
 function resolveTypeInfo(typeText) {
     const key = normalizeSymbolKey(typeText).replace(/\s+/g, "");
@@ -95,7 +119,7 @@ function resolveTypeInfo(typeText) {
         return { type: key, isTexture: true };
     }
     if (PARAMETER_TYPES.has(key)) {
-        return { type: key, isParameter: true, isStaticSwitch: key === "staticswitchparameter" };
+        return PARAMETER_TYPE_INFOS.get(key) || { type: key, isParameter: true, isStaticSwitch: key === "staticswitchparameter" };
     }
     if (key === "materialattributes") {
         return { type: key, isMaterialAttributes: true };

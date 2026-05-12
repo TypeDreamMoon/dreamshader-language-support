@@ -8,7 +8,7 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.4.1` 版本在重写后的语言服务核心上增加了 `.dsf` Dream Shader Function 文件支持。补全、诊断、文档符号、折叠和语义高亮现在走 scanner / parser / context 管线，不再依赖旧的正则堆叠逻辑，区块和作用域判断会更稳定。
+`1.4.2` 版本同步了当前 DreamShader 插件的反射节点 metadata。补全、诊断、文档符号、折叠和语义高亮现在走 scanner / parser / context 管线，不再依赖旧的正则堆叠逻辑，区块和作用域判断会更稳定。
 
 ## 主要能力
 
@@ -21,7 +21,7 @@ DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言�
 - `Base.` 输出补全只插入成员名，避免 `Base.Base.xxx`。
 - `MaterialAttributes` 成员补全，例如 `BaseColor`、`Roughness`、`Metallic`、`Normal`、`Opacity`。
 - `Domain`、`MaterialDomain`、`ShadingModel`、`BlendMode`、`RenderType` 的 Settings 值补全。
-- 声明 metadata 补全，例如 `Group`、`SortPriority`、`Description`、`SamplerType` 和纹理采样相关属性。
+- 声明 metadata 补全，例如 `Group`、`SortPriority`、`Description`、`SamplerType`、`GatherMode` 和纹理采样相关属性。
 - `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转。
 - `.dsf` 文件形状诊断，支持 `ShaderFunction`、`Function`、`GraphFunction`、`Namespace` 和 `VirtualFunction`。
 - Go to Definition、Find References、Hover、Signature Help、Inlay Hints、文档格式化、折叠和文档符号。
@@ -199,7 +199,7 @@ npm run package
 生成的 VSIX 文件：
 
 ```text
-dreamshaderlang-language-support-1.4.1.vsix
+dreamshaderlang-language-support-1.4.2.vsix
 ```
 
 ## License

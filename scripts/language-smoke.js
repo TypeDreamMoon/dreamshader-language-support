@@ -2,6 +2,7 @@
 
 const assert = require("assert");
 const language = require("../src/language");
+const { resolveTypeInfo } = require("../src/language/types");
 
 const source = `import "Shared/Common.dsh";
 
@@ -104,6 +105,9 @@ const graphSymbolLabels = labelsAt("        My", services);
 assert(graphSymbolLabels.includes("BaseColor"), "Graph should offer Properties symbols");
 assert(graphSymbolLabels.includes("Roughness"), "Graph should offer scalar Properties symbols");
 assert(graphSymbolLabels.includes("Result"), "Graph should offer Outputs symbols");
+assert(graphSymbolLabels.includes("uecurveatlas"), "Graph should offer CurveAtlasRowParameter helper snippets");
+assert(graphSymbolLabels.includes("uestaticmask"), "Graph should offer StaticComponentMaskParameter helper snippets");
+assert(graphSymbolLabels.includes("uetexturesample"), "Graph should offer reflected TextureSample helper snippets");
 assert(labelsAt("    sa").includes("saturate"), "Function body should offer native HLSL intrinsic completions");
 assert(!labelsAt("            Group=\"Surface").includes("DefaultLit"), "Metadata value completion should not leak settings values");
 assert(labelsAt("            Group").includes("SortPriority"), "Metadata block should offer metadata keys");
@@ -117,6 +121,50 @@ const baseColor = findCompletion("        Base.Ba", "BaseColor");
 assert.strictEqual(baseColor.insertText, "BaseColor = $0;", "Base. member insert should not duplicate Base.");
 const baseMemberStart = source.indexOf("Base.Ba") + "Base.".length;
 assert.deepStrictEqual(baseColor.range, [baseMemberStart, baseMemberStart + 2], "Base. member should replace only the typed member");
+assert.strictEqual(resolveTypeInfo("CurveAtlasRowParameter").componentCount, 3, "CurveAtlasRowParameter should resolve as float3-compatible");
+
+const textureMetadataSource = `Shader(Name="Materials/M_TextureMetadata")
+{
+    Properties = {
+        TextureSampleParameter2D Albedo = Path(Game, "Textures/T_White") [
+            SamplerType=SAMPLERTYPE_;
+            GatherMode=TGM_;
+        ];
+    }
+    Outputs = {
+        float4 Color;
+    }
+    Graph = {
+        Color = float4(1, 1, 1, 1);
+    }
+}`;
+const samplerMetadataLabels = language.getCompletionSpecs(textureMetadataSource, textureMetadataSource.indexOf("SAMPLERTYPE_") + "SAMPLERTYPE_".length, {}).map((item) => item.label);
+assert(samplerMetadataLabels.includes("SAMPLERTYPE_Color"), "SamplerType metadata should offer UE enum spellings");
+const gatherMetadataLabels = language.getCompletionSpecs(textureMetadataSource, textureMetadataSource.indexOf("TGM_") + "TGM_".length, {}).map((item) => item.label);
+assert(gatherMetadataLabels.includes("TGM_None"), "GatherMode metadata should offer UE enum spellings");
+
+const reflectedExpressionDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_ReflectedExpression")
+{
+    Outputs = {
+        float4 Result;
+        Base.EmissiveColor = Result.rgb;
+    }
+    Graph = {
+        float2 UV = UE.TexCoord(Index=0);
+        Result = UE.Expression(
+            Class=TextureSample,
+            OutputType=float4,
+            Coordinates=UV,
+            Texture=Path(Engine, "EditorMaterials/Anchor"),
+            SamplerType=SAMPLERTYPE_Color,
+            SamplerSource=SSM_FromTextureAsset,
+            MipValueMode=TMVM_None,
+            GatherMode=TGM_None,
+            AutomaticViewMipBias=true
+        );
+    }
+}`, "M_ReflectedExpression.dsm", {});
+assert(!reflectedExpressionDiagnostics.some((diagnostic) => /Identifier '(TextureSample|SAMPLERTYPE_Color|SSM_FromTextureAsset|TMVM_None|TGM_None|Engine)'/.test(diagnostic.message)), "Reflected UE.Expression metadata should not warn on known bare metadata values");
 
 const functionLabels = labelsAt("    sa");
 assert(!functionLabels.includes("UE"), "Function body should not offer UE graph namespace");

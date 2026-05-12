@@ -265,6 +265,7 @@ function createUEBuiltinItemFromManifestExpression(expression) {
     const parameters = [
         { qualifier: "in", type: "value", name: "OutputType" },
         { qualifier: "in", type: "value", name: "Output" },
+        { qualifier: "in", type: "value", name: "OutputName" },
         { qualifier: "in", type: "value", name: "OutputIndex" },
         ...(expression.properties || []).map((property) => ({
             qualifier: "in",
@@ -368,6 +369,14 @@ const HOVER_DOCS = new Map([
     ["output", "Selects a named output from a multi-output expression, ShaderFunction call, or VirtualFunction call."],
     ["outputname", "Alias of `Output`."],
     ["outputindex", "Selects an output by zero-based output index."],
+    ["parametername", "Sets a reflected parameter node name. Used by `UE.Expression(...)`, `UE.StaticSwitchParameter(...)`, `StaticComponentMaskParameter`, and `CurveAtlasRowParameter`."],
+    ["defaultvalue", "Sets a reflected MaterialExpression default value. Static switches accept `true` / `false`; Curve Atlas Row parameters accept a scalar row value."],
+    ["samplertype", "Texture sample metadata such as `SAMPLERTYPE_Color`, `SAMPLERTYPE_LinearColor`, `SAMPLERTYPE_Normal`, or short aliases such as `Color` and `Normal`."],
+    ["samplersource", "Texture sample source metadata such as `SSM_FromTextureAsset`, `SSM_Wrap_WorldGroupSettings`, or short aliases such as `SharedWrap`."],
+    ["mipvaluemode", "Texture mip mode metadata such as `TMVM_None`, `TMVM_MipLevel`, `TMVM_MipBias`, or `TMVM_Derivative`."],
+    ["gathermode", "Texture gather mode metadata such as `TGM_None`, `TGM_Red`, `TGM_Green`, `TGM_Blue`, or `TGM_Alpha`."],
+    ["curveatlasrowparameter", "Creates a Curve Atlas Row parameter. DreamShader treats its primary output as a `float3` color."],
+    ["staticcomponentmaskparameter", "Creates a reflected StaticComponentMaskParameter. Use `DefaultR/G/B/A` to define the output channels."],
     ["materialattributes", "Unreal Material Attributes aggregate. In Graph, declare `MaterialAttributes Attrs;` and assign members such as `Attrs.BaseColor = Color;`."],
     ["opt", "Marks a ShaderFunction or VirtualFunction input as optional. Calls may pass `default` or omit trailing optional inputs."],
     ["const", "Marks a Properties declaration as a const helper node instead of an externally adjustable parameter."],
@@ -440,7 +449,7 @@ const PARAMETER_TYPE_INFOS = new Map([
     ["staticcomponentmaskparameter", { type: "staticcomponentmaskparameter", componentCount: 4, isTexture: false }],
     ["dynamicparameter", { type: "dynamicparameter", componentCount: 4, isTexture: false }],
     ["fontsampleparameter", { type: "fontsampleparameter", componentCount: 4, isTexture: false }],
-    ["curveatlasrowparameter", { type: "curveatlasrowparameter", componentCount: 4, isTexture: false }],
+    ["curveatlasrowparameter", { type: "curveatlasrowparameter", componentCount: 3, isTexture: false }],
     ["spritetexturesampler", { type: "spritetexturesampler", componentCount: 4, isTexture: false }],
     ["textureobjectparameter", { type: "textureobjectparameter", componentCount: 0, isTexture: true }],
     ["texturecollectionparameter", { type: "texturecollectionparameter", componentCount: 0, isTexture: true }],
@@ -785,7 +794,7 @@ function createInlayHintsProvider() {
                     continue;
                 }
 
-                const signature = getInlayHintSignatureForCall(callExpression, reachableCallables);
+                const signature = getInlayHintSignatureForCall(document, callExpression, reachableCallables);
                 if (!signature) {
                     continue;
                 }
@@ -879,14 +888,14 @@ function createDocumentLinkProvider() {
     };
 }
 
-function getInlayHintSignatureForCall(callExpression, reachableCallables) {
+function getInlayHintSignatureForCall(document, callExpression, reachableCallables) {
     const normalized = normalizeSymbolKey(callExpression.callee);
     const signatures = reachableCallables.get(normalized) || [];
     if (signatures.length > 0) {
         return signatures[0];
     }
 
-    const ueBuiltin = getUEBuiltinItemsForDocument().find((item) => normalizeSymbolKey(item.qualifiedName) === normalized || normalizeSymbolKey(item.name) === normalized);
+    const ueBuiltin = getUEBuiltinItemsForDocument(document).find((item) => normalizeSymbolKey(item.qualifiedName) === normalized || normalizeSymbolKey(item.name) === normalized);
     if (ueBuiltin) {
         return {
             kind: "UE",
@@ -3834,6 +3843,49 @@ function isDefaultArgumentText(text) {
     return String(text || "").trim().toLowerCase() === "default";
 }
 
+function shouldValidateNamedArgumentValue(callee, name, valueText) {
+    const calleeKey = normalizeSymbolKey(callee);
+    const nameKey = normalizeSymbolKey(name);
+    if (calleeKey === "path") {
+        return false;
+    }
+    if (calleeKey.startsWith("ue.") && [
+        "class",
+        "outputtype",
+        "resulttype",
+        "output",
+        "outputname",
+        "source",
+        "destination",
+        "parameter",
+        "parametername",
+        "samplertype",
+        "samplersource",
+        "mipvaluemode",
+        "gathermode",
+        "description",
+        "desc",
+        "group",
+        "category"
+    ].includes(nameKey)) {
+        return false;
+    }
+    return !isBareLiteralToken(valueText);
+}
+
+function isBareLiteralToken(text) {
+    return /^[A-Za-z_][A-Za-z0-9_./-]*$/.test(String(text || "").trim());
+}
+
+function isOutputSelectorArgument(argument) {
+    if (!argument || !argument.isNamed) {
+        return false;
+    }
+
+    const key = normalizeSymbolKey(argument.name);
+    return key === "output" || key === "outputname" || key === "outputindex";
+}
+
 function isDreamShaderHelperFunctionName(name) {
     return normalizeSymbolKey(name) === "path";
 }
@@ -3850,7 +3902,9 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
             if (isDefaultArgumentText(argument.valueText)) {
                 continue;
             }
-            diagnostics.push(...analyzeExpressionText(document, argument.valueText, argument.valueOffset, symbols, reachableCallables, "value"));
+            if (shouldValidateNamedArgumentValue(callExpression.callee, argument.name, argument.valueText)) {
+                diagnostics.push(...analyzeExpressionText(document, argument.valueText, argument.valueOffset, symbols, reachableCallables, "value"));
+            }
         }
     }
 
@@ -3930,7 +3984,26 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
         return diagnostics;
     }
 
-    for (const argument of callExpression.arguments) {
+    const valueArguments = mode === "value" && isMaterialFunctionCallableKind(signature.kind)
+        ? callExpression.arguments.filter((argument) => !isOutputSelectorArgument(argument))
+        : callExpression.arguments;
+
+    if (mode === "value" && isMaterialFunctionCallableKind(signature.kind)) {
+        const optionalTailCount = countOptionalTailInputs(signature.inputs || []);
+        const minInputCount = signature.inputs.length - optionalTailCount;
+        if (valueArguments.length < minInputCount || valueArguments.length > signature.inputs.length) {
+            diagnostics.push(makeOffsetDiagnostic(
+                document,
+                callExpression.calleeOffset,
+                callExpression.endOffset,
+                minInputCount === signature.inputs.length
+                    ? `${signature.kind} '${signature.name}' returns a selected output and expects ${signature.inputs.length} input argument(s), but got ${valueArguments.length}.`
+                    : `${signature.kind} '${signature.name}' returns a selected output and expects ${minInputCount}-${signature.inputs.length} input argument(s), but got ${valueArguments.length}.`));
+            return diagnostics;
+        }
+    }
+
+    for (const argument of valueArguments) {
         if (!argument.isNamed) {
             if (isDefaultArgumentText(argument.valueText)) {
                 continue;
@@ -3940,7 +4013,7 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
     }
 
     if (isMaterialFunctionCallableKind(signature.kind)) {
-        const positionalArguments = callExpression.arguments.filter((argument) => !argument.isNamed);
+        const positionalArguments = valueArguments.filter((argument) => !argument.isNamed);
         if (positionalArguments.length > signature.inputs.length) {
             diagnostics.push(makeOffsetDiagnostic(
                 document,
@@ -3953,7 +4026,7 @@ function analyzeCallExpression(document, callExpression, symbols, reachableCalla
         for (let inputIndex = 0; inputIndex < inputs.length; inputIndex += 1) {
             const input = inputs[inputIndex];
             const positionalArgument = positionalArguments[inputIndex];
-            const namedArgument = callExpression.arguments.find((argument) => argument.isNamed && normalizeSymbolKey(argument.name) === normalizeSymbolKey(input.name));
+            const namedArgument = valueArguments.find((argument) => argument.isNamed && normalizeSymbolKey(argument.name) === normalizeSymbolKey(input.name));
             const inputArgument = namedArgument || positionalArgument;
 
             if (!inputArgument) {

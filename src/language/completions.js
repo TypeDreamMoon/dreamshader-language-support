@@ -74,13 +74,30 @@ const SETTING_MAPPING_FALLBACKS = new Map([
 
 const METADATA_ITEMS = [
     ["Group", "Group=\"${1:General}\"", "Material parameter group"],
+    ["Category", "Category=\"${1:General}\"", "Alias of Group"],
     ["SortPriority", "SortPriority=${1:32}", "Material parameter sort priority"],
+    ["Sort", "Sort=${1:32}", "Alias of SortPriority"],
     ["Description", "Description=\"${1:Description}\"", "Editor tooltip text"],
+    ["Desc", "Desc=\"${1:Description}\"", "Alias of Description"],
+    ["Tooltip", "Tooltip=\"${1:Description}\"", "Alias of Description"],
     ["DisplayName", "DisplayName=\"${1:Name}\"", "Editor display name"],
-    ["SamplerType", "SamplerType=\"${1|Color,LinearColor,Grayscale,Normal,Masks,DistanceFieldFont,Alpha|}\"", "Texture sampler type"],
-    ["SamplerSource", "SamplerSource=\"${1|FromTextureAsset,SharedWrap,SharedClamp|}\"", "Texture sampler source"],
-    ["MipValueMode", "MipValueMode=\"${1|None,MipLevel,MipBias,Derivative|}\"", "Texture mip value mode"],
+    ["ParameterName", "ParameterName=\"${1:Parameter}\"", "Reflected MaterialExpression parameter name"],
+    ["DefaultValue", "DefaultValue=${1:0.0}", "Reflected MaterialExpression default value"],
+    ["Curve", "Curve=Path(${1:Game}, \"${2:Curves/C_Color}\")", "Curve asset for CurveAtlasRowParameter"],
+    ["Atlas", "Atlas=Path(${1:Game}, \"${2:Curves/CA_Atlas}\")", "Curve atlas asset for CurveAtlasRowParameter"],
+    ["CurveTime", "CurveTime=${1:0.0}", "Curve time input for CurveAtlasRowParameter"],
+    ["UseCustomPrimitiveData", "UseCustomPrimitiveData=${1:false}", "Use custom primitive data for a reflected parameter"],
+    ["PrimitiveDataIndex", "PrimitiveDataIndex=${1:0}", "Custom primitive data slot index"],
+    ["SamplerType", "SamplerType=\"${1|Color,LinearColor,Grayscale,Normal,Masks,DistanceFieldFont,Alpha,SAMPLERTYPE_Color,SAMPLERTYPE_LinearColor,SAMPLERTYPE_Grayscale,SAMPLERTYPE_Normal,SAMPLERTYPE_Masks,SAMPLERTYPE_DistanceFieldFont,SAMPLERTYPE_Alpha|}\"", "Texture sampler type"],
+    ["SamplerSource", "SamplerSource=\"${1|FromTextureAsset,SharedWrap,SharedClamp,SSM_FromTextureAsset,SSM_Wrap_WorldGroupSettings,SSM_Clamp_WorldGroupSettings|}\"", "Texture sampler source"],
+    ["MipValueMode", "MipValueMode=\"${1|None,MipLevel,MipBias,Derivative,TMVM_None,TMVM_MipLevel,TMVM_MipBias,TMVM_Derivative|}\"", "Texture mip value mode"],
+    ["GatherMode", "GatherMode=\"${1|None,Red,Green,Blue,Alpha,TGM_None,TGM_Red,TGM_Green,TGM_Blue,TGM_Alpha|}\"", "Texture gather mode"],
     ["AutomaticViewMipBias", "AutomaticViewMipBias=${1:true}", "Apply automatic view mip bias"],
+    ["AutomaticViewMipBiasValue", "AutomaticViewMipBiasValue=${1:0.0}", "Automatic view mip bias input"],
+    ["Coordinates", "Coordinates=${1:UV}", "Texture sample coordinates"],
+    ["MipValue", "MipValue=${1:0.0}", "Texture mip value input"],
+    ["CoordinatesDX", "CoordinatesDX=${1:ddx(UV)}", "Texture derivative X input"],
+    ["CoordinatesDY", "CoordinatesDY=${1:ddy(UV)}", "Texture derivative Y input"],
     ["ConstCoordinate", "ConstCoordinate=${1:0}", "Texture coordinate channel"],
     ["ConstMipValue", "ConstMipValue=${1:-1}", "Texture mip override"]
 ];
@@ -106,6 +123,9 @@ const DECLARATION_SNIPPET_ITEMS = [
 const GRAPH_SNIPPET_ITEMS = [
     ["uepanner", "UE.Panner(\n\tCoordinate=UE.TexCoord(Index=${1:0}),\n\tTime=UE.Time(Period=${2:4.0}),\n\tSpeed=float2(${3:0.05}, ${4:0.0}))", "UE.Panner call"],
     ["ueexpr", "UE.Expression(\n\tClass=\"${1:Sine}\",\n\tOutputType=\"${2:float1}\",\n\t${3:Input}=${4:Value})", "Reflected MaterialExpression call"],
+    ["uestaticmask", "UE.StaticComponentMaskParameter(\n\tOutputType=\"${1:float3}\",\n\tInput=${2:Value},\n\tParameterName=\"${3:Mask}\",\n\tDefaultR=${4:true},\n\tDefaultG=${5:true},\n\tDefaultB=${6:true},\n\tDefaultA=${7:false})", "Reflected StaticComponentMaskParameter call"],
+    ["uecurveatlas", "UE.CurveAtlasRowParameter(\n\tOutputType=\"${1:float3}\",\n\tParameterName=\"${2:CurveColor}\",\n\tDefaultValue=${3:0.0},\n\tCurve=Path(${4:Game}, \"${5:Curves/C_Color}\"),\n\tAtlas=Path(${6:Game}, \"${7:Curves/CA_Atlas}\"),\n\tCurveTime=${8:0.0})", "Reflected CurveAtlasRowParameter call"],
+    ["uetexturesample", "UE.Expression(\n\tClass=\"${1:TextureSample}\",\n\tOutputType=\"${2:float4}\",\n\tCoordinates=${3:UV},\n\tTexture=Path(${4:Game}, \"${5:Textures/T_Texture}\"),\n\tSamplerType=\"${6:SAMPLERTYPE_Color}\")", "Reflected TextureSample call"],
     ["collectionparam", "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")", "MaterialParameterCollection read"]
 ];
 
@@ -411,16 +431,19 @@ function addMetadata(add, context) {
 function addMetadataValueItems(add, key, range) {
     const normalized = normalizeSymbolKey(key);
     const values = normalized === "group"
+        || normalized === "category"
         ? ["Surface", "Textures", "Layer", "UV", "Switches", "Advanced"]
-        : normalized === "description" || normalized === "displayname"
+        : normalized === "description" || normalized === "desc" || normalized === "tooltip" || normalized === "displayname" || normalized === "parametername"
             ? []
         : normalized === "samplertype"
-        ? ["Color", "LinearColor", "Grayscale", "Normal", "Masks", "Alpha"]
+        ? ["Color", "LinearColor", "Grayscale", "Normal", "Masks", "Alpha", "SAMPLERTYPE_Color", "SAMPLERTYPE_LinearColor", "SAMPLERTYPE_Grayscale", "SAMPLERTYPE_Normal", "SAMPLERTYPE_Masks", "SAMPLERTYPE_Alpha"]
         : normalized === "samplersource"
-            ? ["FromTextureAsset", "SharedWrap", "SharedClamp"]
+            ? ["FromTextureAsset", "SharedWrap", "SharedClamp", "SSM_FromTextureAsset", "SSM_Wrap_WorldGroupSettings", "SSM_Clamp_WorldGroupSettings"]
         : normalized === "mipvaluemode"
-            ? ["None", "MipLevel", "MipBias", "Derivative"]
-        : normalized === "automaticviewmipbias"
+            ? ["None", "MipLevel", "MipBias", "Derivative", "TMVM_None", "TMVM_MipLevel", "TMVM_MipBias", "TMVM_Derivative"]
+        : normalized === "gathermode"
+            ? ["None", "Red", "Green", "Blue", "Alpha", "TGM_None", "TGM_Red", "TGM_Green", "TGM_Blue", "TGM_Alpha"]
+        : normalized === "automaticviewmipbias" || normalized === "usecustomprimitivedata"
             ? ["true", "false"]
         : [];
     for (const value of values) {

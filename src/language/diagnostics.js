@@ -506,9 +506,12 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     const outputs = signature.outputs || [];
     const optionalTailCount = countOptionalTailInputs(inputs);
     const minInputs = inputs.length - optionalTailCount;
+    const valueArguments = !standalone && isMaterialFunctionCallableKind(signature.kind)
+        ? callExpression.arguments.filter((arg) => !isOutputSelectorArgument(arg))
+        : callExpression.arguments;
     const expected = standalone ? inputs.length + outputs.length : inputs.length;
     const minExpected = standalone ? minInputs + outputs.length : minInputs;
-    const received = callExpression.arguments.length;
+    const received = valueArguments.length;
     if (received < minExpected || received > expected) {
         diagnostics.push(makeDiagnostic(
             callExpression.calleeOffset,
@@ -521,8 +524,9 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     }
 
     const inputArgumentCount = standalone ? received - outputs.length : received;
+    const inputArguments = standalone ? callExpression.arguments : valueArguments;
     for (let index = 0; index < inputArgumentCount; index += 1) {
-        const arg = callExpression.arguments[index];
+        const arg = inputArguments[index];
         if (arg && !isDefaultArgumentText(arg.valueText)) {
             addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables);
         }
@@ -587,6 +591,22 @@ function addCycleDiagnostics(diagnostics, services, fileName) {
 
 function isDefaultArgumentText(text) {
     return normalizeSymbolKey(text) === "default";
+}
+
+function isMaterialFunctionCallableKind(kind) {
+    return kind === "ShaderFunction"
+        || kind === "ShaderLayer"
+        || kind === "ShaderLayerBlend"
+        || kind === "VirtualFunction";
+}
+
+function isOutputSelectorArgument(argument) {
+    if (!argument || !argument.isNamed) {
+        return false;
+    }
+
+    const key = normalizeSymbolKey(argument.name);
+    return key === "output" || key === "outputname" || key === "outputindex";
 }
 
 function isHlslKnownName(key) {
@@ -862,7 +882,25 @@ function shouldValidateNamedArgumentValue(callee, name, valueText) {
     if (calleeKey === "path") {
         return false;
     }
-    if (calleeKey.startsWith("ue.") && ["class", "outputtype", "resulttype", "output", "source", "destination", "parameter"].includes(nameKey)) {
+    if (calleeKey.startsWith("ue.") && [
+        "class",
+        "outputtype",
+        "resulttype",
+        "output",
+        "outputname",
+        "source",
+        "destination",
+        "parameter",
+        "parametername",
+        "samplertype",
+        "samplersource",
+        "mipvaluemode",
+        "gathermode",
+        "description",
+        "desc",
+        "group",
+        "category"
+    ].includes(nameKey)) {
         return false;
     }
     return !isBareLiteralToken(valueText);

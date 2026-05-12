@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.2
+
+- Synced language metadata with current DreamShader reflected MaterialExpression support.
+- Added completion, hover, formatting, and diagnostics support for reflected texture sampler metadata such as `SAMPLERTYPE_*`, `SSM_*`, `TMVM_*`, and `TGM_*`.
+- Added `UE.StaticComponentMaskParameter(...)`, `UE.CurveAtlasRowParameter(...)`, and reflected TextureSample helper snippets.
+- Updated `CurveAtlasRowParameter` type inference to behave as a 3-component color.
+- Fixed inlay-hint signature lookup for document-specific reflected UE expression manifests.
+
 ## 1.4.1
 
 - Added `.dsf` Dream Shader Function file association, command-palette template creation, import completion, clickable import handling, and workspace indexing.

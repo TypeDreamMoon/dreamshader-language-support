@@ -508,8 +508,46 @@ const UE_BUILTINS = [
         [
             { qualifier: "in", type: "value", name: "Class" },
             { qualifier: "in", type: "value", name: "OutputType" },
+            { qualifier: "in", type: "value", name: "ResultType" },
             { qualifier: "in", type: "value", name: "Output" },
-            { qualifier: "in", type: "value", name: "OutputIndex" }
+            { qualifier: "in", type: "value", name: "OutputName" },
+            { qualifier: "in", type: "value", name: "OutputIndex" },
+            { qualifier: "in", type: "value", name: "Input" },
+            { qualifier: "in", type: "value", name: "A" },
+            { qualifier: "in", type: "value", name: "B" },
+            { qualifier: "in", type: "value", name: "True" },
+            { qualifier: "in", type: "value", name: "False" },
+            { qualifier: "in", type: "value", name: "ParameterName" },
+            { qualifier: "in", type: "value", name: "DefaultValue" },
+            { qualifier: "in", type: "value", name: "DefaultR" },
+            { qualifier: "in", type: "value", name: "DefaultG" },
+            { qualifier: "in", type: "value", name: "DefaultB" },
+            { qualifier: "in", type: "value", name: "DefaultA" },
+            { qualifier: "in", type: "Path", name: "Texture" },
+            { qualifier: "in", type: "Path", name: "TextureObject" },
+            { qualifier: "in", type: "Path", name: "Curve" },
+            { qualifier: "in", type: "Path", name: "Atlas" },
+            { qualifier: "in", type: "value", name: "CurveTime" },
+            { qualifier: "in", type: "value", name: "Coordinates" },
+            { qualifier: "in", type: "value", name: "MipValue" },
+            { qualifier: "in", type: "value", name: "CoordinatesDX" },
+            { qualifier: "in", type: "value", name: "CoordinatesDY" },
+            { qualifier: "in", type: "value", name: "AutomaticViewMipBiasValue" },
+            { qualifier: "in", type: "value", name: "SamplerType" },
+            { qualifier: "in", type: "value", name: "SamplerSource" },
+            { qualifier: "in", type: "value", name: "MipValueMode" },
+            { qualifier: "in", type: "value", name: "GatherMode" },
+            { qualifier: "in", type: "value", name: "AutomaticViewMipBias" },
+            { qualifier: "in", type: "value", name: "ConstCoordinate" },
+            { qualifier: "in", type: "value", name: "ConstMipValue" },
+            { qualifier: "in", type: "value", name: "UseCustomPrimitiveData" },
+            { qualifier: "in", type: "value", name: "PrimitiveDataIndex" },
+            { qualifier: "in", type: "value", name: "DynamicBranch" },
+            { qualifier: "in", type: "value", name: "Code" },
+            { qualifier: "in", type: "value", name: "Description" },
+            { qualifier: "in", type: "value", name: "Desc" },
+            { qualifier: "in", type: "value", name: "Group" },
+            { qualifier: "in", type: "value", name: "SortPriority" }
         ],
         "UE.Expression(Class=\"Sine\", OutputType=\"float1\", Input=UE.Time())"
     ),
@@ -532,14 +570,55 @@ const UE_BUILTINS = [
         "Creates an inline StaticSwitchParameter with True and False branches.",
         [
             { qualifier: "in", type: "value", name: "Name" },
+            { qualifier: "in", type: "value", name: "ParameterName" },
             { qualifier: "in", type: "value", name: "Default" },
+            { qualifier: "in", type: "value", name: "DefaultValue" },
             { qualifier: "in", type: "value", name: "True" },
             { qualifier: "in", type: "value", name: "False" },
+            { qualifier: "in", type: "value", name: "DynamicBranch" },
             { qualifier: "in", type: "value", name: "Group" },
             { qualifier: "in", type: "value", name: "SortPriority" },
             { qualifier: "in", type: "value", name: "Description" }
         ],
         "UE.StaticSwitchParameter(Name=\"UseDetail\", Default=true, True=Detail, False=Base)"
+    ),
+    createUEBuiltinItem(
+        "StaticComponentMaskParameter",
+        "UE.StaticComponentMaskParameter(OutputType=\"${1:float3}\", Input=${2:Value}, ParameterName=\"${3:Mask}\", DefaultR=${4:true}, DefaultG=${5:true}, DefaultB=${6:true}, DefaultA=${7:false})",
+        "Creates a reflected StaticComponentMaskParameter node.",
+        [
+            { qualifier: "in", type: "value", name: "OutputType" },
+            { qualifier: "in", type: "value", name: "Input" },
+            { qualifier: "in", type: "value", name: "ParameterName" },
+            { qualifier: "in", type: "value", name: "DefaultR" },
+            { qualifier: "in", type: "value", name: "DefaultG" },
+            { qualifier: "in", type: "value", name: "DefaultB" },
+            { qualifier: "in", type: "value", name: "DefaultA" },
+            { qualifier: "in", type: "value", name: "Group" },
+            { qualifier: "in", type: "value", name: "SortPriority" },
+            { qualifier: "in", type: "value", name: "Description" }
+        ],
+        "UE.StaticComponentMaskParameter(OutputType=\"float3\", Input=Value, ParameterName=\"Mask\", DefaultR=true, DefaultG=true, DefaultB=true, DefaultA=false)"
+    ),
+    createUEBuiltinItem(
+        "CurveAtlasRowParameter",
+        "UE.CurveAtlasRowParameter(OutputType=\"${1:float3}\", ParameterName=\"${2:CurveColor}\", DefaultValue=${3:0.0}, Curve=Path(${4:Game}, \"${5:Curves/C_Color}\"), Atlas=Path(${6:Game}, \"${7:Curves/CA_Atlas}\"), CurveTime=${8:0.0})",
+        "Creates a reflected CurveAtlasRowParameter node. Its primary output is a 3-component color.",
+        [
+            { qualifier: "in", type: "value", name: "OutputType" },
+            { qualifier: "in", type: "value", name: "ParameterName" },
+            { qualifier: "in", type: "value", name: "DefaultValue" },
+            { qualifier: "in", type: "Path", name: "Curve" },
+            { qualifier: "in", type: "Path", name: "Atlas" },
+            { qualifier: "in", type: "value", name: "CurveTime" },
+            { qualifier: "in", type: "value", name: "UseCustomPrimitiveData" },
+            { qualifier: "in", type: "value", name: "PrimitiveDataIndex" },
+            { qualifier: "in", type: "value", name: "Group" },
+            { qualifier: "in", type: "value", name: "SortPriority" },
+            { qualifier: "in", type: "value", name: "Description" },
+            { qualifier: "in", type: "value", name: "Desc" }
+        ],
+        "UE.CurveAtlasRowParameter(OutputType=\"float3\", ParameterName=\"CurveColor\", DefaultValue=0.0)"
     )
 ];
 
