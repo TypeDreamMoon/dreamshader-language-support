@@ -283,9 +283,9 @@ function createUEBuiltinItemFromManifestExpression(expression) {
         .filter((property) => !["outputtype", "resulttype", "output", "outputname", "outputindex", "class"].includes(normalizeSymbolKey(property.name)))
         .slice(0, 4);
 
-    const snippetParts = [`OutputType="${outputType}"`];
+    const snippetParts = [`Class="${name}"`, `OutputType="${outputType}"`];
     preferredProperties.forEach((property, index) => {
-        snippetParts.push(`${property.name}=\${${index + 2}:${getManifestPropertyPlaceholder(property)}}`);
+        snippetParts.push(`${property.name}=\${${index + 1}:${getManifestPropertyPlaceholder(property)}}`);
     });
 
     const parameters = [
@@ -306,10 +306,10 @@ function createUEBuiltinItemFromManifestExpression(expression) {
 
     return createUEBuiltinItem(
         name,
-        `UE.${name}(${snippetParts.join(", ")})`,
+        `UE.Expression(${snippetParts.join(", ")})`,
         `Reflected ${classLabel} material expression.${outputSummary}`,
         parameters,
-        `UE.${name}(OutputType="${outputType}")`
+        `UE.Expression(Class="${name}", OutputType="${outputType}")`
     );
 }
 

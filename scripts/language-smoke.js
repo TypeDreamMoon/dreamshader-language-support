@@ -152,6 +152,29 @@ const reflectedClassSource = "UE.Expression(Class=\"TextureSample\")";
 const reflectedClassOffset = reflectedClassSource.indexOf("TextureSample") + "TextureSample".length;
 const reflectedClassLabels = language.getCompletionSpecs(reflectedClassSource, reflectedClassOffset, manifestBackedServices).map((item) => item.label);
 assert(reflectedClassLabels.includes("TextureSampleParameter2D"), "Reflected MaterialExpression Class completion should use manifest symbols");
+const reflectedMemberSource = `Shader(Name="Materials/M_ReflectedMember")
+{
+    Outputs = {
+        float Value;
+    }
+    Graph = {
+        Value = UE.
+    }
+}`;
+const reflectedMemberOffset = reflectedMemberSource.indexOf("UE.") + "UE.".length;
+const reflectedMemberCompletions = language.getCompletionSpecs(reflectedMemberSource, reflectedMemberOffset, {
+    getUEBuiltinItems: () => [
+        {
+            name: "Abs",
+            qualifiedName: "UE.Abs",
+            memberSnippet: "Expression(Class=\"Abs\", OutputType=\"float1\", Input=${1:Value})",
+            detail: "Reflected MaterialExpressionAbs material expression."
+        }
+    ]
+});
+const reflectedAbsCompletion = reflectedMemberCompletions.find((item) => item.label === "Abs");
+assert(reflectedAbsCompletion, "UE. completion should offer reflected MaterialExpression short names");
+assert.strictEqual(reflectedAbsCompletion.insertText, "Expression(Class=\"Abs\", OutputType=\"float1\", Input=${1:Value})", "Reflected UE. completion should expand to UE.Expression syntax");
 
 const reflectedExpressionDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_ReflectedExpression")
 {

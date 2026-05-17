@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.4
+
+- Changed reflected `UE.` MaterialExpression completions to insert `UE.Expression(Class="...", ...)` snippets while keeping short labels such as `Abs` and `TextureSampleParameter2D`.
+
 ## 1.4.3
 
 - Bundled a fallback `material-expressions.json` manifest so reflected `UE.Expression(Class="...")` completions still work outside an auto-detected Unreal project.
