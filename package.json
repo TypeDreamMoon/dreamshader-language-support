@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm materials, .dsf function files, and .dsh shared headers.",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -195,6 +195,11 @@
           "type": "string",
           "default": "",
           "description": "Optional Unreal project root used for DreamShaderLang bridge files. Leave empty to auto-detect from the active .dsm/.dsf/.dsh file or workspace."
+        },
+        "dreamshader.materialExpressionManifestPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to Saved/DreamShader/Bridge/material-expressions.json. Leave empty to use the active project's bridge manifest and the bundled fallback."
         },
         "dreamshader.packageStoreIndexUrls": {
           "type": "array",

@@ -143,6 +143,16 @@ assert(samplerMetadataLabels.includes("SAMPLERTYPE_Color"), "SamplerType metadat
 const gatherMetadataLabels = language.getCompletionSpecs(textureMetadataSource, textureMetadataSource.indexOf("TGM_") + "TGM_".length, {}).map((item) => item.label);
 assert(gatherMetadataLabels.includes("TGM_None"), "GatherMode metadata should offer UE enum spellings");
 
+const manifestBackedServices = {
+    collectMaterialExpressionSymbols: () => [
+        { name: "TextureSampleParameter2D", className: "MaterialExpressionTextureSampleParameter2D" }
+    ]
+};
+const reflectedClassSource = "UE.Expression(Class=\"TextureSample\")";
+const reflectedClassOffset = reflectedClassSource.indexOf("TextureSample") + "TextureSample".length;
+const reflectedClassLabels = language.getCompletionSpecs(reflectedClassSource, reflectedClassOffset, manifestBackedServices).map((item) => item.label);
+assert(reflectedClassLabels.includes("TextureSampleParameter2D"), "Reflected MaterialExpression Class completion should use manifest symbols");
+
 const reflectedExpressionDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_ReflectedExpression")
 {
     Outputs = {

@@ -28,6 +28,7 @@ const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYP
 
 const materialExpressionManifestCache = new Map();
 const dreamShaderSettingsManifestCache = new Map();
+const BUNDLED_MATERIAL_EXPRESSION_MANIFEST_PATH = path.join(__dirname, "..", "resources", MATERIAL_EXPRESSION_MANIFEST_NAME);
 
 function getUEBuiltinItemsForDocument(document) {
     const items = [...UE_BUILTINS];
@@ -86,6 +87,23 @@ function collectMaterialExpressionSymbols(document) {
         }
     }
 
+    const configuredManifestPath = getConfiguredMaterialExpressionManifestPath();
+    if (configuredManifestPath) {
+        for (const expression of readMaterialExpressionManifestFile(configuredManifestPath).expressions) {
+            const key = normalizeSymbolKey(expression.name);
+            if (key && !expressionsByKey.has(key)) {
+                expressionsByKey.set(key, expression);
+            }
+        }
+    }
+
+    for (const expression of readMaterialExpressionManifestFile(BUNDLED_MATERIAL_EXPRESSION_MANIFEST_PATH).expressions) {
+        const key = normalizeSymbolKey(expression.name);
+        if (key && !expressionsByKey.has(key)) {
+            expressionsByKey.set(key, expression);
+        }
+    }
+
     return Array.from(expressionsByKey.values()).sort((left, right) =>
         String(left.name || "").localeCompare(String(right.name || "")));
 }
@@ -95,23 +113,31 @@ function readMaterialExpressionManifest(projectRoot) {
         return { expressions: [] };
     }
 
-    const manifestPath = getMaterialExpressionManifestPath(projectRoot);
-    let stat;
-    try {
-        stat = fs.statSync(manifestPath);
-    } catch (_error) {
-        materialExpressionManifestCache.delete(manifestPath);
+    return readMaterialExpressionManifestFile(getMaterialExpressionManifestPath(projectRoot));
+}
+
+function readMaterialExpressionManifestFile(manifestPath) {
+    if (!manifestPath) {
         return { expressions: [] };
     }
 
-    const cached = materialExpressionManifestCache.get(manifestPath);
+    const normalizedManifestPath = normalizeFsPath(path.resolve(manifestPath));
+    let stat;
+    try {
+        stat = fs.statSync(normalizedManifestPath);
+    } catch (_error) {
+        materialExpressionManifestCache.delete(normalizedManifestPath);
+        return { expressions: [] };
+    }
+
+    const cached = materialExpressionManifestCache.get(normalizedManifestPath);
     if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
         return cached.manifest;
     }
 
     let parsed;
     try {
-        parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        parsed = JSON.parse(fs.readFileSync(normalizedManifestPath, "utf8"));
     } catch (_error) {
         return { expressions: [] };
     }
@@ -121,7 +147,7 @@ function readMaterialExpressionManifest(projectRoot) {
             ? parsed.expressions.map(normalizeMaterialExpressionManifestEntry).filter(Boolean)
             : []
     };
-    materialExpressionManifestCache.set(manifestPath, {
+    materialExpressionManifestCache.set(normalizedManifestPath, {
         mtimeMs: stat.mtimeMs,
         size: stat.size,
         manifest
@@ -7124,6 +7150,16 @@ function getConfiguredProjectRoot() {
     }
 
     return fs.existsSync(configuredRoot) ? normalizeFsPath(configuredRoot) : "";
+}
+
+function getConfiguredMaterialExpressionManifestPath() {
+    const configuredPath = vscode.workspace.getConfiguration("dreamshader").get("materialExpressionManifestPath", "");
+    if (!configuredPath) {
+        return "";
+    }
+
+    const resolvedPath = path.resolve(configuredPath);
+    return fs.existsSync(resolvedPath) ? normalizeFsPath(resolvedPath) : "";
 }
 
 function collectProjectContentPluginNames(projectRoot) {

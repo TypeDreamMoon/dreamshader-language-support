@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.3
+
+- Bundled a fallback `material-expressions.json` manifest so reflected `UE.Expression(Class="...")` completions still work outside an auto-detected Unreal project.
+- Added `dreamshader.materialExpressionManifestPath` for explicitly pointing the extension at a generated `Saved/DreamShader/Bridge/material-expressions.json`.
+- Added a language smoke test covering manifest-backed reflected MaterialExpression class completion.
+
 ## 1.4.2
 
 - Synced language metadata with current DreamShader reflected MaterialExpression support.

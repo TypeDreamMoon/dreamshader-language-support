@@ -8,7 +8,7 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.4.2` syncs the extension with the current DreamShader plugin reflection metadata. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
+Version `1.4.3` keeps reflected `UE.Expression(Class="...")` completion available through project bridge manifests, an optional explicit manifest path, and a bundled fallback manifest. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
 
 ## Highlights
 
@@ -160,6 +160,7 @@ Available commands include:
 ```json
 {
   "dreamshader.projectRoot": "",
+  "dreamshader.materialExpressionManifestPath": "",
   "dreamshader.packageStoreIndexUrls": [
     "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json"
   ],
@@ -170,6 +171,8 @@ Available commands include:
 ```
 
 `dreamshader.projectRoot` can be left empty in most workspaces. The extension tries to auto-detect the Unreal project root from the active DreamShader file or workspace.
+
+`dreamshader.materialExpressionManifestPath` can point directly at a generated `Saved/DreamShader/Bridge/material-expressions.json`. Leave it empty to use the active project's bridge manifest plus the bundled fallback manifest.
 
 ## Bridge Diagnostics
 
