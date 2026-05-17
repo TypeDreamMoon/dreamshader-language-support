@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.5
+
+- Loaded bundled MaterialExpression completions from the language core as a hard fallback, so `UE.` suggestions include `material-expressions.json` entries even when VSCode adapter services do not provide a project manifest.
+
 ## 1.4.4
 
 - Changed reflected `UE.` MaterialExpression completions to insert `UE.Expression(Class="...", ...)` snippets while keeping short labels such as `Abs` and `TextureSampleParameter2D`.

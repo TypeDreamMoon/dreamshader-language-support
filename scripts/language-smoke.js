@@ -175,6 +175,10 @@ const reflectedMemberCompletions = language.getCompletionSpecs(reflectedMemberSo
 const reflectedAbsCompletion = reflectedMemberCompletions.find((item) => item.label === "Abs");
 assert(reflectedAbsCompletion, "UE. completion should offer reflected MaterialExpression short names");
 assert.strictEqual(reflectedAbsCompletion.insertText, "Expression(Class=\"Abs\", OutputType=\"float1\", Input=${1:Value})", "Reflected UE. completion should expand to UE.Expression syntax");
+const bundledReflectedCompletions = language.getCompletionSpecs(reflectedMemberSource, reflectedMemberOffset, {});
+const bundledAbsCompletion = bundledReflectedCompletions.find((item) => item.label === "Abs");
+assert(bundledAbsCompletion, "UE. completion should include bundled material-expressions.json entries without adapter services");
+assert(String(bundledAbsCompletion.insertText || "").startsWith("Expression(Class=\"Abs\""), "Bundled UE. completion should expand to UE.Expression syntax");
 
 const reflectedExpressionDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_ReflectedExpression")
 {

@@ -15,7 +15,8 @@ const {
     MATERIAL_OUTPUT_ITEMS,
     MATERIAL_ATTRIBUTE_MEMBER_ITEMS,
     OUTPUT_HELPER_ITEMS,
-    UE_BUILTINS
+    UE_BUILTINS,
+    getBundledMaterialExpressionBuiltinItems
 } = require("../languageData");
 const { analyzeContext } = require("./context");
 const { collectSymbols, collectCallables } = require("./symbols");
@@ -517,7 +518,26 @@ function addUEBuiltinMembers(add, services) {
 
 function getUEBuiltins(services) {
     const items = callService(services, "getUEBuiltinItems", null);
-    return Array.isArray(items) ? items : UE_BUILTINS;
+    const baseItems = Array.isArray(items) ? items : UE_BUILTINS;
+    const merged = [...baseItems];
+    const seen = new Set(merged.flatMap((item) => [
+        normalizeSymbolKey(item.name),
+        normalizeSymbolKey(item.qualifiedName)
+    ]));
+
+    for (const item of getBundledMaterialExpressionBuiltinItems()) {
+        const key = normalizeSymbolKey(item.name);
+        const qualifiedKey = normalizeSymbolKey(item.qualifiedName);
+        if (!key || seen.has(key) || seen.has(qualifiedKey)) {
+            continue;
+        }
+
+        merged.push(item);
+        seen.add(key);
+        seen.add(qualifiedKey);
+    }
+
+    return merged;
 }
 
 function addReachableFunctions(add, context, services) {

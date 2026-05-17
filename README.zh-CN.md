@@ -8,7 +8,7 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.4.4` 版本通过项目 Bridge manifest、可选的显式 manifest 路径，以及扩展内置 fallback manifest 保持 `UE.Expression(Class="...")` 反射节点补全可用。`UE.` 后的 MaterialExpression 短名补全，例如 `Abs`，会直接展开成稳定的 `UE.Expression(Class="Abs", ...)` 片段。补全、诊断、文档符号、折叠和语义高亮现在走 scanner / parser / context 管线，不再依赖旧的正则堆叠逻辑，区块和作用域判断会更稳定。
+`1.4.5` 版本通过项目 Bridge manifest、可选的显式 manifest 路径，以及语言核心直接加载的扩展内置 fallback manifest 保持 `UE.Expression(Class="...")` 反射节点补全可用。`UE.` 后的 MaterialExpression 短名补全，例如 `Abs`，会直接展开成稳定的 `UE.Expression(Class="Abs", ...)` 片段。补全、诊断、文档符号、折叠和语义高亮现在走 scanner / parser / context 管线，不再依赖旧的正则堆叠逻辑，区块和作用域判断会更稳定。
 
 ## 主要能力
 

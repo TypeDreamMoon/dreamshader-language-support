@@ -8,7 +8,7 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.4.4` keeps reflected `UE.Expression(Class="...")` completion available through project bridge manifests, an optional explicit manifest path, and a bundled fallback manifest. `UE.` MaterialExpression short-name completions such as `Abs` expand directly to stable `UE.Expression(Class="Abs", ...)` snippets. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
+Version `1.4.5` keeps reflected `UE.Expression(Class="...")` completion available through project bridge manifests, an optional explicit manifest path, and a bundled fallback manifest loaded by the language core. `UE.` MaterialExpression short-name completions such as `Abs` expand directly to stable `UE.Expression(Class="Abs", ...)` snippets. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
 
 ## Highlights
 

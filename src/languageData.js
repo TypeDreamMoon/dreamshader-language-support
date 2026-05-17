@@ -1,4 +1,6 @@
 "use strict";
+const fs = require("fs");
+const path = require("path");
 const {
     DREAMSHADER_KEYWORD_COMPLETIONS,
     DREAMSHADER_TEMPLATE_COMPLETIONS
@@ -18,6 +20,7 @@ const PACKAGE_LOCK_NAME = "dreamshader.lock.json";
 const MATERIAL_EXPRESSION_MANIFEST_NAME = "material-expressions.json";
 const SETTINGS_MANIFEST_NAME = "settings.json";
 const DEFAULT_PACKAGE_INDEX_URL = "https://raw.githubusercontent.com/TypeDreamMoon/dreamshader-package-index/main/packages.json";
+const BUNDLED_MATERIAL_EXPRESSION_MANIFEST_PATH = path.join(__dirname, "..", "resources", MATERIAL_EXPRESSION_MANIFEST_NAME);
 const SEMANTIC_TOKEN_TYPES = [
     "namespace",
     "class",
@@ -224,6 +227,118 @@ function createUEBuiltinItem(name, snippet, detail, parameters, example) {
         parameters: parameters || [],
         example: example || snippet
     };
+}
+
+let bundledMaterialExpressionBuiltinItems = null;
+
+function getBundledMaterialExpressionBuiltinItems() {
+    if (bundledMaterialExpressionBuiltinItems) {
+        return bundledMaterialExpressionBuiltinItems;
+    }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(fs.readFileSync(BUNDLED_MATERIAL_EXPRESSION_MANIFEST_PATH, "utf8"));
+    } catch (_error) {
+        bundledMaterialExpressionBuiltinItems = [];
+        return bundledMaterialExpressionBuiltinItems;
+    }
+
+    bundledMaterialExpressionBuiltinItems = Array.isArray(parsed.expressions)
+        ? parsed.expressions.map(createUEBuiltinItemFromManifestExpression).filter(Boolean)
+        : [];
+    return bundledMaterialExpressionBuiltinItems;
+}
+
+function createUEBuiltinItemFromManifestExpression(expression) {
+    const name = String(expression?.name || "").trim();
+    if (!name) {
+        return null;
+    }
+
+    const outputType = typeof expression.defaultOutputType === "string" && expression.defaultOutputType.trim()
+        ? expression.defaultOutputType.trim()
+        : inferOutputTypeFromManifestOutputs(expression.outputs);
+    const preferredProperties = (Array.isArray(expression.properties) ? expression.properties : [])
+        .filter(isPreferredManifestCompletionProperty)
+        .slice(0, 4);
+    const snippetParts = [`Class="${name}"`, `OutputType="${outputType}"`];
+    preferredProperties.forEach((property, index) => {
+        snippetParts.push(`${property.name}=\${${index + 1}:${getManifestPropertyPlaceholder(property)}}`);
+    });
+
+    const className = typeof expression.className === "string" && expression.className.trim()
+        ? expression.className.trim()
+        : `MaterialExpression${name}`;
+    const parameters = [
+        { qualifier: "in", type: "value", name: "OutputType" },
+        { qualifier: "in", type: "value", name: "Output" },
+        { qualifier: "in", type: "value", name: "OutputName" },
+        { qualifier: "in", type: "value", name: "OutputIndex" },
+        ...(Array.isArray(expression.properties) ? expression.properties : []).map((property) => ({
+            qualifier: "in",
+            type: property.isInput ? "value" : property.type || "value",
+            name: property.name
+        }))
+    ];
+
+    return createUEBuiltinItem(
+        name,
+        `UE.Expression(${snippetParts.join(", ")})`,
+        `Reflected ${className} material expression.`,
+        parameters,
+        `UE.Expression(Class="${name}", OutputType="${outputType}")`
+    );
+}
+
+function inferOutputTypeFromManifestOutputs(outputs) {
+    const firstOutput = Array.isArray(outputs) ? outputs[0] : null;
+    if (firstOutput && typeof firstOutput.outputType === "string" && firstOutput.outputType.trim()) {
+        return firstOutput.outputType.trim();
+    }
+
+    const components = firstOutput && Number.isFinite(Number(firstOutput.componentCount))
+        ? Number(firstOutput.componentCount)
+        : 1;
+    return `float${Math.max(1, Math.min(4, components || 1))}`;
+}
+
+function isPreferredManifestCompletionProperty(property) {
+    if (!property || typeof property.name !== "string" || !property.name.trim()) {
+        return false;
+    }
+
+    const key = normalizeSymbolKey(property.name);
+    return ![
+        "class",
+        "outputtype",
+        "resulttype",
+        "output",
+        "outputname",
+        "outputindex",
+        "desc",
+        "description",
+        "materialexpressioneditorx",
+        "materialexpressioneditory",
+        "sortpriority"
+    ].includes(key);
+}
+
+function getManifestPropertyPlaceholder(property) {
+    const type = normalizeSymbolKey(property?.type || "");
+    if (property?.isInput) {
+        return "Value";
+    }
+    if (type === "bool") {
+        return "true";
+    }
+    if (type === "name" || type === "string" || type.includes("enum")) {
+        return "\"Value\"";
+    }
+    if (type.includes("texture") || type.includes("object")) {
+        return "Path(Game, \"Textures/MyTexture\")";
+    }
+    return "0";
 }
 
 const SETTINGS_ITEMS = [
@@ -651,5 +766,6 @@ module.exports = {
     MATERIAL_ATTRIBUTE_MEMBER_ITEMS,
     MATERIAL_ATTRIBUTE_MEMBER_NAME_SET,
     OUTPUT_HELPER_ITEMS,
-    UE_BUILTINS
+    UE_BUILTINS,
+    getBundledMaterialExpressionBuiltinItems
 };
