@@ -118,6 +118,8 @@ const DECLARATION_SNIPPET_ITEMS = [
     ["optinput", "opt ${1:float4} ${2:Color} = ${3:float4(1.0, 1.0, 1.0, 1.0)} [\n\tDescription=\"${4:Optional input}\";\n\tSortPriority=${5:32};\n];", "Optional input declaration"],
     ["staticswitch", "StaticSwitchParameter ${1:UseDetail} = ${2:true} [\n\tGroup=\"${3:Switches}\";\n\tSortPriority=${4:32};\n\tDescription=\"${5:Use detail branch}\";\n];", "Static switch parameter"],
     ["texparam", "TextureSampleParameter2D ${1:AlbedoMap} = Path(${2:Game}, \"${3:Textures/T_White}\") [\n\tGroup=\"${4:Textures}\";\n\tSortPriority=${5:10};\n\tSamplerType=\"${6:Color}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n];", "Texture sample parameter"],
+    ["volumeparam", "VolumeTexture ${1:NoiseVolume} = Path(${2:Game}, \"${3:Textures/T_NoiseVolume}\");", "Volume texture object parameter"],
+    ["volumesample", "TextureSampleParameterVolume ${1:VolumeMap} = Path(${2:Game}, \"${3:Textures/T_Volume}\") [\n\tGroup=\"${4:Textures}\";\n\tSortPriority=${5:10};\n\tSamplerType=\"${6:Color}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n];", "Volume texture sample parameter"],
     ["constprop", "const ${1:float} ${2:Value} = ${3:0.0};", "Const property declaration"]
 ];
 

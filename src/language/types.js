@@ -15,7 +15,7 @@ const VECTOR_TYPES = new Map([
     ["bvec2", 2], ["bvec3", 3], ["bvec4", 4]
 ]);
 const MATRIX_TYPES = new Set(["float2x2", "float3x3", "float4x4", "mat2", "mat3", "mat4"]);
-const TEXTURE_TYPES = new Set(["texture2d", "texturecube", "texture2darray", "samplerstate"]);
+const TEXTURE_TYPES = new Set(["texture2d", "texturecube", "texture2darray", "volumetexture", "texture3d", "samplerstate"]);
 const SUBSTRATE_TYPES = new Set([
     "substrate",
     "substratebsdf",

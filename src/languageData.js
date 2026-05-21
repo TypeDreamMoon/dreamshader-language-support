@@ -108,6 +108,8 @@ const GRAPH_TYPE_ITEMS = [
     ["Texture2D", "Texture object input"],
     ["TextureCube", "Texture cube input"],
     ["Texture2DArray", "Texture array input"],
+    ["VolumeTexture", "Volume texture object input"],
+    ["Texture3D", "Texture3D alias for VolumeTexture"],
     ["MaterialAttributes", "Unreal Material Attributes aggregate"],
     ["ScalarParameter", "Scalar material parameter"],
     ["VectorParameter", "Vector material parameter"],
@@ -175,6 +177,8 @@ const HLSL_TYPE_ITEMS = [
     ["Texture2D", "Texture object"],
     ["TextureCube", "Texture cube object"],
     ["Texture2DArray", "Texture2DArray object"],
+    ["VolumeTexture", "Volume texture object"],
+    ["Texture3D", "Texture3D alias for VolumeTexture"],
     ["SamplerState", "Sampler state"],
     ["void", "No return value"]
 ];

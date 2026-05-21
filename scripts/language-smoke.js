@@ -122,6 +122,8 @@ assert.strictEqual(baseColor.insertText, "BaseColor = $0;", "Base. member insert
 const baseMemberStart = source.indexOf("Base.Ba") + "Base.".length;
 assert.deepStrictEqual(baseColor.range, [baseMemberStart, baseMemberStart + 2], "Base. member should replace only the typed member");
 assert.strictEqual(resolveTypeInfo("CurveAtlasRowParameter").componentCount, 3, "CurveAtlasRowParameter should resolve as float3-compatible");
+assert.strictEqual(resolveTypeInfo("VolumeTexture").isTexture, true, "VolumeTexture should resolve as a texture type");
+assert.strictEqual(resolveTypeInfo("Texture3D").isTexture, true, "Texture3D should resolve as a texture alias");
 
 const textureMetadataSource = `Shader(Name="Materials/M_TextureMetadata")
 {
@@ -130,6 +132,8 @@ const textureMetadataSource = `Shader(Name="Materials/M_TextureMetadata")
             SamplerType=SAMPLERTYPE_;
             GatherMode=TGM_;
         ];
+        VolumeTexture NoiseVolume = Path(Game, "Textures/T_NoiseVolume");
+        Texture3D DensityVolume = Path(Game, "Textures/T_DensityVolume");
     }
     Outputs = {
         float4 Color;
@@ -142,6 +146,7 @@ const samplerMetadataLabels = language.getCompletionSpecs(textureMetadataSource,
 assert(samplerMetadataLabels.includes("SAMPLERTYPE_Color"), "SamplerType metadata should offer UE enum spellings");
 const gatherMetadataLabels = language.getCompletionSpecs(textureMetadataSource, textureMetadataSource.indexOf("TGM_") + "TGM_".length, {}).map((item) => item.label);
 assert(gatherMetadataLabels.includes("TGM_None"), "GatherMode metadata should offer UE enum spellings");
+assert(!language.getDiagnostics(textureMetadataSource, "M_TextureMetadata.dsm", {}).some((diagnostic) => /Unknown type '(VolumeTexture|Texture3D)'/.test(diagnostic.message)), "VolumeTexture and Texture3D should not report unknown type diagnostics");
 
 const manifestBackedServices = {
     collectMaterialExpressionSymbols: () => [

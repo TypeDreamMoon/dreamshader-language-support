@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.6
+
+- Added language support, highlighting, completions, snippets, and diagnostics coverage for `VolumeTexture` / `Texture3D`.
+
 ## 1.4.5
 
 - Loaded bundled MaterialExpression completions from the language core as a hard fallback, so `UE.` suggestions include `material-expressions.json` entries even when VSCode adapter services do not provide a project manifest.

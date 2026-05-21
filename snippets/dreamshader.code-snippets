@@ -242,6 +242,27 @@
     ],
     "description": "Create a reflected TextureSample expression"
   },
+  "DreamShader Volume Texture Property": {
+    "scope": "dreamshaderlang",
+    "prefix": "volumeparam",
+    "body": [
+      "VolumeTexture ${1:NoiseVolume} = Path(${2:Game}, \"${3:Textures/T_NoiseVolume}\");"
+    ],
+    "description": "Create a VolumeTexture property"
+  },
+  "DreamShader Volume Texture Sample Parameter": {
+    "scope": "dreamshaderlang",
+    "prefix": "volumesample",
+    "body": [
+      "TextureSampleParameterVolume ${1:VolumeMap} = Path(${2:Game}, \"${3:Textures/T_Volume}\") [",
+      "\tGroup=\"${4:Textures}\";",
+      "\tSortPriority=${5:10};",
+      "\tSamplerType=\"${6:Color}\";",
+      "\tSamplerSource=\"${7:FromTextureAsset}\";",
+      "];"
+    ],
+    "description": "Create a volume texture sample parameter"
+  },
   "DreamShader UE StaticComponentMaskParameter": {
     "scope": "dreamshaderlang",
     "prefix": "uestaticmask",

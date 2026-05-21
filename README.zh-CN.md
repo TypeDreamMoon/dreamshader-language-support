@@ -57,6 +57,7 @@ Shader(Name="Materials/M_Example", Root="Game")
             SortPriority=10;
         ];
         ScalarParameter Roughness = 0.55;
+        VolumeTexture NoiseVolume = Path(Game, "Textures/T_NoiseVolume");
     }
 
     Settings = {
