@@ -5,12 +5,37 @@ function normalizeSymbolKey(name) {
 }
 
 function isIdentifierStart(char) {
-    return /[A-Za-z_]/.test(char || "");
+    return (char || "") === "_" || /\p{L}/u.test(char || "");
 }
 
 function isIdentifierPart(char) {
-    return /[A-Za-z0-9_]/.test(char || "");
+    return (char || "") === "_" || /[\p{L}\p{N}]/u.test(char || "");
 }
+
+function readIdentifier(text, index = 0) {
+    const source = String(text || "");
+    if (!isIdentifierStart(source[index])) {
+        return null;
+    }
+    let cursor = index + 1;
+    while (cursor < source.length && isIdentifierPart(source[cursor])) {
+        cursor += 1;
+    }
+    return { name: source.slice(index, cursor), start: index, end: cursor };
+}
+
+function isValidIdentifier(text) {
+    const source = String(text || "").trim();
+    const identifier = readIdentifier(source, 0);
+    return Boolean(identifier && identifier.end === source.length);
+}
+
+function escapeRegExp(text) {
+    return String(text || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const IDENTIFIER_PATTERN = "[_\\p{L}][_\\p{L}\\p{N}]*";
+const QUALIFIED_IDENTIFIER_PATTERN = `${IDENTIFIER_PATTERN}(?:(?:::|\\.)${IDENTIFIER_PATTERN})*`;
 
 function isWhitespace(char) {
     return /\s/.test(char || "");
@@ -257,8 +282,13 @@ function splitTopLevelAssignment(text) {
 
 module.exports = {
     normalizeSymbolKey,
+    IDENTIFIER_PATTERN,
+    QUALIFIED_IDENTIFIER_PATTERN,
     isIdentifierStart,
     isIdentifierPart,
+    readIdentifier,
+    isValidIdentifier,
+    escapeRegExp,
     isWhitespace,
     clampOffset,
     findLineStart,

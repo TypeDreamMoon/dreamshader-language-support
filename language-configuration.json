@@ -62,5 +62,5 @@
       "end": "^\\s*//\\s*#?endregion\\b"
     }
   },
-  "wordPattern": "(-?\\d*\\.\\d\\w*)|([A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*)"
+  "wordPattern": "(-?\\d*\\.\\d\\w*)|([_\\p{L}][_\\p{L}\\p{N}]*)|([_\\p{L}][_\\p{L}\\p{N}]*\\.[_\\p{L}][_\\p{L}\\p{N}]*)"
 }

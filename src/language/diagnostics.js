@@ -5,7 +5,14 @@ const { parseDocument, parseCodeStatements } = require("./parser");
 const { collectSymbols, collectCallables, flatten } = require("./symbols");
 const { parseCallExpressionText } = require("./calls");
 const { isTypeName, resolveTypeInfo, getMaterialAttributeMemberType, areTypesCompatible } = require("./types");
-const { normalizeSymbolKey, stripCommentsPreserveLayout, splitTopLevelAssignment } = require("./utils");
+const {
+    IDENTIFIER_PATTERN,
+    QUALIFIED_IDENTIFIER_PATTERN,
+    normalizeSymbolKey,
+    stripCommentsPreserveLayout,
+    splitTopLevelAssignment,
+    isValidIdentifier
+} = require("./utils");
 const {
     MATERIAL_OUTPUT_NAME_SET,
     MATERIAL_ATTRIBUTE_MEMBER_NAME_SET
@@ -400,7 +407,7 @@ function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols
 
 function validateAssignmentTarget(diagnostics, statement, symbols) {
     const target = String(statement.target || "").trim();
-    const memberMatch = /^([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)$/.exec(target);
+    const memberMatch = new RegExp(`^(${IDENTIFIER_PATTERN})\\s*\\.\\s*(${IDENTIFIER_PATTERN})$`, "u").exec(target);
     if (memberMatch) {
         const baseSymbol = symbols.get(normalizeSymbolKey(memberMatch[1]));
         if (!baseSymbol) {
@@ -418,7 +425,7 @@ function validateAssignmentTarget(diagnostics, statement, symbols) {
         return;
     }
     const existing = symbols.get(normalizeSymbolKey(target));
-    if (!existing && /^[A-Za-z_][A-Za-z0-9_]*$/.test(target)) {
+    if (!existing && isValidIdentifier(target)) {
         symbols.set(normalizeSymbolKey(target), { name: target, typeInfo: null });
     }
 }
@@ -431,7 +438,8 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
         known.add(normalizeSymbolKey(key));
     }
 
-    for (const match of clean.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g)) {
+    const callPattern = new RegExp(`(?<![_\\p{L}\\p{N}])(${QUALIFIED_IDENTIFIER_PATTERN})\\s*\\(`, "gu");
+    for (const match of clean.matchAll(callPattern)) {
         const callExpression = parseCallExpressionText(clean.slice(match.index), baseOffset + match.index);
         if (callExpression) {
             validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, false);
@@ -440,7 +448,8 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
 
     const ignoredRanges = collectIgnoredIdentifierRanges(clean);
 
-    for (const match of clean.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    const memberPattern = new RegExp(`(?<![_\\p{L}\\p{N}])(${IDENTIFIER_PATTERN})\\s*\\.\\s*(${IDENTIFIER_PATTERN})`, "gu");
+    for (const match of clean.matchAll(memberPattern)) {
         const base = normalizeSymbolKey(match[1]);
         const member = normalizeSymbolKey(match[2]);
         if (base === "ue" || base === "base") {
@@ -456,7 +465,8 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
         }
     }
 
-    for (const match of clean.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\b/g)) {
+    const identifierPattern = new RegExp(`(?<![_\\p{L}\\p{N}])(${IDENTIFIER_PATTERN})(?![_\\p{L}\\p{N}])`, "gu");
+    for (const match of clean.matchAll(identifierPattern)) {
         if (isOffsetInRanges(match.index, ignoredRanges)) {
             continue;
         }
@@ -539,7 +549,7 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     for (let index = 0; index < outputs.length; index += 1) {
         const arg = callExpression.arguments[inputArgumentCount + index];
         const expectedOutput = outputs[index];
-        if (!arg || arg.isNamed || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(arg.valueText)) {
+        if (!arg || arg.isNamed || !isValidIdentifier(arg.valueText)) {
             diagnostics.push(makeDiagnostic(
                 arg ? arg.startOffset : callExpression.endOffset,
                 arg ? arg.endOffset : callExpression.endOffset,
@@ -727,7 +737,7 @@ function findTopLevelAssignmentRange(text, startOffset, endOffset) {
         if (char === "=" && paren === 0 && bracket === 0 && brace === 0) {
             const left = trimRange(text, startOffset, index);
             const right = trimRange(text, index + 1, endOffset);
-            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(text.slice(left.start, left.end))) {
+            if (!isValidIdentifier(text.slice(left.start, left.end))) {
                 return null;
             }
             return {
@@ -755,7 +765,8 @@ function trimRange(text, startOffset, endOffset) {
 
 function collectCallArgumentRanges(text) {
     const calls = [];
-    for (const match of text.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g)) {
+    const callPattern = new RegExp(`(?<![_\\p{L}\\p{N}])(${QUALIFIED_IDENTIFIER_PATTERN})\\s*\\(`, "gu");
+    for (const match of text.matchAll(callPattern)) {
         const callee = match[1];
         const calleeOffset = match.index + match[0].indexOf(callee);
         const openOffset = match.index + match[0].lastIndexOf("(");

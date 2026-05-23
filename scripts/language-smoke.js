@@ -418,6 +418,36 @@ const virtualDiagnostics = language.getDiagnostics(`VirtualFunction(Name="Extern
 assert(virtualDiagnostics.some((diagnostic) => /Options must include Asset/.test(diagnostic.message)), "VirtualFunction should require Options.Asset");
 assert(virtualDiagnostics.some((diagnostic) => /Outputs section/.test(diagnostic.message)), "VirtualFunction should require Outputs");
 
+const unicodeVirtualSource = `VirtualFunction(Name="海森_不透明蒙版")
+{
+    Options = {
+        Asset = Path(Game, "鸣潮牛逼/海森_不透明蒙版");
+    }
+    Inputs = {
+        opt float2 可不连_输入统一UV控件 = float2(0, 0) [
+            SortPriority=1;
+        ];
+    }
+    Outputs = {
+        float 输出不透明蒙版;
+    }
+}
+Shader(Name="Materials/M_UnicodeVirtual")
+{
+    Outputs = {
+        float OpacityMask;
+        Base.OpacityMask = OpacityMask;
+    }
+    Graph = {
+        float Node1 = 海森_不透明蒙版(default);
+        float Node2 = 海森_不透明蒙版(default, OutputIndex=0);
+        OpacityMask = Node1 + Node2;
+    }
+}`;
+const unicodeVirtualDiagnostics = language.getDiagnostics(unicodeVirtualSource, "M_UnicodeVirtual.dsm", {});
+assert(!unicodeVirtualDiagnostics.some((diagnostic) => /Identifier '(海森_不透明蒙版|可不连_输入统一UV控件|输出不透明蒙版|鸣潮牛逼)'/.test(diagnostic.message)), "Unicode VirtualFunction identifiers and asset paths should be accepted");
+assert(!unicodeVirtualDiagnostics.some((diagnostic) => /Unknown|expects|Inputs statement|OutputIndex/.test(diagnostic.message)), "Unicode VirtualFunction calls with OutputIndex should not warn");
+
 const callDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_Call")
 {
     Outputs = {

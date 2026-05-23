@@ -3,6 +3,7 @@
 const { scan } = require("./scanner");
 const {
     normalizeSymbolKey,
+    isValidIdentifier,
     splitTopLevel,
     splitTopLevelAssignment,
     stripCommentsPreserveLayout
@@ -411,7 +412,7 @@ function parseCodeDeclarationEntries(text, baseOffset) {
     for (let index = 1; index < segments.length; index += 1) {
         const assignment = splitTopLevelAssignment(segments[index].text);
         const name = (assignment ? assignment.left : segments[index].text).trim();
-        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+        if (!isValidIdentifier(name)) {
             return [];
         }
         result.push({
@@ -436,8 +437,13 @@ function parseDeclaration(text) {
         constant = constant || match[1].toLowerCase() === "const";
         trimmed = trimmed.slice(match[0].length).trim();
     }
-    const match = /^(.+?)\s+([A-Za-z_][A-Za-z0-9_]*)$/.exec(trimmed);
-    return match ? { type: match[1].trim(), name: match[2].trim(), optional, constant } : null;
+    const lastWhitespace = trimmed.search(/\s+\S+$/);
+    if (lastWhitespace < 0) {
+        return null;
+    }
+    const type = trimmed.slice(0, lastWhitespace).trim();
+    const name = trimmed.slice(lastWhitespace).trim();
+    return type && isValidIdentifier(name) ? { type, name, optional, constant } : null;
 }
 
 function parseFunctionParams(text, baseOffset) {

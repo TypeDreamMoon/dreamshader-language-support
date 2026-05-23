@@ -1,6 +1,12 @@
 "use strict";
 
-const { splitTopLevel, stripCommentsPreserveLayout, normalizeSymbolKey } = require("./utils");
+const {
+    QUALIFIED_IDENTIFIER_PATTERN,
+    splitTopLevel,
+    stripCommentsPreserveLayout,
+    normalizeSymbolKey,
+    isValidIdentifier
+} = require("./utils");
 
 const CONSTRUCTOR_NAMES = new Set([
     "float", "float1", "float2", "float3", "float4",
@@ -17,7 +23,7 @@ const CONSTRUCTOR_NAMES = new Set([
 
 function parseCallExpressionText(text, baseOffset = 0) {
     const clean = stripCommentsPreserveLayout(String(text || ""));
-    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/.exec(clean);
+    const match = new RegExp(`^\\s*(${QUALIFIED_IDENTIFIER_PATTERN})\\s*\\(`, "u").exec(clean);
     if (!match) {
         return null;
     }
@@ -115,7 +121,7 @@ function findNamedArgument(text) {
         }
         if (char === "=" && depthParen === 0 && depthBrace === 0 && depthBracket === 0) {
             const left = clean.slice(0, index).trim();
-            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(left)) {
+            if (!isValidIdentifier(left)) {
                 return null;
             }
             const value = clean.slice(index + 1).trim();
@@ -134,7 +140,8 @@ function collectCallNames(text) {
     const clean = stripCommentsPreserveLayout(String(text || ""));
     const result = [];
     const seen = new Set();
-    for (const match of clean.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g)) {
+    const callPattern = new RegExp(`(?<![_\\p{L}\\p{N}])(${QUALIFIED_IDENTIFIER_PATTERN})\\s*\\(`, "gu");
+    for (const match of clean.matchAll(callPattern)) {
         const name = match[1];
         const key = normalizeSymbolKey(name);
         if (!key || key.startsWith("ue.") || CONSTRUCTOR_NAMES.has(key) || seen.has(key)) {

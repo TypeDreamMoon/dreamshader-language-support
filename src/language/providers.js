@@ -236,7 +236,7 @@ function addCodeSemanticTokens(tokens, text, startOffset, endOffset) {
 
     const source = text.slice(startOffset, endOffset);
     const clean = stripCommentsPreserveLayout(source);
-    const callPattern = /\b([A-Za-z_][A-Za-z0-9_]*(?:(?:::|\.)[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g;
+    const callPattern = /(?<![_\p{L}\p{N}])([_\p{L}][_\p{L}\p{N}]*(?:(?:::|\.)[_\p{L}][_\p{L}\p{N}]*)*)\s*\(/gu;
     for (const match of clean.matchAll(callPattern)) {
         const callee = match[1];
         const calleeOffset = startOffset + match.index + match[0].indexOf(callee);
