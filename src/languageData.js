@@ -45,6 +45,7 @@ const LEGACY_SECTION_NAMES = [
     "Settings",
     "Outputs",
     "Graph",
+    "Layout",
     "Inputs",
     "Options"
 ];

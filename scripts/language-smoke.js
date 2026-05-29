@@ -28,10 +28,17 @@ Shader(Name="Materials/M_Test", Root="Game")
     }
 
     Graph = {
+        #Region "Surface"
         float3 Tint;
         Result.BaseColor = BaseColor.rgb;
         Result.
         My
+        #EndRegion
+    }
+
+    Layout = {
+        Comment(Name="Surface", X=-400, Y=-260, W=1200, H=700, Color=float4(0.10, 0.16, 0.22, 0.35));
+        Node(Var="BaseColor", X=-240, Y=-80);
     }
 }
 
@@ -101,6 +108,11 @@ assert(dsfImport, "Import completion should include .dsf function files");
 assert.strictEqual(dsfImport.detail, "DreamShader function file import", ".dsf import completion should be labeled as a function file");
 assert(labelsAt("        My", services).includes("MyGraph"), "Graph should offer local GraphFunction completions");
 assert(labelsAt("        My", services).includes("ImportedTint"), "Graph should offer imported function completions");
+const blockBodySource = "Shader(Name=\"Materials/M_BlockBody\")\n{\n    ";
+assert(language.getCompletionSpecs(blockBodySource, blockBodySource.length, {}).some((item) => item.label === "Layout"), "Shader block body should offer Layout section completion");
+assert(labelsAt("        #Region \"Surface\"\n        float3 Tint").includes("region"), "Graph should offer a #Region snippet");
+assert(labelsAt("        Node(Var=\"Base").includes("layoutnode"), "Layout section should offer layout node snippets");
+assert(labelsAt("        Node(Var=\"Base").includes("Comment"), "Layout section should offer Comment statements");
 const graphSymbolLabels = labelsAt("        My", services);
 assert(graphSymbolLabels.includes("BaseColor"), "Graph should offer Properties symbols");
 assert(graphSymbolLabels.includes("Roughness"), "Graph should offer scalar Properties symbols");
@@ -249,6 +261,39 @@ assert(semanticTokens.some((token) => token.text === "mix" && token.type === "fu
 
 const diagnostics = language.getDiagnostics(source, "M_Test.dsm", services);
 assert(!diagnostics.some((diagnostic) => /Unclosed/.test(diagnostic.message)), "Valid braces should not report unclosed delimiters");
+assert(!diagnostics.some((diagnostic) => /Layout|#Region|#EndRegion|Identifier 'Region'/.test(diagnostic.message)), "Valid Layout and Graph region directives should not report diagnostics");
+const layoutSection = language.parseDocument(source).blocks[0].sections.find((section) => section.name === "Layout");
+assert(layoutSection && layoutSection.entries.some((entry) => entry.kind === "layout" && entry.layoutKind === "Node"), "Parser should expose Layout Node entries");
+const layoutSymbols = language.getDocumentSymbols(source)[0].children.find((symbol) => symbol.name === "Layout")?.children || [];
+assert(layoutSymbols.some((symbol) => symbol.name === "Node: BaseColor"), "Document symbols should include Layout nodes");
+const badLayoutDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_BadLayout")
+{
+    Outputs = {
+        float3 Color;
+        Base.BaseColor = Color;
+    }
+    Graph = {
+        Color = float3(1, 1, 1);
+    }
+    Layout = {
+        Node(Var="Color", X=left, Y=0);
+        Group(Name="Bad", X=0, Y=0);
+    }
+}`, "M_BadLayout.dsm", {});
+assert(badLayoutDiagnostics.some((diagnostic) => /Layout argument 'X' must be an integer/.test(diagnostic.message)), "Layout diagnostics should validate integer coordinates");
+assert(badLayoutDiagnostics.some((diagnostic) => /Unknown Layout statement 'Group'/.test(diagnostic.message)), "Layout diagnostics should reject unknown statements");
+const badRegionDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_BadRegion")
+{
+    Outputs = {
+        float3 Color;
+        Base.BaseColor = Color;
+    }
+    Graph = {
+        #Region "Open"
+        Color = float3(1, 1, 1);
+    }
+}`, "M_BadRegion.dsm", {});
+assert(badRegionDiagnostics.some((diagnostic) => /missing #EndRegion/.test(diagnostic.message)), "Graph region diagnostics should catch unclosed regions");
 
 const dsfSource = `ShaderFunction(Name="Functions/F_PulseTint")
 {
@@ -271,6 +316,37 @@ const dsfSource = `ShaderFunction(Name="Functions/F_PulseTint")
 }`;
 const dsfDiagnostics = language.getDiagnostics(dsfSource, "F_PulseTint.dsf", { resolveImportPath: () => "ok" });
 assert(!dsfDiagnostics.some((diagnostic) => /should declare|may not declare/.test(diagnostic.message)), ".dsf files should accept ShaderFunction declarations");
+const layerDsfDiagnostics = language.getDiagnostics(`ShaderLayer(Name="Layers/ML_Test")
+{
+    Inputs = {
+        MaterialAttributes MaterialAttributes;
+    }
+
+    Outputs = {
+        MaterialAttributes MaterialAttributes;
+    }
+
+    Graph = {
+        MaterialAttributes = MaterialAttributes;
+    }
+}`, "ML_Test.dsf", {});
+assert(!layerDsfDiagnostics.some((diagnostic) => /should declare|may not declare/.test(diagnostic.message)), ".dsf files should accept ShaderLayer declarations");
+const layerBlendDsfDiagnostics = language.getDiagnostics(`ShaderLayerBlend(Name="Layers/LB_Test")
+{
+    Inputs = {
+        MaterialAttributes Base;
+        MaterialAttributes Layer;
+    }
+
+    Outputs = {
+        MaterialAttributes MaterialAttributes;
+    }
+
+    Graph = {
+        MaterialAttributes = Layer;
+    }
+}`, "LB_Test.dsf", {});
+assert(!layerBlendDsfDiagnostics.some((diagnostic) => /should declare|may not declare/.test(diagnostic.message)), ".dsf files should accept ShaderLayerBlend declarations");
 const badDsfDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_Bad")
 {
     Outputs = {

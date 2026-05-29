@@ -8,14 +8,14 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.4.5` keeps reflected `UE.Expression(Class="...")` completion available through project bridge manifests, an optional explicit manifest path, and a bundled fallback manifest loaded by the language core. `UE.` MaterialExpression short-name completions such as `Abs` expand directly to stable `UE.Expression(Class="Abs", ...)` snippets. Completion, diagnostics, document symbols, folding, and semantic tokens use a scanner/parser/context pipeline instead of the previous regex-heavy path, which makes section scope handling much more predictable.
+Version `1.4.8` syncs the current DreamShader layout metadata syntax: `Layout` sections, `Node(...)` / `Comment(...)` statements, and Graph `#Region` / `#EndRegion` directives are covered by completion, diagnostics, formatting, symbols, folding, snippets, and highlighting.
 
 ## Highlights
 
 - `.dsm`, `.dsf`, and `.dsh` file association.
 - Syntax highlighting and semantic tokens for blocks, sections, types, variables, parameters, UE graph calls, and material outputs.
 - Context-aware completion for `Shader`, `ShaderFunction`, `ShaderLayer`, `ShaderLayerBlend`, `VirtualFunction`, `Function`, `GraphFunction`, and `Namespace`.
-- Section-aware completion for `Properties`, `Inputs`, `Outputs`, `Settings`, `Options`, and `Graph`.
+- Section-aware completion for `Properties`, `Inputs`, `Outputs`, `Settings`, `Options`, `Graph`, and `Layout`.
 - Type completion in declarations, function signatures, Graph code, and HLSL helper code.
 - UE graph node completion with `UE.` member suggestions.
 - HLSL intrinsic completion inside `Function` and graph-like code.
@@ -23,6 +23,7 @@ Version `1.4.5` keeps reflected `UE.Expression(Class="...")` completion availabl
 - `MaterialAttributes` member completion such as `BaseColor`, `Roughness`, `Metallic`, `Normal`, and `Opacity`.
 - Settings value completion for `Domain`, `MaterialDomain`, `ShadingModel`, `BlendMode`, and `RenderType`.
 - Metadata completion for declaration reflection blocks such as `Group`, `SortPriority`, `Description`, `SamplerType`, `GatherMode`, and texture sampling options.
+- Layout authoring support for `Layout = { Node(...); Comment(...); }` and Graph `#Region` / `#EndRegion` directives.
 - Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files.
 - `.dsf` file-shape diagnostics for reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations.
 - Go to Definition, Find References, Hover, Signature Help, Inlay Hints, document formatting, folding, and document symbols.
@@ -75,8 +76,15 @@ Shader(Name="Materials/M_Example", Root="Game")
     }
 
     Graph = {
+        #Region "Surface"
         Color = BaseColor.rgb;
         Rough = saturate(Roughness);
+        #EndRegion
+    }
+
+    Layout = {
+        Comment(Name="Surface", X=-400, Y=-260, W=1200, H=700, Color=float4(0.10, 0.16, 0.22, 0.35));
+        Node(Var="BaseColor", X=-240, Y=-80);
     }
 }
 ```
@@ -129,6 +137,8 @@ The extension contributes file and code templates for common DreamShader authori
 - `FunctionTemplate`: reusable HLSL helper.
 - `SelfContainedFunctionTemplate`: embedded helper function.
 - `GraphFunctionTemplate`: reusable graph helper that may call `UE.*` nodes.
+- `LayoutBlock`: explicit material graph layout metadata.
+- `GraphRegion`: named Graph region that generates layout comments.
 - `NamespaceTemplate`: grouped helper functions.
 - `ImportTemplate`: shared header or function file import.
 - `ImportFunctionFileTemplate`: `.dsf` function file import.

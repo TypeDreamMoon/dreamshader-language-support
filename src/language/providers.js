@@ -25,6 +25,7 @@ function getFoldingRanges(text) {
             addRange(ranges, section.bodyOpenOffset, section.bodyCloseOffset);
         }
     }
+    addGraphRegionFoldingRanges(ranges, text);
     return dedupeRanges(ranges);
 }
 
@@ -111,9 +112,31 @@ function makeSectionSymbol(section) {
                 selectionEndOffset: entry.startOffset + String(entry.name || "").length,
                 children: []
             });
+        } else if (entry.kind === "layout") {
+            const label = getLayoutSymbolName(entry);
+            symbol.children.push({
+                name: label,
+                detail: "layout",
+                kind: "Property",
+                startOffset: entry.startOffset,
+                endOffset: entry.endOffset,
+                selectionStartOffset: entry.callExpression?.calleeOffset ?? entry.startOffset,
+                selectionEndOffset: (entry.callExpression?.calleeOffset ?? entry.startOffset) + String(entry.layoutKind || label).length,
+                children: []
+            });
         }
     }
     return symbol;
+}
+
+function getLayoutSymbolName(entry) {
+    const call = entry.callExpression;
+    const args = new Map((call?.arguments || [])
+        .filter((arg) => arg.isNamed)
+        .map((arg) => [normalizeSymbolKey(arg.name), String(arg.valueText || "").replace(/^"|"$/g, "")]));
+    const layoutKind = String(entry.layoutKind || "Layout");
+    const label = args.get("var") || args.get("name");
+    return label ? `${layoutKind}: ${label}` : layoutKind;
 }
 
 function findIdentifierOffset(_bodyText, _bodyOffset, name, startOffset, endOffset) {
@@ -190,6 +213,18 @@ function addEntryTokens(tokens, text, section, entry) {
     if (entry.kind === "binding" || entry.kind === "assignment") {
         const length = String(entry.kind === "binding" ? entry.target : entry.name || "").length;
         tokens.push({ offset: entry.startOffset, length, type: "property", modifiers: [] });
+        return;
+    }
+    if (entry.kind === "layout") {
+        const call = entry.callExpression;
+        if (call?.calleeOffset >= 0 && call.callee) {
+            tokens.push({ offset: call.calleeOffset, length: call.callee.length, type: "function", modifiers: [] });
+        }
+        for (const arg of call?.arguments || []) {
+            if (arg.isNamed && arg.nameOffset >= 0) {
+                tokens.push({ offset: arg.nameOffset, length: arg.name.length, type: "property", modifiers: [] });
+            }
+        }
     }
 }
 
@@ -335,6 +370,32 @@ function dedupeTokens(tokens) {
         seen.add(key);
         return true;
     });
+}
+
+function addGraphRegionFoldingRanges(ranges, text) {
+    const stack = [];
+    const lines = String(text || "").split(/\n/);
+    let lineStart = 0;
+    for (const line of lines) {
+        const rawLine = line.replace(/\r$/, "");
+        const trimmed = rawLine.trim();
+        const hashOffset = rawLine.indexOf("#");
+        if (hashOffset >= 0 && isRegionDirective(trimmed, "#Region")) {
+            stack.push(lineStart + hashOffset);
+        } else if (hashOffset >= 0 && isRegionDirective(trimmed, "#EndRegion")) {
+            const startOffset = stack.pop();
+            if (typeof startOffset === "number") {
+                addRange(ranges, startOffset, lineStart + rawLine.length);
+            }
+        }
+        lineStart += line.length + 1;
+    }
+}
+
+function isRegionDirective(trimmedLine, directive) {
+    return trimmedLine.length >= directive.length
+        && trimmedLine.slice(0, directive.length).toLowerCase() === directive.toLowerCase()
+        && (trimmedLine.length === directive.length || /\s|"/.test(trimmedLine[directive.length]));
 }
 
 module.exports = {

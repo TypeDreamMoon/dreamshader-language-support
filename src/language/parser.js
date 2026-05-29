@@ -8,6 +8,7 @@ const {
     splitTopLevelAssignment,
     stripCommentsPreserveLayout
 } = require("./utils");
+const { parseCallExpressionText } = require("./calls");
 
 const TOP_LEVEL_BLOCKS = new Set([
     "Shader",
@@ -20,7 +21,7 @@ const TOP_LEVEL_BLOCKS = new Set([
     "Namespace"
 ]);
 
-const SECTION_NAMES = new Set(["Properties", "Inputs", "Outputs", "Results", "Settings", "Options", "Graph"]);
+const SECTION_NAMES = new Set(["Properties", "Inputs", "Outputs", "Results", "Settings", "Options", "Graph", "Layout"]);
 const SECTION_NAME_ALIASES = new Map([
     ["Results", "Outputs"]
 ]);
@@ -316,6 +317,10 @@ function parseSectionEntries(section) {
         return parseCodeStatements(section.bodyText, section.bodyOffset);
     }
 
+    if (section.name === "Layout") {
+        return parseLayoutEntries(section);
+    }
+
     const entries = [];
     for (const statement of splitTopLevel(section.bodyText, section.bodyOffset, ";")) {
         const withoutMetadata = stripTrailingMetadata(statement.text);
@@ -372,8 +377,28 @@ function parseAssignments(text, baseOffset) {
     });
 }
 
+function parseLayoutEntries(section) {
+    const entries = [];
+    for (const statement of splitTopLevel(section.bodyText, section.bodyOffset, ";")) {
+        const callExpression = parseCallExpressionText(statement.text, statement.startOffset);
+        if (!callExpression) {
+            entries.push({ kind: "invalid", ...statement });
+            continue;
+        }
+
+        entries.push({
+            kind: "layout",
+            ...statement,
+            layoutKind: callExpression.callee,
+            callExpression,
+            arguments: callExpression.arguments
+        });
+    }
+    return entries;
+}
+
 function parseCodeStatements(text, baseOffset) {
-    return splitTopLevel(text, baseOffset, ";").map((segment) => {
+    return splitTopLevel(stripGraphRegionDirectivesPreserveLayout(text), baseOffset, ";").map((segment) => {
         const declarations = parseCodeDeclarationEntries(segment.text, segment.startOffset);
         if (declarations.length > 0) {
             return { kind: "declarations", ...segment, declarations };
@@ -425,6 +450,12 @@ function parseCodeDeclarationEntries(text, baseOffset) {
         });
     }
     return result;
+}
+
+function stripGraphRegionDirectivesPreserveLayout(text) {
+    const source = String(text || "");
+    return source.replace(/^[ \t]*#(?:End)?Region(?:[ \t]+(?:"[^"\r\n]*"|[^\r\n]*))?[ \t]*(?=\r?$)/gim, (match) =>
+        match.replace(/[^\r\n]/g, " "));
 }
 
 function parseDeclaration(text) {
@@ -614,8 +645,10 @@ module.exports = {
     parseSections,
     parseSectionEntries,
     parseAssignments,
+    parseLayoutEntries,
     parseCodeDeclarationEntries,
     parseCodeStatements,
+    stripGraphRegionDirectivesPreserveLayout,
     parseFunctionParams,
     parseDeclaration,
     TOP_LEVEL_BLOCKS,

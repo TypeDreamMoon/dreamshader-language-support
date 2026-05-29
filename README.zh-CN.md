@@ -8,13 +8,13 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.4.5` 版本通过项目 Bridge manifest、可选的显式 manifest 路径，以及语言核心直接加载的扩展内置 fallback manifest 保持 `UE.Expression(Class="...")` 反射节点补全可用。`UE.` 后的 MaterialExpression 短名补全，例如 `Abs`，会直接展开成稳定的 `UE.Expression(Class="Abs", ...)` 片段。补全、诊断、文档符号、折叠和语义高亮现在走 scanner / parser / context 管线，不再依赖旧的正则堆叠逻辑，区块和作用域判断会更稳定。
+`1.4.8` 版本同步当前 DreamShader 布局 metadata 语法：`Layout` 区块、`Node(...)` / `Comment(...)` 语句，以及 Graph `#Region` / `#EndRegion` 指令都已接入补全、诊断、格式化、符号、折叠、snippet 和高亮。
 
 ## 主要能力
 
 - `.dsm`、`.dsf` 和 `.dsh` 文件关联。
 - `Shader`、`ShaderFunction`、`ShaderLayer`、`ShaderLayerBlend`、`VirtualFunction`、`Function`、`GraphFunction`、`Namespace` 的上下文感知补全。
-- `Properties`、`Inputs`、`Outputs`、`Settings`、`Options`、`Graph` 的区块级补全。
+- `Properties`、`Inputs`、`Outputs`、`Settings`、`Options`、`Graph`、`Layout` 的区块级补全。
 - 声明、函数签名、Graph 代码和 HLSL helper 中的类型补全。
 - `UE.` 内置 Graph 节点补全。
 - `Function` 和 Graph 类上下文中的 HLSL 原生函数补全。
@@ -22,6 +22,7 @@ DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言�
 - `MaterialAttributes` 成员补全，例如 `BaseColor`、`Roughness`、`Metallic`、`Normal`、`Opacity`。
 - `Domain`、`MaterialDomain`、`ShadingModel`、`BlendMode`、`RenderType` 的 Settings 值补全。
 - 声明 metadata 补全，例如 `Group`、`SortPriority`、`Description`、`SamplerType`、`GatherMode` 和纹理采样相关属性。
+- 支持 `Layout = { Node(...); Comment(...); }` 和 Graph `#Region` / `#EndRegion` 布局指令。
 - `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转。
 - `.dsf` 文件形状诊断，支持 `ShaderFunction`、`Function`、`GraphFunction`、`Namespace` 和 `VirtualFunction`。
 - Go to Definition、Find References、Hover、Signature Help、Inlay Hints、文档格式化、折叠和文档符号。
@@ -74,8 +75,15 @@ Shader(Name="Materials/M_Example", Root="Game")
     }
 
     Graph = {
+        #Region "Surface"
         Color = BaseColor.rgb;
         Rough = saturate(Roughness);
+        #EndRegion
+    }
+
+    Layout = {
+        Comment(Name="Surface", X=-400, Y=-260, W=1200, H=700, Color=float4(0.10, 0.16, 0.22, 0.35));
+        Node(Var="BaseColor", X=-240, Y=-80);
     }
 }
 ```
@@ -128,6 +136,8 @@ Graph = {
 - `FunctionTemplate`：可复用 HLSL helper。
 - `SelfContainedFunctionTemplate`：嵌入式 helper 函数。
 - `GraphFunctionTemplate`：可调用 `UE.*` 节点的可复用 Graph helper。
+- `LayoutBlock`：显式材质图布局 metadata。
+- `GraphRegion`：生成布局注释框的命名 Graph 区域。
 - `NamespaceTemplate`：分组 helper 函数。
 - `ImportTemplate`：共享头文件或函数文件 import。
 - `ImportFunctionFileTemplate`：`.dsf` 函数文件 import。

@@ -40,8 +40,8 @@ function formatLine(line) {
     }
     let result = line;
     result = result.replace(/\b(import)\s+("[^"]*")\s*;?$/i, "$1 $2;");
-    result = result.replace(/\b(Properties|Inputs|Outputs|Results|Settings|Options|Graph)\s*=\s*\{/g, "$1 = {");
-    result = result.replace(/\b(Name|Root|Asset|Domain|MaterialDomain|ShadingModel|BlendMode|RenderType|Group|Category|SortPriority|Sort|Description|Desc|Tooltip|DisplayName|ParameterName|DefaultValue|Curve|Atlas|CurveTime|UseCustomPrimitiveData|PrimitiveDataIndex|SamplerType|SamplerSource|MipValueMode|GatherMode|AutomaticViewMipBias|AutomaticViewMipBiasValue|Coordinates|MipValue|CoordinatesDX|CoordinatesDY|ConstCoordinate|ConstMipValue|OutputType|ResultType|Output|OutputName|OutputIndex|Class|True|False|Default|DynamicBranch)\s*=\s*/g, "$1 = ");
+    result = result.replace(/\b(Properties|Inputs|Outputs|Results|Settings|Options|Graph|Layout)\s*=\s*\{/g, "$1 = {");
+    result = result.replace(/\b(Name|Root|Asset|Domain|MaterialDomain|ShadingModel|BlendMode|RenderType|Group|Category|SortPriority|Sort|Description|Desc|Tooltip|DisplayName|ParameterName|DefaultValue|Curve|Atlas|CurveTime|UseCustomPrimitiveData|PrimitiveDataIndex|SamplerType|SamplerSource|MipValueMode|GatherMode|AutomaticViewMipBias|AutomaticViewMipBiasValue|Coordinates|MipValue|CoordinatesDX|CoordinatesDY|ConstCoordinate|ConstMipValue|OutputType|ResultType|Output|OutputName|OutputIndex|Class|True|False|Default|DynamicBranch|Var|X|Y|W|H|Color)\s*=\s*/g, "$1 = ");
     result = result.replace(/\s+;/g, ";");
     result = result.replace(/,\s*/g, ", ");
     result = result.replace(/\(\s+/g, "(");

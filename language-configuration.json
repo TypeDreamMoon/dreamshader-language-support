@@ -58,8 +58,8 @@
   ],
   "folding": {
     "markers": {
-      "start": "^\\s*//\\s*#?region\\b",
-      "end": "^\\s*//\\s*#?endregion\\b"
+      "start": "^\\s*(?://\\s*)?#?[Rr]egion\\b",
+      "end": "^\\s*(?://\\s*)?#?[Ee]nd[Rr]egion\\b"
     }
   },
   "wordPattern": "(-?\\d*\\.\\d\\w*)|([_\\p{L}][_\\p{L}\\p{N}]*)|([_\\p{L}][_\\p{L}\\p{N}]*\\.[_\\p{L}][_\\p{L}\\p{N}]*)"

@@ -387,6 +387,7 @@ const HOVER_DOCS = new Map([
     ["options", "Declares VirtualFunction metadata such as `Asset = Path(...)`."],
     ["outputs", "Declares shader outputs, ShaderFunction result pins, or VirtualFunction output pins. Material properties should use `Base.BaseColor = ...`, while auxiliary output nodes use `Expression(...).Pin[n] = ...`."],
     ["graph", "Inside `Shader` or `ShaderFunction`, `Graph` is DreamShader graph code. It supports basic `if` / `else`; put loops and complex flow logic inside `Function` blocks."],
+    ["layout", "Optional material graph layout metadata. Use `Node(Var=\"Name\", X=0, Y=0);` and `Comment(Name=\"Main\", X=0, Y=0, W=1200, H=700);` to preserve decompiled graph positions."],
     ["code", "`Code` is kept for Function helper code only. Use `Graph = { ... }` inside `Shader` or `ShaderFunction`."],
     ["inputs", "ShaderFunction or VirtualFunction input pin list."],
     ["outputtype", "Required for generic `UE.Expression(...)` or reflected `UE.ClassName(...)` calls."],
@@ -1796,7 +1797,7 @@ function findCurrentLegacyTopLevelBlock(prefix) {
 
 function findOpenLegacySection(prefix) {
     const normalizedPrefix = stripCommentsPreserveLayout(prefix);
-    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Inputs|Options)\s*=\s*\{/g;
+    const sectionRegex = /\b(Properties|Settings|Outputs|Graph|Layout|Inputs|Options)\s*=\s*\{/g;
     const matches = Array.from(normalizedPrefix.matchAll(sectionRegex));
     for (let matchIndex = matches.length - 1; matchIndex >= 0; matchIndex -= 1) {
         const match = matches[matchIndex];

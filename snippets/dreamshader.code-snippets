@@ -36,9 +36,11 @@
       "\t}",
       "",
       "\tGraph = {",
+      "\t\t#Region \"Surface\"",
       "\t\tColor = ${3:BaseColor}.rgb;",
       "\t\tRough = ${4:Roughness};",
       "\t\tMetal = ${5:Metallic};",
+      "\t\t#EndRegion",
       "\t}",
       "}"
     ],
@@ -228,6 +230,42 @@
       "}"
     ],
     "description": "Create a Graph block"
+  },
+  "DreamShader Graph Region": {
+    "scope": "dreamshaderlang",
+    "prefix": "graphregion",
+    "body": [
+      "#Region \"${1:Main}\"",
+      "\t$0",
+      "#EndRegion"
+    ],
+    "description": "Create a named Graph layout region"
+  },
+  "DreamShader Layout Block": {
+    "scope": "dreamshaderlang",
+    "prefix": "layoutblock",
+    "body": [
+      "Layout = {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Create a Layout block for explicit material graph positions"
+  },
+  "DreamShader Layout Node": {
+    "scope": "dreamshaderlang",
+    "prefix": "layoutnode",
+    "body": [
+      "Node(Var=\"${1:Value}\", X=${2:0}, Y=${3:0});"
+    ],
+    "description": "Pin a generated node to an explicit material graph position"
+  },
+  "DreamShader Layout Comment": {
+    "scope": "dreamshaderlang",
+    "prefix": "layoutcomment",
+    "body": [
+      "Comment(Name=\"${1:Main}\", X=${2:0}, Y=${3:0}, W=${4:1200}, H=${5:700}, Color=float4(${6:0.10}, ${7:0.16}, ${8:0.22}, ${9:0.35}));"
+    ],
+    "description": "Create a material graph comment frame"
   },
   "DreamShader UE TextureSample": {
     "scope": "dreamshaderlang",

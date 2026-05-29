@@ -97,6 +97,7 @@
         { "include": "#inputsSection" },
         { "include": "#outputsSection" },
         { "include": "#graphSection" },
+        { "include": "#layoutSection" },
         { "include": "#settingsSection" },
         { "include": "#optionsSection" }
       ]
@@ -110,6 +111,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#graphRegionDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#declarationLines" },
@@ -131,6 +133,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#graphRegionDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#declarationLines" },
@@ -211,6 +214,24 @@
         }
       ]
     },
+    "layoutSection": {
+      "patterns": [
+        {
+          "name": "meta.section.layout.dreamshader",
+          "begin": "\\b(Layout)\\b\\s*=\\s*\\{",
+          "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#layoutCalls" },
+            { "include": "#types" },
+            { "include": "#operators" }
+          ]
+        }
+      ]
+    },
     "settingsSection": {
       "patterns": [
         {
@@ -280,6 +301,24 @@
     "declarationMetadataKeys": {
       "patterns": [
         { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Group|Category|SortPriority|Sort|Description|Desc|Tooltip|DisplayName|ParameterName|DefaultValue|Curve|Atlas|CurveTime|UseCustomPrimitiveData|PrimitiveDataIndex|SamplerType|SamplerSource|MipValueMode|GatherMode|AutomaticViewMipBias|AutomaticViewMipBiasValue|Coordinates|MipValue|CoordinatesDX|CoordinatesDY|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
+      ]
+    },
+    "graphRegionDirectives": {
+      "patterns": [
+        {
+          "name": "meta.region.graph.dreamshader",
+          "match": "^\\s*(#(?:End)?Region)\\b(?:\\s+(\"[^\"]*\"|[^\\r\\n]+))?",
+          "captures": {
+            "1": { "name": "keyword.control.region.dreamshader" },
+            "2": { "name": "string.quoted.double.region-name.dreamshader" }
+          }
+        }
+      ]
+    },
+    "layoutCalls": {
+      "patterns": [
+        { "name": "support.function.layout.dreamshader", "match": "\\b(?:Node|Comment)\\b(?=\\s*\\()" },
+        { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Var|Name|X|Y|W|H|Color)\\b(?=\\s*=)" }
       ]
     },
     "pathHelpers": {

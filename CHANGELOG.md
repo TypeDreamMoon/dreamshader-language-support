@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.8
+
+- Added language support for `Layout` sections with `Node(...)` and `Comment(...)` statements.
+- Added Graph `#Region` / `#EndRegion` parsing, diagnostics, folding, snippets, and highlighting.
+- Updated snippets, templates, README files, formatter, document symbols, and semantic tokens for layout metadata.
+
 ## 1.4.6
 
 - Added language support, highlighting, completions, snippets, and diagnostics coverage for `VolumeTexture` / `Texture3D`.

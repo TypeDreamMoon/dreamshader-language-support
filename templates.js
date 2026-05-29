@@ -16,7 +16,7 @@ const DREAMSHADER_TEMPLATE_COMPLETIONS = [
     {
         label: "ShaderTemplate",
         detail: "Create a DreamShader material block",
-        snippet: "Shader(Name=\"Materials/${1:M_Surface}\", Root=\"${2:Game}\")\n{\n    Properties = {\n        VectorParameter ${3:BaseColor} = float4(0.8, 0.8, 0.8, 1.0) [\n            Group=\"Surface\";\n            SortPriority=10;\n        ];\n        ScalarParameter ${4:Roughness} = 0.55 [\n            Group=\"Surface\";\n            SortPriority=20;\n        ];\n        ScalarParameter ${5:Metallic} = 0.0 [\n            Group=\"Surface\";\n            SortPriority=30;\n        ];\n    }\n\n    Settings = {\n        Domain = \"Surface\";\n        ShadingModel = \"DefaultLit\";\n        BlendMode = \"Opaque\";\n    }\n\n    Outputs = {\n        float3 Color;\n        float Rough;\n        float Metal;\n        Base.BaseColor = Color;\n        Base.Roughness = Rough;\n        Base.Metallic = Metal;\n    }\n\n    Graph = {\n        Color = ${3:BaseColor}.rgb;\n        Rough = ${4:Roughness};\n        Metal = ${5:Metallic};\n    }\n}"
+        snippet: "Shader(Name=\"Materials/${1:M_Surface}\", Root=\"${2:Game}\")\n{\n    Properties = {\n        VectorParameter ${3:BaseColor} = float4(0.8, 0.8, 0.8, 1.0) [\n            Group=\"Surface\";\n            SortPriority=10;\n        ];\n        ScalarParameter ${4:Roughness} = 0.55 [\n            Group=\"Surface\";\n            SortPriority=20;\n        ];\n        ScalarParameter ${5:Metallic} = 0.0 [\n            Group=\"Surface\";\n            SortPriority=30;\n        ];\n    }\n\n    Settings = {\n        Domain = \"Surface\";\n        ShadingModel = \"DefaultLit\";\n        BlendMode = \"Opaque\";\n    }\n\n    Outputs = {\n        float3 Color;\n        float Rough;\n        float Metal;\n        Base.BaseColor = Color;\n        Base.Roughness = Rough;\n        Base.Metallic = Metal;\n    }\n\n    Graph = {\n        #Region \"Surface\"\n        Color = ${3:BaseColor}.rgb;\n        Rough = ${4:Roughness};\n        Metal = ${5:Metallic};\n        #EndRegion\n    }\n}"
     },
     {
         label: "FunctionTemplate",
@@ -67,6 +67,16 @@ const DREAMSHADER_TEMPLATE_COMPLETIONS = [
         label: "VirtualFunctionTemplate",
         detail: "Declare an existing Unreal MaterialFunction asset",
         snippet: "VirtualFunction(Name=\"${1:MyFunction}\")\n{\n    Options = {\n        Asset = Path(Plugins.${2:PluginName}, \"${3:MaterialFunctions/MyFunction}\");\n    }\n\n    Inputs = {\n        ${4:float} ${5:Value};\n    }\n\n    Outputs = {\n        ${6:float} ${7:Result};\n    }\n}"
+    },
+    {
+        label: "LayoutBlock",
+        detail: "Create a DreamShader Layout block",
+        snippet: "Layout = {\n    Node(Var=\"${1:Value}\", X=${2:0}, Y=${3:0});\n    Comment(Name=\"${4:Main}\", X=${5:0}, Y=${6:0}, W=${7:1200}, H=${8:700}, Color=float4(${9:0.10}, ${10:0.16}, ${11:0.22}, ${12:0.35}));\n}"
+    },
+    {
+        label: "GraphRegion",
+        detail: "Create a named Graph layout region",
+        snippet: "#Region \"${1:Main}\"\n$0\n#EndRegion"
     }
 ];
 

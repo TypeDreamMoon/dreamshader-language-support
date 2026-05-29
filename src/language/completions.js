@@ -124,12 +124,30 @@ const DECLARATION_SNIPPET_ITEMS = [
 ];
 
 const GRAPH_SNIPPET_ITEMS = [
+    ["region", "#Region \"${1:Main}\"\n$0\n#EndRegion", "Group generated graph nodes into a named layout region"],
     ["uepanner", "UE.Panner(\n\tCoordinate=UE.TexCoord(Index=${1:0}),\n\tTime=UE.Time(Period=${2:4.0}),\n\tSpeed=float2(${3:0.05}, ${4:0.0}))", "UE.Panner call"],
     ["ueexpr", "UE.Expression(\n\tClass=\"${1:Sine}\",\n\tOutputType=\"${2:float1}\",\n\t${3:Input}=${4:Value})", "Reflected MaterialExpression call"],
     ["uestaticmask", "UE.StaticComponentMaskParameter(\n\tOutputType=\"${1:float3}\",\n\tInput=${2:Value},\n\tParameterName=\"${3:Mask}\",\n\tDefaultR=${4:true},\n\tDefaultG=${5:true},\n\tDefaultB=${6:true},\n\tDefaultA=${7:false})", "Reflected StaticComponentMaskParameter call"],
     ["uecurveatlas", "UE.CurveAtlasRowParameter(\n\tOutputType=\"${1:float3}\",\n\tParameterName=\"${2:CurveColor}\",\n\tDefaultValue=${3:0.0},\n\tCurve=Path(${4:Game}, \"${5:Curves/C_Color}\"),\n\tAtlas=Path(${6:Game}, \"${7:Curves/CA_Atlas}\"),\n\tCurveTime=${8:0.0})", "Reflected CurveAtlasRowParameter call"],
     ["uetexturesample", "UE.Expression(\n\tClass=\"${1:TextureSample}\",\n\tOutputType=\"${2:float4}\",\n\tCoordinates=${3:UV},\n\tTexture=Path(${4:Game}, \"${5:Textures/T_Texture}\"),\n\tSamplerType=\"${6:SAMPLERTYPE_Color}\")", "Reflected TextureSample call"],
     ["collectionparam", "UE.CollectionParam(Collection=Path(${1:Game}, \"${2:MaterialParameterCollections/MPC_Global}\"), Parameter=\"${3:Value}\")", "MaterialParameterCollection read"]
+];
+
+const LAYOUT_SNIPPET_ITEMS = [
+    ["layoutnode", "Node(Var=\"${1:Value}\", X=${2:0}, Y=${3:0});", "Pin a generated node to an explicit material graph position"],
+    ["layoutcomment", "Comment(Name=\"${1:Main}\", X=${2:0}, Y=${3:0}, W=${4:1200}, H=${5:700}, Color=float4(${6:0.10}, ${7:0.16}, ${8:0.22}, ${9:0.35}));", "Create a material graph comment frame"],
+    ["Node", "Node(Var=\"${1:Value}\", X=${2:0}, Y=${3:0});", "Layout node statement"],
+    ["Comment", "Comment(Name=\"${1:Main}\", X=${2:0}, Y=${3:0}, W=${4:1200}, H=${5:700}, Color=float4(${6:0.10}, ${7:0.16}, ${8:0.22}, ${9:0.35}));", "Layout comment statement"]
+];
+
+const LAYOUT_ARGUMENT_ITEMS = [
+    ["Var", "Var=\"${1:Value}\"", "Node variable name"],
+    ["Name", "Name=\"${1:Main}\"", "Comment title"],
+    ["X", "X=${1:0}", "Editor X position"],
+    ["Y", "Y=${1:0}", "Editor Y position"],
+    ["W", "W=${1:1200}", "Comment width"],
+    ["H", "H=${1:700}", "Comment height"],
+    ["Color", "Color=float4(${1:0.10}, ${2:0.16}, ${3:0.22}, ${4:0.35})", "Comment color"]
 ];
 
 const SWIZZLE_ITEMS = [
@@ -277,6 +295,12 @@ function getCompletionSpecs(text, offset, services = {}) {
         addUEBuiltins(add, services);
     }
 
+    if (context.kind === "Layout") {
+        addLayoutSnippets(add);
+        addLayoutArguments(add);
+        addSymbols(add, context, services);
+    }
+
     if (context.kind === "Declaration" || context.kind === "OutputsDeclaration" || context.kind === "Outputs") {
         addTypeItems(add, "graph");
         addDeclarationSnippets(add, context);
@@ -346,10 +370,10 @@ function addSectionItems(add, context) {
 
 function allowedSectionsForBlock(kind) {
     if (kind === "Shader") {
-        return ["Properties", "Settings", "Outputs", "Graph"];
+        return ["Properties", "Settings", "Outputs", "Graph", "Layout"];
     }
     if (kind === "ShaderFunction" || kind === "ShaderLayer" || kind === "ShaderLayerBlend") {
-        return ["Properties", "Inputs", "Outputs", "Results", "Graph", "Settings"];
+        return ["Properties", "Inputs", "Outputs", "Results", "Graph", "Settings", "Layout"];
     }
     if (kind === "VirtualFunction") {
         return ["Options", "Settings", "Inputs", "Outputs", "Results"];
@@ -388,6 +412,18 @@ function addHlslIntrinsics(add) {
 function addGraphSnippets(add) {
     for (const [label, insertText, detail] of GRAPH_SNIPPET_ITEMS) {
         add({ label, kind: "Snippet", insertText, detail });
+    }
+}
+
+function addLayoutSnippets(add) {
+    for (const [label, insertText, detail] of LAYOUT_SNIPPET_ITEMS) {
+        add({ label, kind: "Snippet", insertText, detail });
+    }
+}
+
+function addLayoutArguments(add) {
+    for (const [label, insertText, detail] of LAYOUT_ARGUMENT_ITEMS) {
+        add({ label, kind: "Property", insertText, detail });
     }
 }
 

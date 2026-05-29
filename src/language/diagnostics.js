@@ -46,12 +46,12 @@ function addFileShapeDiagnostics(diagnostics, ast, text, extension) {
         diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader implementation (.dsm) should declare a top-level Shader, ShaderFunction, ShaderLayer, ShaderLayerBlend, GraphFunction, or VirtualFunction block.", SEVERITY.Warning));
     }
 
-    if (extension === ".dsf" && !["ShaderFunction", "Function", "GraphFunction", "Namespace", "VirtualFunction"].some((kind) => topLevelKinds.has(kind))) {
-        diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader function file (.dsf) should declare ShaderFunction assets or reusable Function, GraphFunction, Namespace, or VirtualFunction blocks.", SEVERITY.Warning));
+    if (extension === ".dsf" && !["ShaderFunction", "ShaderLayer", "ShaderLayerBlend", "Function", "GraphFunction", "Namespace", "VirtualFunction"].some((kind) => topLevelKinds.has(kind))) {
+        diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader function file (.dsf) should declare ShaderFunction, ShaderLayer, or ShaderLayerBlend assets, or reusable Function, GraphFunction, Namespace, or VirtualFunction blocks.", SEVERITY.Warning));
     }
 
-    if (extension === ".dsf" && ["Shader", "ShaderLayer", "ShaderLayerBlend"].some((kind) => topLevelKinds.has(kind))) {
-        diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader function file (.dsf) may not declare Shader, ShaderLayer, or ShaderLayerBlend blocks.", SEVERITY.Error));
+    if (extension === ".dsf" && topLevelKinds.has("Shader")) {
+        diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader function file (.dsf) may not declare Shader blocks.", SEVERITY.Error));
     }
 
     if (extension === ".dsh" && ["Shader", "ShaderFunction", "ShaderLayer", "ShaderLayerBlend"].some((kind) => topLevelKinds.has(kind))) {
@@ -248,6 +248,11 @@ function addSectionEntryDiagnostics(diagnostics, block, section, ast, reachableC
         return;
     }
 
+    if (section.name === "Layout") {
+        addLayoutDiagnostics(diagnostics, section);
+        return;
+    }
+
     for (const entry of section.entries || []) {
         if (entry.kind === "invalid") {
             diagnostics.push(makeDiagnostic(entry.startOffset, entry.endOffset, `${section.name} statement is not a valid declaration or binding.`, SEVERITY.Error));
@@ -360,7 +365,138 @@ function addGraphFunctionBodyDiagnostics(diagnostics, ast, block, reachableCalla
 function addGraphDiagnostics(diagnostics, block, section, ast, reachableCallables) {
     const context = { ast, block, section, kind: "Graph", offset: section.endOffset };
     const symbols = collectSymbols(ast, context, reachableCallables);
+    addGraphRegionDirectiveDiagnostics(diagnostics, section.bodyText || "", section.bodyOffset);
     addGraphStatementDiagnostics(diagnostics, section.bodyText || "", section.bodyOffset, symbols, reachableCallables);
+}
+
+function addLayoutDiagnostics(diagnostics, section) {
+    for (const entry of section.entries || []) {
+        if (!entry.terminated && entry.text.trim()) {
+            diagnostics.push(makeDiagnostic(entry.endOffset, entry.endOffset, "Layout statement is missing a trailing ';'.", SEVERITY.Error));
+        }
+
+        if (entry.kind !== "layout") {
+            diagnostics.push(makeDiagnostic(entry.startOffset, entry.endOffset, "Layout statement should be Node(...) or Comment(...).", SEVERITY.Error));
+            continue;
+        }
+
+        const layoutKind = normalizeSymbolKey(entry.layoutKind);
+        if (layoutKind !== "node" && layoutKind !== "comment") {
+            diagnostics.push(makeDiagnostic(entry.callExpression?.calleeOffset ?? entry.startOffset, (entry.callExpression?.calleeOffset ?? entry.startOffset) + String(entry.layoutKind || "").length, `Unknown Layout statement '${entry.layoutKind}'.`, SEVERITY.Error));
+            continue;
+        }
+
+        const args = collectNamedArguments(entry.callExpression?.arguments || []);
+        if (!args.valid) {
+            diagnostics.push(makeDiagnostic(entry.startOffset, entry.endOffset, "Layout arguments must use Key=Value syntax.", SEVERITY.Error));
+            continue;
+        }
+
+        for (const duplicate of args.duplicates) {
+            diagnostics.push(makeDiagnostic(duplicate.nameOffset, duplicate.nameOffset + duplicate.name.length, `Layout argument '${duplicate.name}' is declared more than once.`, SEVERITY.Error));
+        }
+
+        if (layoutKind === "node") {
+            validateRequiredTextLayoutArgument(diagnostics, args.map, "Var", entry);
+            validateRequiredIntLayoutArgument(diagnostics, args.map, "X", entry);
+            validateRequiredIntLayoutArgument(diagnostics, args.map, "Y", entry);
+        } else {
+            validateRequiredTextLayoutArgument(diagnostics, args.map, "Name", entry);
+            validateRequiredIntLayoutArgument(diagnostics, args.map, "X", entry);
+            validateRequiredIntLayoutArgument(diagnostics, args.map, "Y", entry);
+            validateRequiredIntLayoutArgument(diagnostics, args.map, "W", entry);
+            validateRequiredIntLayoutArgument(diagnostics, args.map, "H", entry);
+            validateOptionalColorLayoutArgument(diagnostics, args.map);
+        }
+    }
+}
+
+function collectNamedArguments(args) {
+    const map = new Map();
+    const duplicates = [];
+    let valid = true;
+    for (const arg of args || []) {
+        if (!arg.isNamed) {
+            valid = false;
+            continue;
+        }
+        const key = normalizeSymbolKey(arg.name);
+        if (map.has(key)) {
+            duplicates.push(arg);
+        } else {
+            map.set(key, arg);
+        }
+    }
+    return { map, duplicates, valid };
+}
+
+function validateRequiredTextLayoutArgument(diagnostics, args, name, entry) {
+    const arg = args.get(normalizeSymbolKey(name));
+    if (!arg || !unquote(arg.valueText).trim()) {
+        diagnostics.push(makeDiagnostic(entry.startOffset, entry.endOffset, `Layout argument '${name}' is required.`, SEVERITY.Error));
+    }
+}
+
+function validateRequiredIntLayoutArgument(diagnostics, args, name, entry) {
+    const arg = args.get(normalizeSymbolKey(name));
+    if (!arg) {
+        diagnostics.push(makeDiagnostic(entry.startOffset, entry.endOffset, `Layout argument '${name}' is required.`, SEVERITY.Error));
+        return;
+    }
+    if (!/^[+-]?\d+$/.test(unquote(arg.valueText).trim())) {
+        diagnostics.push(makeDiagnostic(arg.valueOffset, arg.endOffset, `Layout argument '${name}' must be an integer.`, SEVERITY.Error));
+    }
+}
+
+function validateOptionalColorLayoutArgument(diagnostics, args) {
+    const arg = args.get("color");
+    if (!arg) {
+        return;
+    }
+    if (!/^float4\s*\(\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*\)$/i.test(unquote(arg.valueText).trim())) {
+        diagnostics.push(makeDiagnostic(arg.valueOffset, arg.endOffset, "Layout Comment Color must be a float4 literal.", SEVERITY.Error));
+    }
+}
+
+function addGraphRegionDirectiveDiagnostics(diagnostics, bodyText, baseOffset) {
+    const openRegions = [];
+    let lineStart = 0;
+    const source = String(bodyText || "");
+    const lines = source.split(/\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+        const rawLine = lines[index].replace(/\r$/, "");
+        const trimmed = rawLine.trim();
+        if (isRegionDirective(trimmed, "#Region")) {
+            const name = parseRegionDirectiveName(trimmed, "#Region");
+            if (!name) {
+                const directiveOffset = baseOffset + lineStart + Math.max(0, rawLine.indexOf("#"));
+                diagnostics.push(makeDiagnostic(directiveOffset, directiveOffset + "#Region".length, "Graph #Region must include a name.", SEVERITY.Error));
+            }
+            openRegions.push({ name, offset: baseOffset + lineStart + Math.max(0, rawLine.indexOf("#")) });
+        } else if (isRegionDirective(trimmed, "#EndRegion")) {
+            if (openRegions.length === 0) {
+                const directiveOffset = baseOffset + lineStart + Math.max(0, rawLine.indexOf("#"));
+                diagnostics.push(makeDiagnostic(directiveOffset, directiveOffset + "#EndRegion".length, "Graph #EndRegion has no matching #Region.", SEVERITY.Error));
+            } else {
+                openRegions.pop();
+            }
+        }
+        lineStart += lines[index].length + 1;
+    }
+
+    for (const region of openRegions) {
+        diagnostics.push(makeDiagnostic(region.offset, region.offset + "#Region".length, `Graph #Region '${region.name || ""}' is missing #EndRegion.`, SEVERITY.Error));
+    }
+}
+
+function isRegionDirective(trimmedLine, directive) {
+    return trimmedLine.length >= directive.length
+        && trimmedLine.slice(0, directive.length).toLowerCase() === directive.toLowerCase()
+        && (trimmedLine.length === directive.length || /\s|"/.test(trimmedLine[directive.length]));
+}
+
+function parseRegionDirectiveName(trimmedLine, directive) {
+    return unquote(trimmedLine.slice(directive.length).trim()).trim();
 }
 
 function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols, reachableCallables) {
@@ -976,10 +1112,10 @@ function addBraceDiagnostics(diagnostics, text) {
 
 function allowedSectionsForBlock(kind) {
     if (kind === "Shader") {
-        return ["Properties", "Settings", "Outputs", "Graph"];
+        return ["Properties", "Settings", "Outputs", "Graph", "Layout"];
     }
     if (kind === "ShaderFunction" || kind === "ShaderLayer" || kind === "ShaderLayerBlend") {
-        return ["Properties", "Inputs", "Outputs", "Results", "Graph", "Settings"];
+        return ["Properties", "Inputs", "Outputs", "Results", "Graph", "Settings", "Layout"];
     }
     if (kind === "VirtualFunction") {
         return ["Options", "Settings", "Properties", "Inputs", "Outputs", "Results"];

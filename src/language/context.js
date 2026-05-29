@@ -54,6 +54,8 @@ function analyzeContext(text, offset) {
             kind = "Metadata";
         } else if (section.name === "Graph") {
             kind = "Graph";
+        } else if (section.name === "Layout") {
+            kind = "Layout";
         } else if (section.name === "Outputs") {
             kind = getOutputsContextKind(entry, offset);
         } else if (section.name === "Settings" || section.name === "Options") {
