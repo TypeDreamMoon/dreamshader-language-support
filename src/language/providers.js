@@ -3,16 +3,8 @@
 const { parseDocument } = require("./parser");
 const { isConstructorName } = require("./calls");
 const { flatten } = require("./symbols");
+const { isFunctionBuiltinName } = require("./functionBuiltins");
 const { normalizeSymbolKey, stripCommentsPreserveLayout } = require("./utils");
-
-const HLSL_INTRINSIC_NAMES = new Set([
-    "abs", "acos", "all", "any", "asin", "atan", "atan2", "ceil", "clamp", "clip", "cos", "cosh", "cross",
-    "ddx", "ddx_coarse", "ddx_fine", "ddy", "ddy_coarse", "ddy_fine", "degrees", "determinant", "distance",
-    "dot", "exp", "exp2", "floor", "fmod", "frac", "fract", "frexp", "fwidth", "isfinite", "isinf", "isnan", "ldexp",
-    "length", "lerp", "lit", "log", "log10", "log2", "max", "min", "mix", "mod", "modf", "mul", "normalize", "pow", "radians",
-    "reflect", "refract", "round", "rsqrt", "saturate", "sign", "sin", "sincos", "sinh", "smoothstep", "sqrt",
-    "step", "tan", "tanh", "transpose", "trunc"
-]);
 
 const CONTROL_CALL_NAMES = new Set(["if", "for", "while", "switch", "return"]);
 
@@ -290,7 +282,7 @@ function addCalleeTokens(tokens, callee, calleeOffset) {
         return;
     }
 
-    if (HLSL_INTRINSIC_NAMES.has(normalized)) {
+    if (isFunctionBuiltinName(normalized)) {
         tokens.push({ offset: calleeOffset, length: callee.length, type: "function", modifiers: ["defaultLibrary"] });
         return;
     }
@@ -309,7 +301,7 @@ function addCalleeTokens(tokens, callee, calleeOffset) {
 
     const dotIndex = callee.lastIndexOf(".");
     if (dotIndex > 0) {
-        const defaultLibrary = normalized.startsWith("ue.") ? ["defaultLibrary"] : [];
+        const defaultLibrary = (normalized.startsWith("ue.") || normalized.startsWith("substrate.")) ? ["defaultLibrary"] : [];
         tokens.push({ offset: calleeOffset, length: dotIndex, type: "namespace", modifiers: defaultLibrary });
         tokens.push({
             offset: calleeOffset + dotIndex + 1,

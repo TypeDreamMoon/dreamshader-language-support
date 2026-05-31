@@ -125,7 +125,7 @@ function resolveTypeInfo(typeText) {
         return { type: key, isMaterialAttributes: true };
     }
     if (SUBSTRATE_TYPES.has(key)) {
-        return { type: key, isSubstrate: true, isMaterialAttributes: true };
+        return { type: key, isSubstrate: true };
     }
     if (key === "void") {
         return { type: key, isVoid: true };
@@ -146,6 +146,9 @@ function areTypesCompatible(leftType, rightType) {
     const right = resolveTypeInfo(rightType);
     if (!left || !right) {
         return true;
+    }
+    if (left.isSubstrate || right.isSubstrate) {
+        return Boolean(left.isSubstrate) === Boolean(right.isSubstrate);
     }
     if (left.isMaterialAttributes || right.isMaterialAttributes) {
         return Boolean(left.isMaterialAttributes) === Boolean(right.isMaterialAttributes);

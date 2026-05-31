@@ -4,6 +4,7 @@ const path = require("path");
 const { parseDocument, parseCodeStatements } = require("./parser");
 const { collectSymbols, collectCallables, flatten } = require("./symbols");
 const { parseCallExpressionText } = require("./calls");
+const { isFunctionBuiltinName } = require("./functionBuiltins");
 const { isTypeName, resolveTypeInfo, getMaterialAttributeMemberType, areTypesCompatible } = require("./types");
 const {
     IDENTIFIER_PATTERN,
@@ -15,8 +16,11 @@ const {
 } = require("./utils");
 const {
     MATERIAL_OUTPUT_NAME_SET,
-    MATERIAL_ATTRIBUTE_MEMBER_NAME_SET
+    MATERIAL_ATTRIBUTE_MEMBER_NAME_SET,
+    SUBSTRATE_BUILTIN_ITEMS
 } = require("../languageData");
+
+const SUBSTRATE_BUILTIN_NAME_SET = new Set(SUBSTRATE_BUILTIN_ITEMS.map((item) => normalizeSymbolKey(item.name)));
 
 const SEVERITY = {
     Error: "Error",
@@ -220,11 +224,14 @@ function addSubstrateSettingDiagnostics(diagnostics, block, sectionsByName) {
     const hasMaterialAttributesOutput = (outputs?.entries || []).some((entry) =>
         (entry.kind === "declaration" && resolveTypeInfo(entry.type)?.isMaterialAttributes)
         || (entry.kind === "binding" && /^Base\s*\.\s*(MaterialAttributes|Attributes)\s*$/i.test(entry.target || "")));
-    if (!hasMaterialAttributesOutput) {
+    const hasFrontMaterialOutput = (outputs?.entries || []).some((entry) =>
+        (entry.kind === "declaration" && resolveTypeInfo(entry.type)?.isSubstrate)
+        || (entry.kind === "binding" && /^Base\s*\.\s*FrontMaterial\s*$/i.test(entry.target || "")));
+    if (!hasMaterialAttributesOutput && !hasFrontMaterialOutput) {
         diagnostics.push(makeDiagnostic(
             shadingModel.valueOffset,
             shadingModel.valueOffset + String(shadingModel.value || "").length,
-            "Substrate/Strata materials should output MaterialAttributes or bind Base.MaterialAttributes.",
+            "Substrate/Strata materials should bind Base.FrontMaterial or output MaterialAttributes.",
             SEVERITY.Information));
     }
 }
@@ -568,7 +575,12 @@ function validateAssignmentTarget(diagnostics, statement, symbols) {
 
 function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reachableCallables) {
     const clean = stripCommentsPreserveLayout(text);
-    const known = new Set([...symbols.keys(), "ue", "true", "false", "default"]);
+    const known = new Set([...symbols.keys(), "ue", "substrate", "true", "false", "default"]);
+    for (const symbol of symbols.values()) {
+        if (symbol?.typeInfo?.isTexture) {
+            known.add(normalizeSymbolKey(`${symbol.name}Sampler`));
+        }
+    }
     for (const [key] of mapEntries(reachableCallables)) {
         known.add(normalizeSymbolKey(String(key).split("::").pop()));
         known.add(normalizeSymbolKey(key));
@@ -589,6 +601,16 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
         const base = normalizeSymbolKey(match[1]);
         const member = normalizeSymbolKey(match[2]);
         if (base === "ue" || base === "base") {
+            continue;
+        }
+        if (base === "substrate") {
+            if (!SUBSTRATE_BUILTIN_NAME_SET.has(member)) {
+                diagnostics.push(makeDiagnostic(
+                    baseOffset + match.index,
+                    baseOffset + match.index + match[0].length,
+                    `Unknown Substrate builtin '${match[2]}'.`,
+                    SEVERITY.Warning));
+            }
             continue;
         }
         const typeInfo = symbols.get(base)?.typeInfo || resolveTypeInfo(match[1]);
@@ -625,7 +647,7 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
 }
 
 function validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, standalone) {
-    if (!callExpression || isHlslKnownName(normalizeSymbolKey(callExpression.callee)) || normalizeSymbolKey(callExpression.callee).startsWith("ue.") || isTypeName(callExpression.callee) || normalizeSymbolKey(callExpression.callee) === "path") {
+    if (!callExpression || isHlslKnownName(normalizeSymbolKey(callExpression.callee)) || normalizeSymbolKey(callExpression.callee).startsWith("ue.") || isKnownSubstrateBuiltinCall(callExpression.callee) || isTypeName(callExpression.callee) || normalizeSymbolKey(callExpression.callee) === "path") {
         for (let index = 0; index < (callExpression?.arguments || []).length; index += 1) {
             const arg = callExpression.arguments[index];
             if (arg.isNamed) {
@@ -707,6 +729,11 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     }
 }
 
+function isKnownSubstrateBuiltinCall(callee) {
+    const key = normalizeSymbolKey(callee);
+    return key.startsWith("substrate.") && SUBSTRATE_BUILTIN_NAME_SET.has(key.slice("substrate.".length));
+}
+
 function countOptionalTailInputs(inputs) {
     let count = 0;
     for (let index = inputs.length - 1; index >= 0; index -= 1) {
@@ -758,11 +785,8 @@ function isOutputSelectorArgument(argument) {
 function isHlslKnownName(key) {
     return [
         "if", "else", "for", "while", "do", "switch", "case", "return", "break", "continue",
-        "const", "static", "struct", "sin", "cos", "tan", "saturate", "lerp", "clamp", "dot",
-        "cross", "normalize", "pow", "sqrt", "abs", "min", "max", "frac", "floor", "ceil",
-        "ddx", "ddy", "fmod", "length", "mul", "reflect", "rsqrt", "smoothstep", "step", "exp", "exp2", "log", "log2",
-        "mix", "fract", "mod"
-    ].includes(key);
+        "const", "static", "struct"
+    ].includes(key) || isFunctionBuiltinName(key);
 }
 
 function collectIgnoredIdentifierRanges(text) {
@@ -1029,7 +1053,7 @@ function shouldValidateNamedArgumentValue(callee, name, valueText) {
     if (calleeKey === "path") {
         return false;
     }
-    if (calleeKey.startsWith("ue.") && [
+    if ((calleeKey.startsWith("ue.") || calleeKey.startsWith("substrate.")) && [
         "class",
         "outputtype",
         "resulttype",

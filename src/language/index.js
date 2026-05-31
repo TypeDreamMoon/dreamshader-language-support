@@ -9,6 +9,7 @@ const providers = require("./providers");
 const calls = require("./calls");
 const indexer = require("./indexer");
 const formatter = require("./formatter");
+const functionBuiltins = require("./functionBuiltins");
 
 module.exports = {
     ...parser,
@@ -19,5 +20,6 @@ module.exports = {
     ...providers,
     ...calls,
     ...indexer,
-    ...formatter
+    ...formatter,
+    ...functionBuiltins
 };

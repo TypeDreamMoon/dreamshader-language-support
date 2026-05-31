@@ -80,9 +80,10 @@ function analyzeContext(text, offset) {
         kind,
         memberAccess: getMemberAccess(linePrefix, offset),
         afterUEAccessor: /UE\s*\.\s*[A-Za-z0-9_]*$/.test(linePrefix),
+        afterSubstrateAccessor: /\bSubstrate\s*\.\s*[A-Za-z0-9_]*$/.test(linePrefix),
         afterBaseAccessor: /\bBase\s*\.\s*[A-Za-z0-9_]*$/.test(linePrefix),
         afterExpressionAccessor: /Expression\s*\([^)]*\)\.\w*$/.test(linePrefix),
-        afterMemberAccessor: /\.[A-Za-z0-9_]*$/.test(linePrefix) && !/UE\s*\.\s*[A-Za-z0-9_]*$/.test(linePrefix),
+        afterMemberAccessor: /\.[A-Za-z0-9_]*$/.test(linePrefix) && !/(?:UE|Substrate)\s*\.\s*[A-Za-z0-9_]*$/.test(linePrefix),
         currentWord: getCurrentWord(text, offset)
     };
 }

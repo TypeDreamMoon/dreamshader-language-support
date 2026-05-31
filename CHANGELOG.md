@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.9
+
+- Added shared Function builtin metadata for HLSL intrinsics, GLSL aliases, and Unreal texture sampling helpers.
+- Added Function builtin completion, hover, signature help, inlay-hint metadata, semantic highlighting, and diagnostics allow-list coverage.
+- Synced UE 5.7 `Substrate.*` graph helper completion and `Base.FrontMaterial` output diagnostics/highlighting with the current DreamShader plugin.
+- Documented the supported Function builtin list in both README files.
+
 ## 1.4.8
 
 - Added language support for `Layout` sections with `Node(...)` and `Comment(...)` statements.

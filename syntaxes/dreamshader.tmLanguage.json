@@ -334,7 +334,7 @@
     "materialOutputs": {
       "patterns": [
         { "name": "support.class.output-root.dreamshader", "match": "\\bBase\\b(?=\\s*\\.)" },
-        { "name": "variable.language.output.dreamshader", "match": "\\bBase\\s*\\.\\s*(?:MaterialAttributes|Attributes|BaseColor|EmissiveColor|Emissive|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|CustomData0|CustomData1|DiffuseColor|SpecularColor|SurfaceThickness|Displacement|CustomizedUV0|CustomizedUV1|CustomizedUV2|CustomizedUV3|CustomizedUV4|CustomizedUV5|CustomizedUV6|CustomizedUV7|CustomizedUVs0|CustomizedUVs1|CustomizedUVs2|CustomizedUVs3|CustomizedUVs4|CustomizedUVs5|CustomizedUVs6|CustomizedUVs7|MooaEncodedAttribute0|MooaEncodedAttribute1|MooaEncodedAttribute2|MooaEncodedAttribute3|MooaEncodedAttribute4|Anisotropy|Tangent)\\b(?=\\s*=)" },
+        { "name": "variable.language.output.dreamshader", "match": "\\bBase\\s*\\.\\s*(?:MaterialAttributes|Attributes|FrontMaterial|BaseColor|EmissiveColor|Emissive|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|CustomData0|CustomData1|DiffuseColor|SpecularColor|SurfaceThickness|Displacement|CustomizedUV0|CustomizedUV1|CustomizedUV2|CustomizedUV3|CustomizedUV4|CustomizedUV5|CustomizedUV6|CustomizedUV7|CustomizedUVs0|CustomizedUVs1|CustomizedUVs2|CustomizedUVs3|CustomizedUVs4|CustomizedUVs5|CustomizedUVs6|CustomizedUVs7|MooaEncodedAttribute0|MooaEncodedAttribute1|MooaEncodedAttribute2|MooaEncodedAttribute3|MooaEncodedAttribute4|Anisotropy|Tangent)\\b(?=\\s*=)" },
         { "name": "support.function.output-node.dreamshader", "match": "\\bExpression\\b(?=\\s*\\()" },
         { "name": "variable.parameter.output-pin.dreamshader", "match": "\\bPin\\b(?=\\s*\\[)" }
       ]
@@ -342,12 +342,12 @@
     "ueCalls": {
       "patterns": [
         { "name": "support.class.namespace.dreamshader", "match": "\\bUE\\b(?=\\.)" },
-        { "name": "support.function.ue.dreamshader", "match": "(?<=\\bUE\\.)[A-Za-z_][A-Za-z0-9_]*\\b" }
+        { "name": "support.function.ue.dreamshader", "match": "(?<=\\b(?:UE|Substrate)\\.)[A-Za-z_][A-Za-z0-9_]*\\b" }
       ]
     },
     "hlslIntrinsics": {
       "patterns": [
-        { "name": "support.function.hlsl.dreamshader", "match": "\\b(?:abs|acos|all|any|asin|atan|atan2|ceil|clamp|clip|cos|cosh|cross|ddx|ddx_coarse|ddx_fine|ddy|ddy_coarse|ddy_fine|degrees|determinant|distance|dot|exp|exp2|floor|fmod|frac|fract|frexp|fwidth|isfinite|isinf|isnan|ldexp|length|lerp|lit|log|log10|log2|max|min|mix|mod|modf|mul|normalize|pow|radians|reflect|refract|round|rsqrt|saturate|sign|sin|sincos|sinh|smoothstep|sqrt|step|tan|tanh|transpose|trunc)\\b(?=\\s*\\()" }
+        { "name": "support.function.hlsl.dreamshader", "match": "\\b(?:abs|acos|all|any|asin|atan|ceil|clip|cos|cosh|ddx|ddx_coarse|ddx_fine|ddy|ddy_coarse|ddy_fine|degrees|determinant|exp|exp2|floor|frac|fwidth|isfinite|isinf|isnan|length|lit|log|log10|log2|normalize|radians|round|rsqrt|saturate|sign|sin|sinh|sqrt|tan|tanh|transpose|trunc|atan2|cross|distance|dot|fmod|frexp|ldexp|max|min|modf|mul|pow|reflect|refract|clamp|lerp|smoothstep|step|sincos|mix|fract|mod|Texture2DSample|Texture2DSampleLevel|Texture2DSampleBias|Texture2DSampleGrad|Texture2DArraySample|Texture2DArraySampleLevel|TextureCubeSample|TextureCubeSampleLevel|Texture3DSample|Texture3DSampleLevel)\\b(?=\\s*\\()" }
       ]
     },
     "namespaceCalls": {

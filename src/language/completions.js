@@ -14,54 +14,15 @@ const {
     VIRTUAL_FUNCTION_OPTION_ITEMS,
     MATERIAL_OUTPUT_ITEMS,
     MATERIAL_ATTRIBUTE_MEMBER_ITEMS,
+    SUBSTRATE_BUILTIN_ITEMS,
     OUTPUT_HELPER_ITEMS,
     UE_BUILTINS,
     getBundledMaterialExpressionBuiltinItems
 } = require("../languageData");
+const { FUNCTION_BUILTIN_ITEMS } = require("./functionBuiltins");
 const { analyzeContext } = require("./context");
 const { collectSymbols, collectCallables } = require("./symbols");
 const { normalizeSymbolKey, stripCommentsPreserveLayout } = require("./utils");
-
-const HLSL_INTRINSIC_ITEMS = [
-    ["abs", "abs(${1:x})", "Absolute value"],
-    ["acos", "acos(${1:x})", "Arc cosine"],
-    ["asin", "asin(${1:x})", "Arc sine"],
-    ["atan", "atan(${1:x})", "Arc tangent"],
-    ["atan2", "atan2(${1:y}, ${2:x})", "Arc tangent of y/x"],
-    ["ceil", "ceil(${1:x})", "Ceiling"],
-    ["clamp", "clamp(${1:x}, ${2:minValue}, ${3:maxValue})", "Clamp to range"],
-    ["cos", "cos(${1:x})", "Cosine"],
-    ["cross", "cross(${1:a}, ${2:b})", "Vector cross product"],
-    ["ddx", "ddx(${1:x})", "Screen-space derivative X"],
-    ["ddy", "ddy(${1:x})", "Screen-space derivative Y"],
-    ["distance", "distance(${1:a}, ${2:b})", "Distance between values"],
-    ["dot", "dot(${1:a}, ${2:b})", "Vector dot product"],
-    ["exp", "exp(${1:x})", "Base-e exponent"],
-    ["exp2", "exp2(${1:x})", "Base-2 exponent"],
-    ["floor", "floor(${1:x})", "Floor"],
-    ["frac", "frac(${1:x})", "Fractional part"],
-    ["fract", "frac(${1:x})", "GLSL-style alias for frac"],
-    ["fmod", "fmod(${1:x}, ${2:y})", "Floating-point remainder"],
-    ["length", "length(${1:x})", "Vector length"],
-    ["lerp", "lerp(${1:a}, ${2:b}, ${3:alpha})", "Linear interpolation"],
-    ["mix", "lerp(${1:a}, ${2:b}, ${3:alpha})", "GLSL-style alias for lerp"],
-    ["log", "log(${1:x})", "Natural logarithm"],
-    ["log2", "log2(${1:x})", "Base-2 logarithm"],
-    ["max", "max(${1:a}, ${2:b})", "Maximum"],
-    ["min", "min(${1:a}, ${2:b})", "Minimum"],
-    ["mul", "mul(${1:a}, ${2:b})", "Matrix/vector multiply"],
-    ["mod", "fmod(${1:x}, ${2:y})", "GLSL-style alias for fmod"],
-    ["normalize", "normalize(${1:x})", "Normalize vector"],
-    ["pow", "pow(${1:x}, ${2:y})", "Power"],
-    ["reflect", "reflect(${1:i}, ${2:n})", "Reflection vector"],
-    ["rsqrt", "rsqrt(${1:x})", "Reciprocal square root"],
-    ["saturate", "saturate(${1:x})", "Clamp to 0..1"],
-    ["sin", "sin(${1:x})", "Sine"],
-    ["smoothstep", "smoothstep(${1:minValue}, ${2:maxValue}, ${3:x})", "Smooth Hermite interpolation"],
-    ["sqrt", "sqrt(${1:x})", "Square root"],
-    ["step", "step(${1:y}, ${2:x})", "Step comparison"],
-    ["tan", "tan(${1:x})", "Tangent"]
-];
 
 const SETTING_MAPPING_FALLBACKS = new Map([
     ["MaterialDomain", ["Surface", "DeferredDecal", "LightFunction", "PostProcess", "UserInterface", "UI", "VirtualTexture"]],
@@ -101,14 +62,6 @@ const METADATA_ITEMS = [
     ["CoordinatesDY", "CoordinatesDY=${1:ddy(UV)}", "Texture derivative Y input"],
     ["ConstCoordinate", "ConstCoordinate=${1:0}", "Texture coordinate channel"],
     ["ConstMipValue", "ConstMipValue=${1:-1}", "Texture mip override"]
-];
-
-const SUBSTRATE_GRAPH_ITEMS = [
-    ["SubstrateSlabBSDF", "UE.SubstrateSlabBSDF(BaseColor=${1:Color}, Roughness=${2:Roughness}, Normal=${3:Normal})", "Create a Substrate slab BSDF graph node"],
-    ["SubstrateSimpleClearCoat", "UE.SubstrateSimpleClearCoat(Base=${1:Base}, Coat=${2:Coat}, Weight=${3:1.0})", "Create a Substrate clear coat operator"],
-    ["SubstrateHorizontalMixing", "UE.SubstrateHorizontalMixing(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Mix two Substrate materials horizontally"],
-    ["SubstrateVerticalLayering", "UE.SubstrateVerticalLayering(Top=${1:Top}, Bottom=${2:Bottom}, Thickness=${3:1.0})", "Layer Substrate materials vertically"],
-    ["SubstrateAdd", "UE.SubstrateAdd(A=${1:A}, B=${2:B})", "Add two Substrate materials"]
 ];
 
 const DECLARATION_SNIPPET_ITEMS = [
@@ -189,6 +142,11 @@ function getCompletionSpecs(text, offset, services = {}) {
 
     if (context.afterUEAccessor && isGraphLike(context)) {
         addUEBuiltinMembers(add, services, context);
+        return dedupe(specs);
+    }
+
+    if (context.afterSubstrateAccessor && isGraphLike(context)) {
+        addSubstrateBuiltinMembers(add);
         return dedupe(specs);
     }
 
@@ -285,6 +243,7 @@ function getCompletionSpecs(text, offset, services = {}) {
 
     if (context.kind === "GraphFunctionBody" || context.kind === "Graph") {
         add({ label: "UE", kind: "Module", insertText: "UE.", detail: "Unreal material graph node namespace" });
+        add({ label: "Substrate", kind: "Module", insertText: "Substrate.", detail: "UE 5.7 Substrate material node namespace" });
         addSymbols(add, context, services);
         addReachableFunctions(add, context, services);
         addTypeItems(add, "graph");
@@ -404,8 +363,14 @@ function addHlslKeywords(add) {
 }
 
 function addHlslIntrinsics(add) {
-    for (const [name, snippet, detail] of HLSL_INTRINSIC_ITEMS) {
-        add({ label: name, kind: "Function", insertText: snippet, detail: `HLSL ${detail}` });
+    for (const builtin of FUNCTION_BUILTIN_ITEMS) {
+        add({
+            label: builtin.name,
+            kind: "Function",
+            insertText: builtin.snippet,
+            detail: `${builtin.category}: ${builtin.detail}`,
+            documentation: builtin.documentation
+        });
     }
 }
 
@@ -431,17 +396,23 @@ function addSubstrateGraphItems(add, context) {
     if (!blockUsesSubstrate(context.block)) {
         return;
     }
-    for (const [label, insertText, detail] of SUBSTRATE_GRAPH_ITEMS) {
-        add({ label, kind: "Function", insertText, detail });
+    for (const builtin of SUBSTRATE_BUILTIN_ITEMS) {
+        add({ label: builtin.qualifiedName, kind: "Function", insertText: builtin.snippet, detail: builtin.detail });
     }
 }
 
 function blockUsesSubstrate(block) {
     const settings = (block?.sections || []).find((section) => section.name === "Settings");
-    return (settings?.entries || []).some((entry) =>
+    if ((settings?.entries || []).some((entry) =>
         entry.kind === "assignment"
         && normalizeSymbolKey(entry.name) === "shadingmodel"
-        && ["substrate", "strata"].includes(normalizeSymbolKey(String(entry.value || "").replace(/^"|"$/g, ""))));
+        && ["substrate", "strata"].includes(normalizeSymbolKey(String(entry.value || "").replace(/^"|"$/g, ""))))) {
+        return true;
+    }
+    const outputs = (block?.sections || []).find((section) => section.name === "Outputs");
+    return (outputs?.entries || []).some((entry) =>
+        (entry.kind === "declaration" && entry.type && normalizeSymbolKey(entry.type).startsWith("substrate"))
+        || (entry.kind === "binding" && /^Base\s*\.\s*FrontMaterial\s*$/i.test(entry.target || "")));
 }
 
 function addDeclarationSnippets(add, context) {
@@ -550,6 +521,12 @@ function addUEBuiltins(add, services) {
 
 function addUEBuiltinMembers(add, services) {
     for (const builtin of getUEBuiltins(services)) {
+        add({ label: builtin.name, kind: "Function", insertText: builtin.memberSnippet || builtin.snippet || builtin.name, detail: builtin.detail });
+    }
+}
+
+function addSubstrateBuiltinMembers(add) {
+    for (const builtin of SUBSTRATE_BUILTIN_ITEMS) {
         add({ label: builtin.name, kind: "Function", insertText: builtin.memberSnippet || builtin.snippet || builtin.name, detail: builtin.detail });
     }
 }
@@ -819,7 +796,7 @@ function dedupe(specs) {
 
 module.exports = {
     getCompletionSpecs,
-    HLSL_INTRINSIC_ITEMS,
+    HLSL_INTRINSIC_ITEMS: FUNCTION_BUILTIN_ITEMS,
     SETTING_MAPPING_FALLBACKS,
     METADATA_ITEMS
 };

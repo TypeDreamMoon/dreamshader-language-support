@@ -8,7 +8,7 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.4.8` syncs the current DreamShader layout metadata syntax: `Layout` sections, `Node(...)` / `Comment(...)` statements, and Graph `#Region` / `#EndRegion` directives are covered by completion, diagnostics, formatting, symbols, folding, snippets, and highlighting.
+Version `1.4.9` adds shared `Function` builtin metadata for HLSL intrinsics, GLSL aliases, and Unreal texture sampling helpers, with completion, hover, signature help, inlay hints, diagnostics, and highlighting all reading the same list. It also syncs UE 5.7 `Substrate.*` graph helpers and `Base.FrontMaterial` output support with the current DreamShader plugin.
 
 ## Highlights
 
@@ -18,7 +18,8 @@ Version `1.4.8` syncs the current DreamShader layout metadata syntax: `Layout` s
 - Section-aware completion for `Properties`, `Inputs`, `Outputs`, `Settings`, `Options`, `Graph`, and `Layout`.
 - Type completion in declarations, function signatures, Graph code, and HLSL helper code.
 - UE graph node completion with `UE.` member suggestions.
-- HLSL intrinsic completion inside `Function` and graph-like code.
+- UE 5.7 Substrate graph completion with `Substrate.` member suggestions and `Base.FrontMaterial` output support.
+- HLSL intrinsic, GLSL alias, and Unreal texture helper completion inside `Function` and graph-like code.
 - `Base.` output completion that inserts only the selected material output member.
 - `MaterialAttributes` member completion such as `BaseColor`, `Roughness`, `Metallic`, `Normal`, and `Opacity`.
 - Settings value completion for `Domain`, `MaterialDomain`, `ShadingModel`, `BlendMode`, and `RenderType`.
@@ -125,6 +126,70 @@ Graph = {
 }
 ```
 
+## Substrate Graph Helpers
+
+Substrate materials can bind a `Substrate` graph value to `Base.FrontMaterial`:
+
+```dreamshader
+Shader(Name="Materials/M_Substrate")
+{
+    Settings = {
+        ShadingModel = "Substrate";
+    }
+
+    Outputs = {
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+    }
+
+    Graph = {
+        Surface = Substrate.Unlit(EmissiveColor=float3(0.1, 0.6, 1.0));
+    }
+}
+```
+
+The extension completes DreamShader's current `Substrate.*` wrappers, including `Unlit`, `Slab`, `ConvertMaterialAttributes`, `HorizontalMix`, `VerticalLayer`, `Add`, `Weight`, `Select`, `ThinFilm`, and related UE 5.7 Substrate helpers.
+
+## Function Builtins
+
+`Function` blocks are HLSL-style helper code. The extension provides completion, hover, signature help, semantic highlighting, and local diagnostic allow-list coverage for these builtins.
+
+HLSL intrinsics:
+
+```text
+abs, acos, all, any, asin, atan, atan2, ceil, clamp, clip, cos, cosh, cross,
+ddx, ddx_coarse, ddx_fine, ddy, ddy_coarse, ddy_fine, degrees, determinant,
+distance, dot, exp, exp2, floor, fmod, frac, frexp, fwidth, isfinite, isinf,
+isnan, ldexp, length, lerp, lit, log, log10, log2, max, min, modf, mul,
+normalize, pow, radians, reflect, refract, round, rsqrt, saturate, sign, sin,
+sincos, sinh, smoothstep, sqrt, step, tan, tanh, transpose, trunc
+```
+
+GLSL aliases accepted by DreamShader:
+
+```text
+mix -> lerp
+fract -> frac
+mod -> fmod
+```
+
+Unreal texture sampling helpers:
+
+```text
+Texture2DSample, Texture2DSampleLevel, Texture2DSampleBias, Texture2DSampleGrad,
+Texture2DArraySample, Texture2DArraySampleLevel,
+TextureCubeSample, TextureCubeSampleLevel,
+Texture3DSample, Texture3DSampleLevel
+```
+
+Example:
+
+```dreamshader
+Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
+    color = Texture2DSample(texture, textureSampler, uv).rgb;
+}
+```
+
 ## Templates
 
 The extension contributes file and code templates for common DreamShader authoring tasks:
@@ -214,7 +279,7 @@ npm run package
 The packaged VSIX is generated as:
 
 ```text
-dreamshaderlang-language-support-1.4.2.vsix
+dreamshaderlang-language-support-1.4.9.vsix
 ```
 
 ## License

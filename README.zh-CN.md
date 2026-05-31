@@ -8,7 +8,7 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.4.8` 版本同步当前 DreamShader 布局 metadata 语法：`Layout` 区块、`Node(...)` / `Comment(...)` 语句，以及 Graph `#Region` / `#EndRegion` 指令都已接入补全、诊断、格式化、符号、折叠、snippet 和高亮。
+`1.4.9` 版本新增统一的 `Function` 内置函数 metadata，覆盖 HLSL 原生函数、GLSL 风格别名和 Unreal 纹理采样 helper；补全、Hover、Signature Help、Inlay Hint、诊断和高亮都会读取同一份列表。同时同步当前 DreamShader 插件中的 UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出支持。
 
 ## 主要能力
 
@@ -17,7 +17,8 @@ DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言�
 - `Properties`、`Inputs`、`Outputs`、`Settings`、`Options`、`Graph`、`Layout` 的区块级补全。
 - 声明、函数签名、Graph 代码和 HLSL helper 中的类型补全。
 - `UE.` 内置 Graph 节点补全。
-- `Function` 和 Graph 类上下文中的 HLSL 原生函数补全。
+- UE 5.7 `Substrate.` 图节点补全和 `Base.FrontMaterial` 输出支持。
+- `Function` 和 Graph 类上下文中的 HLSL 原生函数、GLSL 别名和 Unreal 纹理 helper 补全。
 - `Base.` 输出补全只插入成员名，避免 `Base.Base.xxx`。
 - `MaterialAttributes` 成员补全，例如 `BaseColor`、`Roughness`、`Metallic`、`Normal`、`Opacity`。
 - `Domain`、`MaterialDomain`、`ShadingModel`、`BlendMode`、`RenderType` 的 Settings 值补全。
@@ -124,6 +125,70 @@ Graph = {
 }
 ```
 
+## Substrate Graph Helper
+
+Substrate 材质可以把 `Substrate` 图值绑定到 `Base.FrontMaterial`：
+
+```dreamshader
+Shader(Name="Materials/M_Substrate")
+{
+    Settings = {
+        ShadingModel = "Substrate";
+    }
+
+    Outputs = {
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+    }
+
+    Graph = {
+        Surface = Substrate.Unlit(EmissiveColor=float3(0.1, 0.6, 1.0));
+    }
+}
+```
+
+扩展会补全 DreamShader 当前支持的 `Substrate.*` wrapper，包括 `Unlit`、`Slab`、`ConvertMaterialAttributes`、`HorizontalMix`、`VerticalLayer`、`Add`、`Weight`、`Select`、`ThinFilm` 和相关 UE 5.7 Substrate helper。
+
+## Function 内置函数
+
+`Function` 块是 HLSL 风格 helper 代码。扩展会为下面这些内置函数提供补全、Hover、Signature Help、语义高亮和本地诊断白名单。
+
+HLSL 原生函数：
+
+```text
+abs, acos, all, any, asin, atan, atan2, ceil, clamp, clip, cos, cosh, cross,
+ddx, ddx_coarse, ddx_fine, ddy, ddy_coarse, ddy_fine, degrees, determinant,
+distance, dot, exp, exp2, floor, fmod, frac, frexp, fwidth, isfinite, isinf,
+isnan, ldexp, length, lerp, lit, log, log10, log2, max, min, modf, mul,
+normalize, pow, radians, reflect, refract, round, rsqrt, saturate, sign, sin,
+sincos, sinh, smoothstep, sqrt, step, tan, tanh, transpose, trunc
+```
+
+DreamShader 接受的 GLSL 风格别名：
+
+```text
+mix -> lerp
+fract -> frac
+mod -> fmod
+```
+
+Unreal 纹理采样 helper：
+
+```text
+Texture2DSample, Texture2DSampleLevel, Texture2DSampleBias, Texture2DSampleGrad,
+Texture2DArraySample, Texture2DArraySampleLevel,
+TextureCubeSample, TextureCubeSampleLevel,
+Texture3DSample, Texture3DSampleLevel
+```
+
+示例：
+
+```dreamshader
+Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
+    color = Texture2DSample(texture, textureSampler, uv).rgb;
+}
+```
+
 ## 模板
 
 扩展提供以下常用模板：
@@ -213,7 +278,7 @@ npm run package
 生成的 VSIX 文件：
 
 ```text
-dreamshaderlang-language-support-1.4.2.vsix
+dreamshaderlang-language-support-1.4.9.vsix
 ```
 
 ## License

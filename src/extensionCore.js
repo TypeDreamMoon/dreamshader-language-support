@@ -922,6 +922,11 @@ function getInlayHintSignatureForCall(document, callExpression, reachableCallabl
         return signatures[0];
     }
 
+    const functionBuiltin = languageCore.findFunctionBuiltin(callExpression.callee);
+    if (functionBuiltin) {
+        return makeFunctionBuiltinSignature(functionBuiltin);
+    }
+
     const ueBuiltin = getUEBuiltinItemsForDocument(document).find((item) => normalizeSymbolKey(item.qualifiedName) === normalized || normalizeSymbolKey(item.name) === normalized);
     if (ueBuiltin) {
         return {
@@ -1043,14 +1048,15 @@ function getLanguageIndexForDocument(document) {
 function createHoverProvider() {
     return {
         provideHover(document, position) {
-            const range = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_]*/);
-            if (!range) {
+            const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_]*/);
+            const qualifiedIdentifier = getQualifiedIdentifierAtPosition(document, position);
+            if (!wordRange) {
                 return undefined;
             }
 
-            const word = document.getText(range);
+            const word = document.getText(wordRange);
             const normalized = word.toLowerCase();
-            if (isSwizzleMemberAccess(document.getText(), document.offsetAt(range.start), word)) {
+            if (isSwizzleMemberAccess(document.getText(), document.offsetAt(wordRange.start), word)) {
                 return new vscode.Hover(new vscode.MarkdownString(`Vector swizzle \`.${word}\`\n\nSelects ${word.length} channel${word.length === 1 ? "" : "s"} from the source value.`));
             }
 
@@ -1073,6 +1079,11 @@ function createHoverProvider() {
                 return new vscode.Hover(new vscode.MarkdownString(`\`${builtin.qualifiedName}\`\n\n${builtin.detail}\n\nExample: \`${builtin.example}\``));
             }
 
+            const functionBuiltin = languageCore.findFunctionBuiltin(word);
+            if (functionBuiltin) {
+                return new vscode.Hover(new vscode.MarkdownString(formatFunctionBuiltinHover(functionBuiltin)));
+            }
+
             const context = analyzeDocument(document, position);
             const visibleEntry = collectVisibleIdentifierEntries(context)
                 .find((entry) => normalizeSymbolKey(entry.name) === normalized);
@@ -1080,7 +1091,6 @@ function createHoverProvider() {
                 return new vscode.Hover(new vscode.MarkdownString(`\`${visibleEntry.name}\`\n\n${visibleEntry.detail}`));
             }
 
-            const qualifiedIdentifier = getQualifiedIdentifierAtPosition(document, position);
             const definitions = collectReachableFunctionDefinitions(document);
             const matchingDefinitions = getDefinitionsForName(definitions, qualifiedIdentifier ? qualifiedIdentifier.text : word);
             if (matchingDefinitions) {
@@ -1400,6 +1410,11 @@ function getCallableSignatureHelpEntries(document, callee) {
         return signatures;
     }
 
+    const functionBuiltin = languageCore.findFunctionBuiltin(callee);
+    if (functionBuiltin) {
+        return [makeFunctionBuiltinSignature(functionBuiltin)];
+    }
+
     const ueBuiltin = getUEBuiltinItemsForDocument(document).find((item) => normalizeSymbolKey(item.qualifiedName) === normalized || normalizeSymbolKey(item.name) === normalized);
     if (ueBuiltin) {
         return [{
@@ -1422,6 +1437,34 @@ function getCallableSignatureHelpEntries(document, callee) {
     }
 
     return [];
+}
+
+function makeFunctionBuiltinSignature(builtin) {
+    return {
+        kind: builtin.category || "Function builtin",
+        name: builtin.name,
+        inputs: builtin.parameters || [],
+        outputs: [],
+        detail: builtin.documentation || builtin.detail
+    };
+}
+
+function formatFunctionBuiltinHover(builtin) {
+    const signature = makeFunctionBuiltinSignature(builtin);
+    const parameters = (signature.inputs || []).map((parameter) =>
+        `${parameter.qualifier || "in"} ${parameter.type || "value"} ${parameter.name || "value"}`.trim());
+    const lines = [
+        `\`${signature.name}(${parameters.join(", ")})\``,
+        "",
+        `${builtin.category || "Function builtin"}: ${builtin.detail}`
+    ];
+    if (builtin.hlslName && normalizeSymbolKey(builtin.hlslName) !== normalizeSymbolKey(builtin.name)) {
+        lines.push("", `Generated HLSL uses \`${builtin.hlslName}\`.`);
+    }
+    if (builtin.example) {
+        lines.push("", `Example: \`${builtin.example}\``);
+    }
+    return lines.join("\n");
 }
 
 function buildSignatureInformation(signature) {

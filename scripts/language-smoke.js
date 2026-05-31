@@ -228,6 +228,12 @@ assert(graphFunctionLabels.includes("Time"), "GraphFunction UE. accessor should 
 assert(labelsAt("    sa").includes("mix"), "Function body should offer GLSL-style mix alias");
 assert(labelsAt("    sa").includes("fract"), "Function body should offer GLSL-style fract alias");
 assert(labelsAt("    sa").includes("mod"), "Function body should offer GLSL-style mod alias");
+assert(labelsAt("    sa").includes("Texture2DSample"), "Function body should offer Unreal texture sample helpers");
+const textureSampleCompletion = findCompletion("    sa", "Texture2DSample");
+assert(/Texture2DSample/.test(textureSampleCompletion.insertText), "Texture2DSample completion should insert the helper call");
+const mixCompletion = findCompletion("    sa", "mix");
+assert(/^mix\(/.test(mixCompletion.insertText), "mix completion should keep the GLSL alias spelling");
+assert(language.findFunctionBuiltin("Texture2DSample"), "Function builtin metadata should expose Texture2DSample");
 
 const semanticSource = `ShaderFunction(Name="Mat_Test/FuncTest", Root="Game")
 {
@@ -248,6 +254,11 @@ const semanticSource = `ShaderFunction(Name="Mat_Test/FuncTest", Root="Game")
 Function __Lerp(in float3 a, in float3 b, in float alpha, out float3 res)
 {
     res = lerp(a, b, alpha);
+}
+
+Function __Sample(in Texture2D texture, in float2 uv, out float3 color)
+{
+    color = Texture2DSample(texture, textureSampler, uv).rgb;
 }`;
 const semanticTokens = language.getSemanticTokens(semanticSource)
     .map((token) => ({ ...token, text: semanticSource.slice(token.offset, token.offset + token.length) }));
@@ -258,6 +269,14 @@ assert(semanticTokens.some((token) => token.text === "in" && token.type === "mod
 assert(semanticTokens.some((token) => token.text === "lerp" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "HLSL intrinsics should be highlighted as default library functions");
 assert(semanticTokens.some((token) => token.text === "saturate" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "HLSL intrinsics inside Graph should be highlighted as default library functions");
 assert(semanticTokens.some((token) => token.text === "mix" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "GLSL aliases should be highlighted as default library functions");
+assert(semanticTokens.some((token) => token.text === "Texture2DSample" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "Texture sample helpers should be highlighted as default library functions");
+
+const builtinFunctionDiagnostics = language.getDiagnostics(`Function SampleTex(in Texture2D texture, in float2 uv, out float3 color)
+{
+    color = Texture2DSample(texture, textureSampler, uv).rgb;
+    color = mix(color, float3(1, 1, 1), 0.5);
+}`, "SampleTex.dsh", {});
+assert(!builtinFunctionDiagnostics.some((diagnostic) => /Identifier '(Texture2DSample|textureSampler|mix)'/.test(diagnostic.message)), "Function builtins should not report undeclared identifier diagnostics");
 
 const diagnostics = language.getDiagnostics(source, "M_Test.dsm", services);
 assert(!diagnostics.some((diagnostic) => /Unclosed/.test(diagnostic.message)), "Valid braces should not report unclosed delimiters");
@@ -588,15 +607,30 @@ const substrateSource = `Shader(Name="Materials/M_Substrate")
         ShadingModel = "Substrate";
     }
     Outputs = {
-        MaterialAttributes Result;
-        Base.MaterialAttributes = Result;
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
     }
     Graph = {
-        Sub
+        Substrate.
     }
 }`;
-const substrateOffset = substrateSource.indexOf("        Sub") + "        Sub".length;
-assert(language.getCompletionSpecs(substrateSource, substrateOffset, {}).some((item) => item.label === "SubstrateSlabBSDF"), "Substrate shaders should offer Substrate graph helpers");
+const substrateOffset = substrateSource.indexOf("        Substrate.") + "        Substrate.".length;
+const substrateLabels = language.getCompletionSpecs(substrateSource, substrateOffset, {}).map((item) => item.label);
+assert(substrateLabels.includes("Slab") && substrateLabels.includes("VerticalLayer"), "Substrate namespace should offer current Substrate.* graph helpers");
+assert(labelsAt("        Base.").includes("FrontMaterial"), "Base output completion should include FrontMaterial");
+assert(!language.getDiagnostics(`Shader(Name="Materials/M_Substrate")
+{
+    Settings = {
+        ShadingModel = "Substrate";
+    }
+    Outputs = {
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+    }
+    Graph = {
+        Surface = Substrate.Unlit(EmissiveColor=float3(0.1, 0.6, 1.0));
+    }
+}`, "M_Substrate.dsm", {}).some((diagnostic) => /Identifier 'Substrate'|Unknown Substrate|FrontMaterial|should bind/.test(diagnostic.message)), "Substrate.FrontMaterial shaders should not report stale Substrate diagnostics");
 
 const formatted = language.formatDocument(`Shader(Name="Materials/M")
 {
