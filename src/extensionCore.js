@@ -963,14 +963,15 @@ function createCompletionProvider() {
 
             const text = document.getText();
             const offset = document.offsetAt(position);
+            const defaultRange = getCompletionWordRange(document, position);
             return languageCore
                 .getCompletionSpecs(text, offset, createLanguageServiceAdapters(document))
-                .map((spec) => completionSpecToVscodeItem(document, spec));
+                .map((spec) => completionSpecToVscodeItem(document, spec, defaultRange));
         }
     };
 }
 
-function completionSpecToVscodeItem(document, spec) {
+function completionSpecToVscodeItem(document, spec, defaultRange) {
     const item = new vscode.CompletionItem(spec.label, getCompletionItemKind(spec.kind));
     if (typeof spec.insertText === "string") {
         item.insertText = spec.insertText.includes("$")
@@ -985,8 +986,14 @@ function completionSpecToVscodeItem(document, spec) {
     }
     if (Array.isArray(spec.range) && spec.range.length === 2) {
         item.range = new vscode.Range(document.positionAt(spec.range[0]), document.positionAt(spec.range[1]));
+    } else if (defaultRange) {
+        item.range = defaultRange;
     }
     return item;
+}
+
+function getCompletionWordRange(document, position) {
+    return document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_]*/);
 }
 
 function getCompletionItemKind(kind) {
