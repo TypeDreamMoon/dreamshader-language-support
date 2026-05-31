@@ -25,6 +25,12 @@ const {
 } = require("./languageData");
 
 const SEMANTIC_TOKEN_LEGEND = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS);
+const COMPLETION_TRIGGER_CHARACTERS = [
+    ".",
+    "\"",
+    "/",
+    ...Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")
+];
 
 const materialExpressionManifestCache = new Map();
 const dreamShaderSettingsManifestCache = new Map();
@@ -540,7 +546,7 @@ function activate(context) {
     );
 
     context.subscriptions.push(
-        vscode.languages.registerCompletionItemProvider({ language: LANGUAGE_ID }, createCompletionProvider(), ".", "\"", "/"),
+        vscode.languages.registerCompletionItemProvider({ language: LANGUAGE_ID }, createCompletionProvider(), ...COMPLETION_TRIGGER_CHARACTERS),
         vscode.languages.registerHoverProvider({ language: LANGUAGE_ID }, createHoverProvider()),
         vscode.languages.registerSignatureHelpProvider({ language: LANGUAGE_ID }, createSignatureHelpProvider(), "(", ","),
         vscode.languages.registerDocumentSymbolProvider({ language: LANGUAGE_ID }, createDocumentSymbolProvider()),

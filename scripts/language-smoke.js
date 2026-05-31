@@ -102,6 +102,7 @@ const services = {
 };
 
 assert(labelsAt("        fl").includes("float"), "Inputs section should offer type completions");
+assert(language.getCompletionSpecs("Sh", 2, {}).some((item) => item.label === "Shader"), "Top-level keyword completion should work while typing Sh");
 const importItems = language.getCompletionSpecs("import \"", "import \"".length, services);
 const dsfImport = importItems.find((item) => item.label === "Functions/F_PulseTint.dsf");
 assert(dsfImport, "Import completion should include .dsf function files");
