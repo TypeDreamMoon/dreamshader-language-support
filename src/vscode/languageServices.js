@@ -13,7 +13,8 @@ const {
     collectDreamShaderSettingMappings
 } = require("../bridge/manifests");
 
-function createLanguageServices(document) {
+function createLanguageServices(document, services = {}) {
+    const indexCache = services.languageIndexCache;
     return {
         resolveImportPath(importPath) {
             return resolveImportPath(document.fileName, importPath);
@@ -34,13 +35,13 @@ function createLanguageServices(document) {
             return collectDreamShaderSettingMappings(document, mappingName);
         },
         collectReachableCallableSignatures() {
-            return getLanguageIndex(document).callables;
+            return getLanguageIndex(document, indexCache).callables;
         },
         collectReachableFunctionDefinitions() {
-            return getLanguageIndex(document).functionDefinitions;
+            return getLanguageIndex(document, indexCache).functionDefinitions;
         },
         getLanguageIndex() {
-            return getLanguageIndex(document);
+            return getLanguageIndex(document, indexCache);
         },
         collectProjectContentPluginNames() {
             return collectProjectContentPluginNames(findProjectRoot(document.fileName));
@@ -48,7 +49,10 @@ function createLanguageServices(document) {
     };
 }
 
-function getLanguageIndex(document) {
+function getLanguageIndex(document, indexCache) {
+    if (indexCache && typeof indexCache.get === "function") {
+        return indexCache.get(document);
+    }
     return languageCore.buildDocumentIndex({
         fileName: document.fileName,
         text: document.getText(),

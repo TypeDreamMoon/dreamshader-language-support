@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.2
+
+- Added callable hover return and output pin metadata for DreamShader functions, UE builtins, and Substrate helpers.
+- Added Substrate ThinFilm output pin hover details, including old bridge manifest fallback handling.
+
+## 1.5.1
+
+- Added `Template` block parsing, completion, formatting, semantic tokens, and syntax highlighting.
+- Added DreamShader bridge commands, status bar, and diagnostics panel integration.
+- Added package install, browse, update, remove, and scaffold commands.
+- Added command-palette authoring templates for materials, functions, headers, texture samples, and noise materials.
+- Restored CodeLens and Inlay Hint registration after the extension activation module split.
+- Refreshed bridge diagnostics when Unreal updates `Saved/DreamShader/Bridge/diagnostics.json`.
+
 ## 1.4.9
 
 - Added shared Function builtin metadata for HLSL intrinsics, GLSL aliases, and Unreal texture sampling helpers.

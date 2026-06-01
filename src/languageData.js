@@ -222,16 +222,56 @@ function createMaterialOutputItem(name, detail) {
     };
 }
 
-function createUEBuiltinItem(name, snippet, detail, parameters, example) {
+function createUEBuiltinItem(name, snippet, detail, parameters, example, options = {}) {
     return {
         name,
-        qualifiedName: `UE.${name}`,
+        qualifiedName: options.qualifiedName || `UE.${name}`,
         snippet,
-        memberSnippet: snippet.replace(/^UE\./, ""),
+        memberSnippet: options.memberSnippet || snippet.replace(/^UE\./, ""),
         detail,
         parameters: parameters || [],
-        example: example || snippet
+        example: example || snippet,
+        outputType: options.outputType,
+        returnType: options.returnType,
+        outputs: normalizeBuiltinOutputs(options.outputs),
+        isSubstrateOutput: options.isSubstrateOutput
     };
+}
+
+function createSubstrateBuiltinItem(name, snippet, detail, parameters, example, options = {}) {
+    return createUEBuiltinItem(name, snippet, detail, parameters, example, {
+        ...options,
+        qualifiedName: options.qualifiedName || `Substrate.${name}`,
+        memberSnippet: options.memberSnippet || snippet.replace(/^Substrate\./, ""),
+        outputType: options.outputType || (options.isSubstrateOutput === false ? undefined : "Substrate"),
+        isSubstrateOutput: options.isSubstrateOutput !== false
+    });
+}
+
+function normalizeBuiltinOutputs(outputs) {
+    if (!Array.isArray(outputs)) {
+        return undefined;
+    }
+    return outputs
+        .map((output, index) => {
+            if (!output) {
+                return null;
+            }
+            const name = typeof output.name === "string" ? output.name.trim() : "";
+            const type = typeof output.type === "string" && output.type.trim()
+                ? output.type.trim()
+                : typeof output.outputType === "string" && output.outputType.trim()
+                    ? output.outputType.trim()
+                    : "";
+            return {
+                index: Number.isFinite(Number(output.index)) ? Number(output.index) : index,
+                name,
+                type,
+                outputType: type,
+                componentCount: Number.isFinite(Number(output.componentCount)) ? Number(output.componentCount) : undefined
+            };
+        })
+        .filter(Boolean);
 }
 
 let bundledMaterialExpressionBuiltinItems = null;
@@ -292,7 +332,12 @@ function createUEBuiltinItemFromManifestExpression(expression) {
         `UE.Expression(${snippetParts.join(", ")})`,
         `Reflected ${className} material expression.`,
         parameters,
-        `UE.Expression(Class="${name}", OutputType="${outputType}")`
+        `UE.Expression(Class="${name}", OutputType="${outputType}")`,
+        {
+            outputType,
+            returnType: outputType,
+            outputs: expression.outputs
+        }
     );
 }
 
@@ -533,83 +578,90 @@ const MATERIAL_ATTRIBUTE_MEMBER_ITEMS = MATERIAL_OUTPUT_ITEMS.filter((item) => !
 const MATERIAL_ATTRIBUTE_MEMBER_NAME_SET = new Set(MATERIAL_ATTRIBUTE_MEMBER_ITEMS.map((item) => String(item.name || "").trim().toLowerCase()));
 
 const SUBSTRATE_BUILTIN_ITEMS = [
-    createUEBuiltinItem("Unlit", "Substrate.Unlit(EmissiveColor=${1:Color})", "Creates a Substrate unlit BSDF.", [
+    createSubstrateBuiltinItem("Unlit", "Substrate.Unlit(EmissiveColor=${1:Color})", "Creates a Substrate unlit BSDF.", [
         { qualifier: "in", type: "value", name: "EmissiveColor" }
     ], "Substrate.Unlit(EmissiveColor=Color)"),
-    createUEBuiltinItem("SimpleClearCoat", "Substrate.SimpleClearCoat(Base=${1:Base}, Coat=${2:Coat}, Weight=${3:1.0})", "Creates a Substrate simple clear coat BSDF.", [
+    createSubstrateBuiltinItem("SimpleClearCoat", "Substrate.SimpleClearCoat(Base=${1:Base}, Coat=${2:Coat}, Weight=${3:1.0})", "Creates a Substrate simple clear coat BSDF.", [
         { qualifier: "in", type: "Substrate", name: "Base" },
         { qualifier: "in", type: "Substrate", name: "Coat" },
         { qualifier: "in", type: "value", name: "Weight" }
     ], "Substrate.SimpleClearCoat(Base=Base, Coat=Coat, Weight=1.0)"),
-    createUEBuiltinItem("HorizontalMixing", "Substrate.HorizontalMixing(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Alias of Substrate.HorizontalMix.", [
+    createSubstrateBuiltinItem("HorizontalMixing", "Substrate.HorizontalMixing(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Alias of Substrate.HorizontalMix.", [
         { qualifier: "in", type: "Substrate", name: "A" },
         { qualifier: "in", type: "Substrate", name: "B" },
         { qualifier: "in", type: "value", name: "Alpha" }
     ], "Substrate.HorizontalMixing(A=A, B=B, Alpha=Alpha)"),
-    createUEBuiltinItem("Slab", "Substrate.Slab(DiffuseAlbedo=${1:Color}, F0=${2:float3(0.04, 0.04, 0.04)}, Roughness=${3:0.45})", "Creates a Substrate slab BSDF.", [
+    createSubstrateBuiltinItem("Slab", "Substrate.Slab(DiffuseAlbedo=${1:Color}, F0=${2:float3(0.04, 0.04, 0.04)}, Roughness=${3:0.45})", "Creates a Substrate slab BSDF.", [
         { qualifier: "in", type: "value", name: "DiffuseAlbedo" },
         { qualifier: "in", type: "value", name: "F0" },
         { qualifier: "in", type: "value", name: "Roughness" },
         { qualifier: "in", type: "value", name: "Normal" }
     ], "Substrate.Slab(DiffuseAlbedo=Color, F0=float3(0.04, 0.04, 0.04), Roughness=0.45)"),
-    createUEBuiltinItem("ShadingModels", "Substrate.ShadingModels()", "Creates a Substrate shading-model node.", [], "Substrate.ShadingModels()"),
-    createUEBuiltinItem("VolumetricFogCloud", "Substrate.VolumetricFogCloud()", "Creates a Substrate volumetric fog/cloud BSDF.", [], "Substrate.VolumetricFogCloud()"),
-    createUEBuiltinItem("Hair", "Substrate.Hair()", "Creates a Substrate hair BSDF.", [], "Substrate.Hair()"),
-    createUEBuiltinItem("Eye", "Substrate.Eye()", "Creates a Substrate eye BSDF.", [], "Substrate.Eye()"),
-    createUEBuiltinItem("SingleLayerWater", "Substrate.SingleLayerWater()", "Creates a Substrate single-layer water BSDF.", [], "Substrate.SingleLayerWater()"),
-    createUEBuiltinItem("LightFunction", "Substrate.LightFunction()", "Creates a Substrate light function material.", [], "Substrate.LightFunction()"),
-    createUEBuiltinItem("PostProcess", "Substrate.PostProcess()", "Creates a Substrate post-process material.", [], "Substrate.PostProcess()"),
-    createUEBuiltinItem("UI", "Substrate.UI()", "Creates a Substrate UI material.", [], "Substrate.UI()"),
-    createUEBuiltinItem("ConvertMaterialAttributes", "Substrate.ConvertMaterialAttributes(Attributes=${1:Attrs})", "Converts MaterialAttributes to a Substrate material.", [
+    createSubstrateBuiltinItem("ShadingModels", "Substrate.ShadingModels()", "Creates a Substrate shading-model node.", [], "Substrate.ShadingModels()"),
+    createSubstrateBuiltinItem("VolumetricFogCloud", "Substrate.VolumetricFogCloud()", "Creates a Substrate volumetric fog/cloud BSDF.", [], "Substrate.VolumetricFogCloud()"),
+    createSubstrateBuiltinItem("Hair", "Substrate.Hair()", "Creates a Substrate hair BSDF.", [], "Substrate.Hair()"),
+    createSubstrateBuiltinItem("Eye", "Substrate.Eye()", "Creates a Substrate eye BSDF.", [], "Substrate.Eye()"),
+    createSubstrateBuiltinItem("SingleLayerWater", "Substrate.SingleLayerWater()", "Creates a Substrate single-layer water BSDF.", [], "Substrate.SingleLayerWater()"),
+    createSubstrateBuiltinItem("LightFunction", "Substrate.LightFunction()", "Creates a Substrate light function material.", [], "Substrate.LightFunction()"),
+    createSubstrateBuiltinItem("PostProcess", "Substrate.PostProcess()", "Creates a Substrate post-process material.", [], "Substrate.PostProcess()"),
+    createSubstrateBuiltinItem("UI", "Substrate.UI()", "Creates a Substrate UI material.", [], "Substrate.UI()"),
+    createSubstrateBuiltinItem("ConvertMaterialAttributes", "Substrate.ConvertMaterialAttributes(Attributes=${1:Attrs})", "Converts MaterialAttributes to a Substrate material.", [
         { qualifier: "in", type: "MaterialAttributes", name: "Attributes" }
     ], "Substrate.ConvertMaterialAttributes(Attributes=Attrs)"),
-    createUEBuiltinItem("ConvertToDecal", "Substrate.ConvertToDecal(Material=${1:Surface})", "Converts a Substrate material to decal output.", [
+    createSubstrateBuiltinItem("ConvertToDecal", "Substrate.ConvertToDecal(Material=${1:Surface})", "Converts a Substrate material to decal output.", [
         { qualifier: "in", type: "Substrate", name: "Material" }
     ], "Substrate.ConvertToDecal(Material=Surface)"),
-    createUEBuiltinItem("HorizontalMix", "Substrate.HorizontalMix(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Horizontally mixes two Substrate materials.", [
+    createSubstrateBuiltinItem("HorizontalMix", "Substrate.HorizontalMix(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Horizontally mixes two Substrate materials.", [
         { qualifier: "in", type: "Substrate", name: "A" },
         { qualifier: "in", type: "Substrate", name: "B" },
         { qualifier: "in", type: "value", name: "Alpha" }
     ], "Substrate.HorizontalMix(A=A, B=B, Alpha=Alpha)"),
-    createUEBuiltinItem("VerticalLayer", "Substrate.VerticalLayer(Top=${1:Top}, Base=${2:Base}, Thickness=${3:0.01})", "Layers one Substrate material over another.", [
+    createSubstrateBuiltinItem("VerticalLayer", "Substrate.VerticalLayer(Top=${1:Top}, Base=${2:Base}, Thickness=${3:0.01})", "Layers one Substrate material over another.", [
         { qualifier: "in", type: "Substrate", name: "Top" },
         { qualifier: "in", type: "Substrate", name: "Base" },
         { qualifier: "in", type: "value", name: "Thickness" }
     ], "Substrate.VerticalLayer(Top=TopLayer, Base=BaseLayer, Thickness=0.01)"),
-    createUEBuiltinItem("VerticalLayering", "Substrate.VerticalLayering(Top=${1:Top}, Base=${2:Base}, Thickness=${3:0.01})", "Alias of Substrate.VerticalLayer.", [
+    createSubstrateBuiltinItem("VerticalLayering", "Substrate.VerticalLayering(Top=${1:Top}, Base=${2:Base}, Thickness=${3:0.01})", "Alias of Substrate.VerticalLayer.", [
         { qualifier: "in", type: "Substrate", name: "Top" },
         { qualifier: "in", type: "Substrate", name: "Base" },
         { qualifier: "in", type: "value", name: "Thickness" }
     ], "Substrate.VerticalLayering(Top=TopLayer, Base=BaseLayer, Thickness=0.01)"),
-    createUEBuiltinItem("Add", "Substrate.Add(A=${1:A}, B=${2:B})", "Adds two Substrate materials.", [
+    createSubstrateBuiltinItem("Add", "Substrate.Add(A=${1:A}, B=${2:B})", "Adds two Substrate materials.", [
         { qualifier: "in", type: "Substrate", name: "A" },
         { qualifier: "in", type: "Substrate", name: "B" }
     ], "Substrate.Add(A=A, B=B)"),
-    createUEBuiltinItem("Weight", "Substrate.Weight(A=${1:Surface}, Weight=${2:1.0})", "Weights a Substrate material.", [
+    createSubstrateBuiltinItem("Weight", "Substrate.Weight(A=${1:Surface}, Weight=${2:1.0})", "Weights a Substrate material.", [
         { qualifier: "in", type: "Substrate", name: "A" },
         { qualifier: "in", type: "value", name: "Weight" }
     ], "Substrate.Weight(A=Surface, Weight=1.0)"),
-    createUEBuiltinItem("Select", "Substrate.Select(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Selects between Substrate materials.", [
+    createSubstrateBuiltinItem("Select", "Substrate.Select(A=${1:A}, B=${2:B}, Alpha=${3:Alpha})", "Selects between Substrate materials.", [
         { qualifier: "in", type: "Substrate", name: "A" },
         { qualifier: "in", type: "Substrate", name: "B" },
         { qualifier: "in", type: "value", name: "Alpha" }
     ], "Substrate.Select(A=A, B=B, Alpha=Alpha)"),
-    createUEBuiltinItem("TransmittanceToMFP", "Substrate.TransmittanceToMFP(TransmittanceColor=${1:Color}, Thickness=${2:1.0})", "Converts transmittance to mean free path values.", [
+    createSubstrateBuiltinItem("TransmittanceToMFP", "Substrate.TransmittanceToMFP(TransmittanceColor=${1:Color}, Thickness=${2:1.0})", "Converts transmittance to mean free path values.", [
         { qualifier: "in", type: "value", name: "TransmittanceColor" },
         { qualifier: "in", type: "value", name: "Thickness" }
     ], "Substrate.TransmittanceToMFP(TransmittanceColor=Color, Thickness=1.0)"),
-    createUEBuiltinItem("MetalnessToDiffuseAlbedoF0", "Substrate.MetalnessToDiffuseAlbedoF0(BaseColor=${1:Color}, Metallic=${2:Metallic})", "Converts metalness workflow values to diffuse albedo and F0.", [
+    createSubstrateBuiltinItem("MetalnessToDiffuseAlbedoF0", "Substrate.MetalnessToDiffuseAlbedoF0(BaseColor=${1:Color}, Metallic=${2:Metallic})", "Converts metalness workflow values to diffuse albedo and F0.", [
         { qualifier: "in", type: "value", name: "BaseColor" },
         { qualifier: "in", type: "value", name: "Metallic" }
     ], "Substrate.MetalnessToDiffuseAlbedoF0(BaseColor=Color, Metallic=Metallic)"),
-    createUEBuiltinItem("HazinessToSecondaryRoughness", "Substrate.HazinessToSecondaryRoughness(Haziness=${1:0.0}, BaseRoughness=${2:Roughness})", "Converts haziness to secondary roughness.", [
+    createSubstrateBuiltinItem("HazinessToSecondaryRoughness", "Substrate.HazinessToSecondaryRoughness(Haziness=${1:0.0}, BaseRoughness=${2:Roughness})", "Converts haziness to secondary roughness.", [
         { qualifier: "in", type: "value", name: "Haziness" },
         { qualifier: "in", type: "value", name: "BaseRoughness" }
     ], "Substrate.HazinessToSecondaryRoughness(Haziness=0.0, BaseRoughness=Roughness)"),
-    createUEBuiltinItem("ThinFilm", "Substrate.ThinFilm(FilmThickness=${1:500.0}, FilmIor=${2:1.4})", "Creates Substrate thin-film interference helper output.", [
+    createSubstrateBuiltinItem("ThinFilm", "Substrate.ThinFilm(FilmThickness=${1:500.0}, FilmIor=${2:1.4})", "Creates Substrate thin-film interference helper output.", [
         { qualifier: "in", type: "value", name: "FilmThickness" },
         { qualifier: "in", type: "value", name: "FilmIor" }
-    ], "Substrate.ThinFilm(FilmThickness=500.0, FilmIor=1.4)")
+    ], "Substrate.ThinFilm(FilmThickness=500.0, FilmIor=1.4)", {
+        outputType: "float1",
+        isSubstrateOutput: false,
+        outputs: [
+            { index: 0, name: "Specular Color", outputType: "float1", componentCount: 1 },
+            { index: 1, name: "Edge Specular Color", outputType: "float1", componentCount: 1 }
+        ]
+    })
 ];
 
 const OUTPUT_HELPER_ITEMS = [
@@ -854,5 +906,6 @@ module.exports = {
     SUBSTRATE_BUILTIN_ITEMS,
     OUTPUT_HELPER_ITEMS,
     UE_BUILTINS,
+    createUEBuiltinItemFromManifestExpression,
     getBundledMaterialExpressionBuiltinItems
 };

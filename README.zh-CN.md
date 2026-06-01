@@ -8,7 +8,7 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.4.9` 版本新增统一的 `Function` 内置函数 metadata，覆盖 HLSL 原生函数、GLSL 风格别名和 Unreal 纹理采样 helper；补全、Hover、Signature Help、Inlay Hint、诊断和高亮都会读取同一份列表。同时同步当前 DreamShader 插件中的 UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出支持。
+`1.5.1` 版本在现有语言服务基础上新增 Template 块支持、DreamShader bridge 命令、包管理工具和创作模板。同时继续同步 `Function` 内置函数 metadata、UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出支持。
 
 ## 主要能力
 
@@ -278,7 +278,7 @@ npm run package
 生成的 VSIX 文件：
 
 ```text
-dreamshaderlang-language-support-1.4.9.vsix
+dreamshaderlang-language-support-1.5.1.vsix
 ```
 
 ## License

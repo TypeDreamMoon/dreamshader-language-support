@@ -1,0 +1,17 @@
+import "Shared/Common.dsh";
+
+Shader(Name="Materials/M_Test", Root="Game")
+{
+    Properties = {
+        VectorParameter BaseColor = float4(1, 1, 1, 1);
+    }
+    Outputs = {
+        float3 Color;
+        Base.BaseColor = Color;
+    }
+    Graph = {
+        float2 UV = UE.TexCoord(0);
+        float ThinFilmSpecular = Substrate.ThinFilm(FilmThickness=500.0, FilmIor=1.4);
+        Color =
+    }
+}

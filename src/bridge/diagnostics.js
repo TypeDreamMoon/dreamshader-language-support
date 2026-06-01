@@ -22,6 +22,7 @@ function createBridgeDiagnosticCounts() {
 }
 
 function refreshBridgeDiagnostics(collection, state, activePath = "") {
+    collection.clear();
     resetState(state);
     const roots = collectKnownProjectRoots(activePath);
     for (const root of roots) {

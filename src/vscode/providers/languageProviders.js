@@ -6,35 +6,87 @@ const vscode = require("vscode");
 const languageCore = require("../../language");
 const { LANGUAGE_ID, SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS } = require("../../languageData");
 const { resolveImportPath } = require("../../project/imports");
+const { isDreamShaderDocument } = require("../../project/projects");
 const { createLanguageServices } = require("../languageServices");
 
 const semanticTokenLegend = new vscode.SemanticTokensLegend(SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS);
 const completionTriggerCharacters = [".", "\"", "/", ...Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")];
 
-function registerLanguageProviders(context, localDiagnostics) {
+function registerLanguageProviders(context, localDiagnostics, services = {}) {
+    const codeLensChangeEmitter = new vscode.EventEmitter();
     context.subscriptions.push(
-        vscode.languages.registerCompletionItemProvider({ language: LANGUAGE_ID }, createCompletionProvider(), ...completionTriggerCharacters),
-        vscode.languages.registerHoverProvider({ language: LANGUAGE_ID }, createHoverProvider()),
-        vscode.languages.registerSignatureHelpProvider({ language: LANGUAGE_ID }, createSignatureHelpProvider(), "(", ","),
+        codeLensChangeEmitter,
+        vscode.languages.registerCompletionItemProvider({ language: LANGUAGE_ID }, createCompletionProvider(services), ...completionTriggerCharacters),
+        vscode.languages.registerHoverProvider({ language: LANGUAGE_ID }, createHoverProvider(services)),
+        vscode.languages.registerSignatureHelpProvider({ language: LANGUAGE_ID }, createSignatureHelpProvider(services), "(", ","),
         vscode.languages.registerDocumentSymbolProvider({ language: LANGUAGE_ID }, createDocumentSymbolProvider()),
         vscode.languages.registerDocumentSemanticTokensProvider({ language: LANGUAGE_ID }, createSemanticTokensProvider(), semanticTokenLegend),
+        vscode.languages.registerInlayHintsProvider({ language: LANGUAGE_ID }, createInlayHintsProvider(services)),
         vscode.languages.registerFoldingRangeProvider({ language: LANGUAGE_ID }, createFoldingRangeProvider()),
         vscode.languages.registerDocumentLinkProvider({ language: LANGUAGE_ID }, createDocumentLinkProvider()),
-        vscode.languages.registerDefinitionProvider({ language: LANGUAGE_ID }, createDefinitionProvider()),
-        vscode.languages.registerReferenceProvider({ language: LANGUAGE_ID }, createReferenceProvider()),
-        vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider())
+        vscode.languages.registerDefinitionProvider({ language: LANGUAGE_ID }, createDefinitionProvider(services)),
+        vscode.languages.registerReferenceProvider({ language: LANGUAGE_ID }, createReferenceProvider(services)),
+        vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider()),
+        vscode.languages.registerCodeLensProvider({ language: LANGUAGE_ID }, createCodeLensProvider(codeLensChangeEmitter)),
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration("dreamshader.enableCodeLens")) {
+                codeLensChangeEmitter.fire();
+            }
+        })
     );
-    refreshAllLocalDiagnostics(localDiagnostics);
+    refreshAllLocalDiagnostics(localDiagnostics, services);
 }
 
-function createCompletionProvider() {
+function createCodeLensProvider(changeEmitter) {
+    return {
+        onDidChangeCodeLenses: changeEmitter.event,
+        provideCodeLenses(document) {
+            if (!isDreamShaderDocument(document) || !vscode.workspace.getConfiguration("dreamshader").get("enableCodeLens", true)) {
+                return [];
+            }
+
+            const lenses = [];
+            for (const target of languageCore.getCodeLensTargets(document.getText())) {
+                const range = new vscode.Range(document.positionAt(target.startOffset), document.positionAt(target.startOffset));
+                for (const action of target.actions || []) {
+                    lenses.push(new vscode.CodeLens(range, codeLensCommandForAction(action, document)));
+                }
+            }
+            return lenses;
+        }
+    };
+}
+
+function codeLensCommandForAction(action, document) {
+    switch (action) {
+        case "recompileCurrent":
+            return {
+                title: "$(play)",
+                command: "dreamshader.recompileCurrent",
+                arguments: [document.uri]
+            };
+        case "showBridgeDiagnostics":
+            return {
+                title: "$(pulse)",
+                command: "dreamshader.showBridgeDiagnostics"
+            };
+        case "recompileAll":
+        default:
+            return {
+                title: "$(sync)",
+                command: "dreamshader.recompileAll"
+            };
+    }
+}
+
+function createCompletionProvider(services = {}) {
     return {
         provideCompletionItems(document, position) {
             const offset = document.offsetAt(position);
             const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_:.]*/);
             const defaultRange = wordRange || new vscode.Range(position, position);
             return languageCore
-                .getCompletionSpecs(document.getText(), offset, createLanguageServices(document))
+                .getCompletionSpecs(document.getText(), offset, createLanguageServices(document, services))
                 .map((spec) => completionSpecToVscodeItem(document, spec, defaultRange));
         }
     };
@@ -71,7 +123,7 @@ function getCompletionItemKind(kind) {
     }
 }
 
-function createHoverProvider() {
+function createHoverProvider(services = {}) {
     return {
         provideHover(document, position) {
             const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_:.]*/);
@@ -79,13 +131,18 @@ function createHoverProvider() {
                 return undefined;
             }
             const word = document.getText(wordRange);
-            const index = createLanguageServices(document).getLanguageIndex();
+            const languageServices = createLanguageServices(document, services);
+            const hoverSpec = languageCore.getHoverInfoSpec(document.getText(), document.offsetAt(position), languageServices);
+            if (hoverSpec) {
+                return new vscode.Hover(hoverSpecToMarkdown(hoverSpec), wordRange);
+            }
+            const index = languageServices.getLanguageIndex();
             const definitions = index.functionDefinitions.get(word.toLowerCase());
             if (definitions?.length) {
                 const first = definitions[0];
                 return new vscode.Hover(new vscode.MarkdownString(`DreamShader ${first.kind} \`${first.name}\`\n\nDefined in \`${path.basename(first.fsPath)}\``), wordRange);
             }
-            const completions = languageCore.getCompletionSpecs(document.getText(), document.offsetAt(position), createLanguageServices(document));
+            const completions = languageCore.getCompletionSpecs(document.getText(), document.offsetAt(position), languageServices);
             const completion = completions.find((entry) => entry.label === word || entry.label.endsWith(`.${word}`));
             if (completion?.detail || completion?.documentation) {
                 return new vscode.Hover(new vscode.MarkdownString([completion.detail, completion.documentation].filter(Boolean).join("\n\n")), wordRange);
@@ -95,7 +152,53 @@ function createHoverProvider() {
     };
 }
 
-function createSignatureHelpProvider() {
+function hoverSpecToMarkdown(spec) {
+    const lines = [];
+    const title = [spec.kind, spec.name ? `\`${spec.name}\`` : ""].filter(Boolean).join(" ");
+    if (title) {
+        lines.push(title);
+    }
+    if (spec.detail) {
+        lines.push(spec.detail);
+    }
+    if (spec.parameters?.length) {
+        lines.push(`Parameters: ${spec.parameters.map(formatHoverParameter).join(", ")}`);
+    }
+    if (spec.outputs?.length > 1) {
+        lines.push("Outputs:");
+        lines.push("| Index | Name | Type |");
+        lines.push("| --- | --- | --- |");
+        for (const output of spec.outputs) {
+            lines.push(`| ${output.index ?? ""} | ${escapeMarkdownTableCell(output.name || "Result")} | \`${output.type || "value"}\` |`);
+        }
+    } else if (spec.returnType) {
+        lines.push(`Returns: \`${spec.returnType}\``);
+    } else if (spec.outputs?.length === 1) {
+        const output = spec.outputs[0];
+        lines.push(`Returns: \`${output.type || "value"}\`${output.name ? ` (${output.name})` : ""}`);
+    }
+    if (spec.example) {
+        lines.push("Example:");
+        lines.push("```dreamshaderlang");
+        lines.push(spec.example);
+        lines.push("```");
+    }
+    if (spec.documentation) {
+        lines.push(spec.documentation);
+    }
+    return new vscode.MarkdownString(lines.filter(Boolean).join("\n\n"));
+}
+
+function formatHoverParameter(parameter) {
+    const optional = parameter.optional ? "?" : "";
+    return `\`${parameter.qualifier || "in"} ${parameter.type || "value"} ${parameter.name || ""}${optional}\``;
+}
+
+function escapeMarkdownTableCell(text) {
+    return String(text || "").replace(/\|/g, "\\|");
+}
+
+function createSignatureHelpProvider(services = {}) {
     return {
         provideSignatureHelp(document, position) {
             const offset = document.offsetAt(position);
@@ -104,7 +207,7 @@ function createSignatureHelpProvider() {
             if (!callContext) {
                 return undefined;
             }
-            const signatures = getCallableSignatures(document, callContext.callee);
+            const signatures = getCallableSignatures(document, callContext.callee, services);
             if (!signatures.length) {
                 return undefined;
             }
@@ -134,9 +237,9 @@ function getActiveCallContext(text, offset) {
     };
 }
 
-function getCallableSignatures(document, callee) {
-    const services = createLanguageServices(document);
-    const callables = services.collectReachableCallableSignatures();
+function getCallableSignatures(document, callee, services = {}) {
+    const languageServices = createLanguageServices(document, services);
+    const callables = languageServices.collectReachableCallableSignatures();
     const normalized = String(callee || "").toLowerCase();
     const shortName = normalized.split("::").pop().split(".").pop();
     const local = callables.get(normalized) || callables.get(shortName) || [];
@@ -144,10 +247,10 @@ function getCallableSignatures(document, callee) {
         return local;
     }
     if (normalized.startsWith("substrate.")) {
-        return (services.getSubstrateBuiltinItems() || []).filter((item) =>
+        return (languageServices.getSubstrateBuiltinItems() || []).filter((item) =>
             item.name?.toLowerCase() === shortName || item.qualifiedName?.toLowerCase() === normalized);
     }
-    return (services.getUEBuiltinItems() || []).filter((item) =>
+    return (languageServices.getUEBuiltinItems() || []).filter((item) =>
         item.name?.toLowerCase() === shortName || item.qualifiedName?.toLowerCase() === normalized);
 }
 
@@ -203,6 +306,37 @@ function createSemanticTokensProvider() {
     };
 }
 
+function createInlayHintsProvider(services = {}) {
+    return {
+        provideInlayHints(document, range) {
+            if (!isDreamShaderDocument(document)) {
+                return [];
+            }
+
+            const hints = [];
+            for (const spec of languageCore.getInlayHintSpecs(document.getText(), createLanguageServices(document, services))) {
+                const position = document.positionAt(spec.offset);
+                if (range && !range.contains(position)) {
+                    continue;
+                }
+
+                const hint = new vscode.InlayHint(position, spec.label, getInlayHintKind(spec.kind));
+                hint.paddingRight = Boolean(spec.paddingRight);
+                hints.push(hint);
+            }
+            return hints;
+        }
+    };
+}
+
+function getInlayHintKind(kind) {
+    switch (kind) {
+        case "Parameter": return vscode.InlayHintKind.Parameter;
+        case "Type": return vscode.InlayHintKind.Type;
+        default: return vscode.InlayHintKind.Parameter;
+    }
+}
+
 function encodeTokenModifiers(modifiers) {
     let encoded = 0;
     for (const modifier of modifiers) {
@@ -241,7 +375,7 @@ function createDocumentLinkProvider() {
     };
 }
 
-function createDefinitionProvider() {
+function createDefinitionProvider(services = {}) {
     return {
         provideDefinition(document, position) {
             const importLocation = getImportDefinitionLocation(document, position);
@@ -253,7 +387,7 @@ function createDefinitionProvider() {
                 return undefined;
             }
             const word = document.getText(wordRange).toLowerCase();
-            return (createLanguageServices(document).collectReachableFunctionDefinitions().get(word) || [])
+            return (createLanguageServices(document, services).collectReachableFunctionDefinitions().get(word) || [])
                 .map((definition) => new vscode.Location(vscode.Uri.file(definition.fsPath), new vscode.Range(
                     offsetToPositionFromFile(definition.fsPath, definition.nameOffset),
                     offsetToPositionFromFile(definition.fsPath, definition.nameOffset + definition.nameRangeLength))));
@@ -285,7 +419,7 @@ function offsetToPositionFromFile(filePath, offset) {
     return new vscode.Position(lines.length - 1, lines[lines.length - 1].replace(/\r$/, "").length);
 }
 
-function createReferenceProvider() {
+function createReferenceProvider(services = {}) {
     return {
         provideReferences(document, position) {
             const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_:]*/);
@@ -293,7 +427,7 @@ function createReferenceProvider() {
                 return [];
             }
             const word = document.getText(wordRange);
-            const index = createLanguageServices(document).getLanguageIndex();
+            const index = createLanguageServices(document, services).getLanguageIndex();
             const locations = [];
             for (const file of index.files || []) {
                 const pattern = new RegExp(`\\b${escapeRegExp(word)}\\b`, "g");
@@ -319,18 +453,18 @@ function createFormattingProvider() {
     };
 }
 
-function refreshAllLocalDiagnostics(collection) {
+function refreshAllLocalDiagnostics(collection, services = {}) {
     for (const document of vscode.workspace.textDocuments) {
-        refreshLocalDiagnosticsForDocument(document, collection);
+        refreshLocalDiagnosticsForDocument(document, collection, services);
     }
 }
 
-function refreshLocalDiagnosticsForDocument(document, collection) {
+function refreshLocalDiagnosticsForDocument(document, collection, services = {}) {
     if (document.languageId !== LANGUAGE_ID) {
         return;
     }
     const diagnostics = languageCore
-        .getDiagnostics(document.getText(), document.fileName, createLanguageServices(document))
+        .getDiagnostics(document.getText(), document.fileName, createLanguageServices(document, services))
         .map((diagnostic) => new vscode.Diagnostic(
             new vscode.Range(document.positionAt(diagnostic.startOffset), document.positionAt(diagnostic.endOffset)),
             diagnostic.message,

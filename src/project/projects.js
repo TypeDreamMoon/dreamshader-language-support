@@ -50,6 +50,65 @@ function findProjectRoot(inputPath = "") {
     return "";
 }
 
+function findProjectRootForCommand() {
+    const configuredRoot = getConfiguredProjectRoot();
+    if (configuredRoot) {
+        return configuredRoot;
+    }
+
+    const vscode = getVscode();
+    const candidates = [];
+    const document = vscode?.window.activeTextEditor?.document;
+    if (document?.uri?.fsPath) {
+        candidates.push(document.uri.fsPath);
+    }
+
+    for (const openDocument of vscode?.workspace.textDocuments || []) {
+        if (openDocument?.uri?.fsPath) {
+            candidates.push(openDocument.uri.fsPath);
+        }
+    }
+
+    for (const folder of vscode?.workspace.workspaceFolders || []) {
+        if (folder?.uri?.fsPath) {
+            candidates.push(folder.uri.fsPath);
+        }
+    }
+
+    for (const candidate of candidates) {
+        const root = findProjectRootFromCandidate(candidate);
+        if (root) {
+            return root;
+        }
+    }
+
+    return "";
+}
+
+function findProjectRootFromCandidate(candidatePath) {
+    if (!candidatePath) {
+        return "";
+    }
+
+    let resolvedCandidate = path.resolve(candidatePath);
+    try {
+        if (!fs.existsSync(resolvedCandidate)) {
+            return "";
+        }
+        if (fs.statSync(resolvedCandidate).isFile()) {
+            resolvedCandidate = path.dirname(resolvedCandidate);
+        }
+    } catch (_error) {
+        return "";
+    }
+
+    return findProjectRootFromDirectory(resolvedCandidate);
+}
+
+function findProjectRootFromDirectory(startDirectory) {
+    return findUp(startDirectory, containsUproject);
+}
+
 function collectKnownProjectRoots(activePath = "") {
     const roots = new Set();
     const configured = getConfiguredProjectRoot();
@@ -82,6 +141,11 @@ function isDreamShaderDocument(document) {
         && DREAMSHADER_EXTENSIONS.has(path.extname(document.fileName).toLowerCase()));
 }
 
+function containsUproject(directory) {
+    return fs.readdirSync(directory, { withFileTypes: true }).some((entry) =>
+        entry.isFile() && entry.name.toLowerCase().endsWith(".uproject"));
+}
+
 function findUp(startDirectory, predicate) {
     let current = path.resolve(startDirectory || ".");
     while (current && fs.existsSync(current)) {
@@ -104,6 +168,9 @@ function findUp(startDirectory, predicate) {
 module.exports = {
     getConfiguredProjectRoot,
     findProjectRoot,
+    findProjectRootForCommand,
+    findProjectRootFromCandidate,
+    findProjectRootFromDirectory,
     collectKnownProjectRoots,
     getDShaderRoot,
     getPackagesDirectory,

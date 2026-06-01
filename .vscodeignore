@@ -1,6 +1,6 @@
 scripts/**
+test/**
 *.vsix
-src/extensionCore.js
 .git/**
 .gitignore
 .github/**

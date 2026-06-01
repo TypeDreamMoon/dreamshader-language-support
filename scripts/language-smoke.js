@@ -66,6 +66,61 @@ ShaderFunction(Name="Functions/F_Test", Root="Game")
 }
 `;
 
+const codeLensTargets = language.getCodeLensTargets(source);
+assert(codeLensTargets.some((target) =>
+    target.startOffset === source.indexOf("Shader(Name=")
+    && target.actions.includes("recompileCurrent")
+    && target.actions.includes("recompileAll")
+    && target.actions.includes("showBridgeDiagnostics")), "CodeLens targets should include recompile actions for Shader blocks");
+const functionOnlyCodeLensTargets = language.getCodeLensTargets("Function Helper(in float A, out float B) { B = A; }");
+assert.deepStrictEqual(functionOnlyCodeLensTargets.map((target) => target.actions), [["recompileAll"]], "Function-only files should expose a recompile-all CodeLens target");
+
+const inlayHintSpecs = language.getInlayHintSpecs("Result = UE.TexCoord(0);", {
+    collectReachableCallableSignatures: () => new Map(),
+    getUEBuiltinItems: () => [
+        { name: "TexCoord", qualifiedName: "UE.TexCoord", parameters: [{ name: "Index", type: "int", qualifier: "in" }] }
+    ]
+});
+assert(inlayHintSpecs.some((hint) => hint.label === "Index:" && hint.kind === "Parameter"), "Inlay hint specs should expose parameter labels for callable arguments");
+
+const thinFilmHoverSource = "Result = Substrate.ThinFilm(FilmThickness=500.0, FilmIor=1.4);";
+const thinFilmHover = language.getHoverInfoSpec(thinFilmHoverSource, thinFilmHoverSource.indexOf("ThinFilm") + 2, {});
+assert(thinFilmHover, "Substrate.ThinFilm hover should resolve a callable spec");
+assert.strictEqual(thinFilmHover.name, "Substrate.ThinFilm", "Substrate.ThinFilm hover should expose the qualified callable name");
+assert(thinFilmHover.outputs.some((output) => output.name === "Specular Color" && output.type === "float1"), "Substrate.ThinFilm hover should include Specular Color output");
+assert(thinFilmHover.outputs.some((output) => output.name === "Edge Specular Color" && output.type === "float1"), "Substrate.ThinFilm hover should include Edge Specular Color output");
+const thinFilmNameHover = language.getHoverInfoSpec("Substrate.ThinFilm", "Substrate.Thin".length, {});
+assert(thinFilmNameHover?.outputs?.some((output) => output.name === "Specular Color"), "Substrate.ThinFilm hover should resolve on qualified callable text without a call");
+
+const functionHoverSource = "Function Foo(in float A, out float3 Result) { Result = float3(A, A, A); }\nGraphFunction Bar() { Foo(1.0, Out); }";
+const functionHover = language.getHoverInfoSpec(functionHoverSource, functionHoverSource.lastIndexOf("Foo") + 1, {});
+assert(functionHover?.outputs?.some((output) => output.name === "Result" && output.type === "float3"), "Function hover should include out parameters as outputs");
+
+const shaderFunctionHoverSource = `ShaderFunction(Name="Functions/F_Hover")
+{
+    Inputs = {
+        float3 Color;
+    }
+    Outputs = {
+        float3 Result;
+    }
+    Graph = {
+        Result = Color;
+    }
+}
+Shader(Name="Materials/M_Hover")
+{
+    Outputs = {
+        float3 Color;
+    }
+    Graph = {
+        Color = F_Hover(float3(1, 1, 1));
+    }
+}`;
+const shaderFunctionHover = language.getHoverInfoSpec(shaderFunctionHoverSource, shaderFunctionHoverSource.lastIndexOf("F_Hover") + 2, {});
+assert(shaderFunctionHover?.outputs?.some((output) => output.name === "Result" && output.type === "float3"), "ShaderFunction hover should include Outputs section declarations");
+assert.strictEqual(language.getHoverInfoSpec("UnknownCall(1.0);", 2, {}), null, "Unknown function hover should fall back cleanly");
+
 function completionsAt(marker, services = {}) {
     const offset = source.indexOf(marker) + marker.length;
     assert(offset >= marker.length, `marker not found: ${marker}`);

@@ -10,6 +10,7 @@ const calls = require("./calls");
 const indexer = require("./indexer");
 const formatter = require("./formatter");
 const functionBuiltins = require("./functionBuiltins");
+const features = require("./features");
 
 module.exports = {
     ...parser,
@@ -21,5 +22,6 @@ module.exports = {
     ...calls,
     ...indexer,
     ...formatter,
-    ...functionBuiltins
+    ...functionBuiltins,
+    ...features
 };

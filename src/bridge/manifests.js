@@ -7,9 +7,9 @@ const {
     SETTINGS_MANIFEST_NAME,
     SUBSTRATE_BUILTIN_ITEMS,
     UE_BUILTINS,
-    createUEBuiltinItemFromManifestExpression,
-    normalizeSymbolKey
+    createUEBuiltinItemFromManifestExpression
 } = require("../languageData");
+const { normalizeSymbolKey } = require("../language/utils");
 const { collectKnownProjectRoots, findProjectRoot } = require("../project/projects");
 const { getMaterialExpressionManifestPath, getSettingsManifestPath, getSubstrateBuiltinsManifestPath } = require("./paths");
 
@@ -131,6 +131,8 @@ function normalizeSubstrateBuiltinManifestEntry(entry) {
     const snippet = typeof entry.snippet === "string" && entry.snippet.trim()
         ? entry.snippet.trim()
         : buildSubstrateSnippet(name, parameters);
+    const outputs = normalizeBuiltinOutputs(entry.outputs);
+    const outputFallbacks = outputs.length > 0 ? outputs : getSubstrateBuiltinFallbackOutputs(entry);
     return {
         name,
         qualifiedName: typeof entry.qualifiedName === "string" && entry.qualifiedName.trim()
@@ -148,6 +150,7 @@ function normalizeSubstrateBuiltinManifestEntry(entry) {
             : `DreamShader Substrate builtin ${name}`,
         documentation: typeof entry.documentation === "string" ? entry.documentation : "",
         parameters,
+        outputs: outputFallbacks,
         example: typeof entry.example === "string" && entry.example.trim() ? entry.example.trim() : snippet
     };
 }
@@ -155,6 +158,44 @@ function normalizeSubstrateBuiltinManifestEntry(entry) {
 function buildSubstrateSnippet(name, parameters) {
     const args = parameters.map((param, index) => `${param.name}=\${${index + 1}:${param.name}}`);
     return `Substrate.${name}(${args.join(", ")})`;
+}
+
+function normalizeBuiltinOutputs(outputs) {
+    if (!Array.isArray(outputs)) {
+        return [];
+    }
+    return outputs
+        .map((output, index) => {
+            if (!output) {
+                return null;
+            }
+            const name = typeof output.name === "string" ? output.name.trim() : "";
+            const type = typeof output.type === "string" && output.type.trim()
+                ? output.type.trim()
+                : typeof output.outputType === "string" && output.outputType.trim()
+                    ? output.outputType.trim()
+                    : "";
+            return {
+                index: Number.isFinite(Number(output.index)) ? Number(output.index) : index,
+                name,
+                type,
+                outputType: type,
+                componentCount: Number.isFinite(Number(output.componentCount)) ? Number(output.componentCount) : undefined
+            };
+        })
+        .filter(Boolean);
+}
+
+function getSubstrateBuiltinFallbackOutputs(entry) {
+    const key = normalizeSymbolKey(entry?.name);
+    const classKey = normalizeSymbolKey(entry?.className);
+    if (key === "thinfilm" || classKey === "materialexpressionsubstratethinfilm") {
+        return [
+            { index: 0, name: "Specular Color", type: "float1", outputType: "float1", componentCount: 1 },
+            { index: 1, name: "Edge Specular Color", type: "float1", outputType: "float1", componentCount: 1 }
+        ];
+    }
+    return [];
 }
 
 module.exports = {

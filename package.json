@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm materials, .dsf function files, and .dsh shared headers.",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -236,14 +236,14 @@
     "viewsContainers": {
       "panel": [
         {
-          "id": "dreamshader.bridge",
+          "id": "dreamshaderBridge",
           "title": "DreamShader Bridge",
           "icon": "resources/dreamshader-bridge.svg"
         }
       ]
     },
     "views": {
-      "dreamshader.bridge": [
+      "dreamshaderBridge": [
         {
           "id": "dreamshader.bridgeDiagnostics",
           "name": "Diagnostics"
@@ -323,9 +323,12 @@
   },
   "scripts": {
     "test:language": "node scripts/language-smoke.js",
+    "test:extension": "node scripts/run-extension-tests.js",
+    "test": "npm run test:language && npm run test:extension",
     "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
+    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.2"
   }
 }

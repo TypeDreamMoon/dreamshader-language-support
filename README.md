@@ -8,7 +8,7 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.4.9` adds shared `Function` builtin metadata for HLSL intrinsics, GLSL aliases, and Unreal texture sampling helpers, with completion, hover, signature help, inlay hints, diagnostics, and highlighting all reading the same list. It also syncs UE 5.7 `Substrate.*` graph helpers and `Base.FrontMaterial` output support with the current DreamShader plugin.
+Version `1.5.1` adds template block support, DreamShader bridge commands, package tooling, and authoring templates on top of the existing language service. It also keeps Function builtin metadata, UE 5.7 `Substrate.*` graph helpers, and `Base.FrontMaterial` output support synced with the current DreamShader plugin.
 
 ## Highlights
 
@@ -279,7 +279,7 @@ npm run package
 The packaged VSIX is generated as:
 
 ```text
-dreamshaderlang-language-support-1.4.9.vsix
+dreamshaderlang-language-support-1.5.1.vsix
 ```
 
 ## License

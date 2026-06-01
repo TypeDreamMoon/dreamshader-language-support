@@ -1,0 +1,1 @@
+Function Tint(in float3 Color, out float3 Result) { Result = Color; }
