@@ -21,6 +21,8 @@ const TOP_LEVEL_BLOCKS = new Set([
     "Namespace"
 ]);
 
+const TEMPLATE_BLOCKS = new Set(["Shader", "ShaderFunction", "ShaderLayer", "ShaderLayerBlend"]);
+
 const SECTION_NAMES = new Set(["Properties", "Inputs", "Outputs", "Results", "Settings", "Options", "Graph", "Layout"]);
 const SECTION_NAME_ALIASES = new Map([
     ["Results", "Outputs"]
@@ -53,6 +55,14 @@ class Parser {
             if (token.type === "identifier" && token.value === "import") {
                 this.imports.push(this.parseImport());
                 continue;
+            }
+
+            if (token.type === "identifier" && token.value === "Template") {
+                const block = this.parseTemplateBlock();
+                if (block) {
+                    this.blocks.push(block);
+                    continue;
+                }
             }
 
             if (token.type === "identifier" && TOP_LEVEL_BLOCKS.has(token.value)) {
@@ -94,6 +104,42 @@ class Parser {
         };
     }
 
+    parseTemplateBlock() {
+        const templateToken = this.advance();
+        const kindToken = this.skipTriviaAndPeek();
+        if (!kindToken || kindToken.type !== "identifier" || !TEMPLATE_BLOCKS.has(kindToken.value)) {
+            return {
+                kind: "Template",
+                name: "Template",
+                localName: "Template",
+                template: true,
+                startOffset: templateToken.start,
+                kindOffset: templateToken.start,
+                nameOffset: templateToken.start,
+                nameRangeLength: templateToken.value.length,
+                attributes: [],
+                sections: [],
+                bodyOpenOffset: -1,
+                bodyCloseOffset: -1,
+                endOffset: templateToken.end
+            };
+        }
+
+        const block = this.parseNamedBlock();
+        if (!block) {
+            return null;
+        }
+
+        return {
+            ...block,
+            template: true,
+            templateOffset: templateToken.start,
+            templateEndOffset: templateToken.end,
+            startOffset: templateToken.start,
+            kindOffset: block.startOffset
+        };
+    }
+
     parseNamedBlock() {
         const kindToken = this.advance();
         const block = {
@@ -101,6 +147,7 @@ class Parser {
             name: kindToken.value,
             localName: kindToken.value,
             startOffset: kindToken.start,
+            kindOffset: kindToken.start,
             nameOffset: kindToken.start,
             nameRangeLength: kindToken.value.length,
             attributes: [],
@@ -154,6 +201,7 @@ class Parser {
             name: "",
             localName: "",
             startOffset: kindToken.start,
+            kindOffset: kindToken.start,
             nameOffset: kindToken.start,
             nameRangeLength: 0,
             params: [],
@@ -587,6 +635,9 @@ function offsetBlock(block, delta, namespace) {
         startOffset: offsetNumber(block.startOffset, delta),
         endOffset: offsetNumber(block.endOffset, delta),
         nameOffset: offsetNumber(block.nameOffset, delta),
+        kindOffset: offsetNumber(block.kindOffset, delta),
+        templateOffset: offsetNumber(block.templateOffset, delta),
+        templateEndOffset: offsetNumber(block.templateEndOffset, delta),
         bodyOpenOffset: offsetNumber(block.bodyOpenOffset, delta),
         bodyCloseOffset: offsetNumber(block.bodyCloseOffset, delta),
         attributeOpenOffset: offsetNumber(block.attributeOpenOffset, delta),
@@ -652,5 +703,6 @@ module.exports = {
     parseFunctionParams,
     parseDeclaration,
     TOP_LEVEL_BLOCKS,
+    TEMPLATE_BLOCKS,
     SECTION_NAMES
 };

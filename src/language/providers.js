@@ -2,11 +2,16 @@
 
 const { parseDocument } = require("./parser");
 const { isConstructorName } = require("./calls");
-const { flatten } = require("./symbols");
+const { collectSymbols, flatten } = require("./symbols");
 const { isFunctionBuiltinName } = require("./functionBuiltins");
+const { isTypeName } = require("./types");
+const { HLSL_KEYWORD_ITEMS } = require("../languageData");
 const { normalizeSymbolKey, stripCommentsPreserveLayout } = require("./utils");
 
 const CONTROL_CALL_NAMES = new Set(["if", "for", "while", "switch", "return"]);
+const HLSL_KEYWORD_SET = new Set(HLSL_KEYWORD_ITEMS.map(([name]) => normalizeSymbolKey(name)));
+const HLSL_MODIFIER_SET = new Set(["const", "static", "in", "out", "inout", "struct"]);
+const CODE_LITERAL_SET = new Set(["true", "false", "default"]);
 
 function getFoldingRanges(text) {
     const ast = parseDocument(text);
@@ -145,7 +150,10 @@ function getSemanticTokens(text) {
         tokens.push({ offset: importStatement.startOffset, length: "import".length, type: "keyword", modifiers: [] });
     }
     for (const block of flatten(ast.blocks)) {
-        tokens.push({ offset: block.startOffset, length: block.kind.length, type: "keyword", modifiers: ["declaration"] });
+        if (block.template && block.templateOffset >= 0) {
+            tokens.push({ offset: block.templateOffset, length: "Template".length, type: "keyword", modifiers: ["declaration"] });
+        }
+        tokens.push({ offset: block.kindOffset ?? block.startOffset, length: block.kind.length, type: "keyword", modifiers: ["declaration"] });
         if (block.nameOffset >= 0 && block.nameRangeLength > 0) {
             tokens.push({ offset: block.nameOffset, length: block.nameRangeLength, type: tokenTypeForBlock(block.kind), modifiers: ["definition"] });
         }
@@ -153,7 +161,14 @@ function getSemanticTokens(text) {
             addParameterTokens(tokens, text, param);
         }
         if ((block.kind === "Function" || block.kind === "GraphFunction") && block.bodyOffset >= 0) {
-            addCodeSemanticTokens(tokens, text, block.bodyOffset, block.bodyCloseOffset);
+            const symbols = collectSymbols(ast, {
+                ast,
+                block,
+                kind: block.kind === "Function" ? "FunctionBody" : "GraphFunctionBody",
+                section: null,
+                offset: block.bodyCloseOffset
+            });
+            addCodeSemanticTokens(tokens, text, block.bodyOffset, block.bodyCloseOffset, symbols);
         }
         for (const section of block.sections || []) {
             tokens.push({ offset: section.nameOffset, length: section.name.length, type: "property", modifiers: ["declaration"] });
@@ -161,7 +176,14 @@ function getSemanticTokens(text) {
                 addEntryTokens(tokens, text, section, entry);
             }
             if (section.name === "Graph") {
-                addCodeSemanticTokens(tokens, text, section.bodyOffset, section.bodyCloseOffset);
+                const symbols = collectSymbols(ast, {
+                    ast,
+                    block,
+                    section,
+                    kind: "Graph",
+                    offset: section.bodyCloseOffset
+                });
+                addCodeSemanticTokens(tokens, text, section.bodyOffset, section.bodyCloseOffset, symbols);
             }
         }
     }
@@ -256,19 +278,67 @@ function findTokenOffsetInRange(text, tokenText, startOffset, endOffset) {
     return match ? startOffset + match.index : -1;
 }
 
-function addCodeSemanticTokens(tokens, text, startOffset, endOffset) {
+function addCodeSemanticTokens(tokens, text, startOffset, endOffset, symbols = new Map()) {
     if (typeof startOffset !== "number" || typeof endOffset !== "number" || startOffset < 0 || endOffset <= startOffset) {
         return;
     }
 
     const source = text.slice(startOffset, endOffset);
     const clean = stripCommentsPreserveLayout(source);
+    const occupied = [];
     const callPattern = /(?<![_\p{L}\p{N}])([_\p{L}][_\p{L}\p{N}]*(?:(?:::|\.)[_\p{L}][_\p{L}\p{N}]*)*)\s*\(/gu;
     for (const match of clean.matchAll(callPattern)) {
         const callee = match[1];
         const calleeOffset = startOffset + match.index + match[0].indexOf(callee);
+        const before = tokens.length;
         addCalleeTokens(tokens, callee, calleeOffset);
+        for (const token of tokens.slice(before)) {
+            occupied.push({ start: token.offset - startOffset, end: token.offset - startOffset + token.length });
+        }
     }
+
+    const identifierPattern = /(?<![_\p{L}\p{N}])([_\p{L}][_\p{L}\p{N}]*)(?![_\p{L}\p{N}])/gu;
+    for (const match of clean.matchAll(identifierPattern)) {
+        const name = match[1];
+        const key = normalizeSymbolKey(name);
+        const offset = startOffset + match.index;
+        if (isRangeOccupied(match.index, match.index + name.length, occupied)) {
+            continue;
+        }
+        const charBefore = clean[Math.max(0, match.index - 1)];
+        const charAfter = clean[match.index + name.length];
+        if (charBefore === ":" || charAfter === ":" || charAfter === "(") {
+            continue;
+        }
+        if (charBefore === ".") {
+            tokens.push({ offset, length: name.length, type: "property", modifiers: [] });
+            continue;
+        }
+        if (HLSL_MODIFIER_SET.has(key)) {
+            tokens.push({ offset, length: name.length, type: "modifier", modifiers: [] });
+            continue;
+        }
+        if (HLSL_KEYWORD_SET.has(key)) {
+            tokens.push({ offset, length: name.length, type: "keyword", modifiers: [] });
+            continue;
+        }
+        if (isTypeName(name)) {
+            tokens.push({ offset, length: name.length, type: "type", modifiers: [] });
+            continue;
+        }
+        if (CODE_LITERAL_SET.has(key)) {
+            continue;
+        }
+        const symbol = symbols.get(key);
+        if (symbol) {
+            const isParameter = /\bparameter\b/i.test(symbol.detail || "");
+            tokens.push({ offset, length: name.length, type: isParameter ? "parameter" : "variable", modifiers: [] });
+        }
+    }
+}
+
+function isRangeOccupied(start, end, ranges) {
+    return ranges.some((range) => start < range.end && end > range.start);
 }
 
 function addCalleeTokens(tokens, callee, calleeOffset) {

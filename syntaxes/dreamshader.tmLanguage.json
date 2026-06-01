@@ -42,7 +42,7 @@
     },
     "topLevelKeywords": {
       "patterns": [
-        { "name": "keyword.control.dreamshader", "match": "\\b(?:Shader|Namespace|Function|GraphFunction|ShaderFunction|ShaderLayer|ShaderLayerBlend|VirtualFunction|import)\\b" },
+        { "name": "keyword.control.dreamshader", "match": "\\b(?:Template|Shader|Namespace|Function|GraphFunction|ShaderFunction|ShaderLayer|ShaderLayerBlend|VirtualFunction|import)\\b" },
         { "name": "storage.modifier.function.dreamshader", "match": "\\b(?:SelfContained|Inline)\\b" },
         { "name": "entity.name.namespace.definition.dreamshader", "match": "(?<=\\bNamespace\\s*\\(\\s*Name\\s*=\\s*\")[A-Za-z_][A-Za-z0-9_]*\\b" },
         { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Name|Root|Asset)\\b(?=\\s*=)" }
@@ -50,6 +50,38 @@
     },
     "functionDefinitions": {
       "patterns": [
+        {
+          "name": "meta.template.block.dreamshader",
+          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.dreamshader" },
+            "2": { "name": "keyword.control.dreamshader" }
+          },
+          "end": "(?=\\{)|$",
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#topLevelKeywords" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "name": "meta.template.body.dreamshader",
+          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b[^\\{]*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.dreamshader" },
+            "2": { "name": "keyword.control.dreamshader" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#sectionBlocks" },
+            { "include": "#booleans" },
+            { "include": "#operators" }
+          ]
+        },
         {
           "name": "meta.function.definition.dreamshader",
           "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",

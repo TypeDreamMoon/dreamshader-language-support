@@ -20,8 +20,6 @@ const {
     SUBSTRATE_BUILTIN_ITEMS
 } = require("../languageData");
 
-const SUBSTRATE_BUILTIN_NAME_SET = new Set(SUBSTRATE_BUILTIN_ITEMS.map((item) => normalizeSymbolKey(item.name)));
-
 const SEVERITY = {
     Error: "Error",
     Warning: "Warning",
@@ -33,12 +31,13 @@ function getDiagnostics(text, fileName = "", services = {}) {
     const diagnostics = [];
     const extension = path.extname(fileName || "").toLowerCase();
     const reachableCallables = mergeCallables(collectCallables(ast), callService(services, "collectReachableCallableSignatures", new Map()));
+    const substrateBuiltinNames = getSubstrateBuiltinNameSet(services);
 
     addFileShapeDiagnostics(diagnostics, ast, text, extension);
     addImportDiagnostics(diagnostics, ast, services);
     addDuplicateCallableDiagnostics(diagnostics, ast);
-    addBlockDiagnostics(diagnostics, ast, reachableCallables);
-    addFunctionDiagnostics(diagnostics, ast, reachableCallables);
+    addBlockDiagnostics(diagnostics, ast, reachableCallables, substrateBuiltinNames);
+    addFunctionDiagnostics(diagnostics, ast, reachableCallables, substrateBuiltinNames);
     addCycleDiagnostics(diagnostics, services, fileName);
     addBraceDiagnostics(diagnostics, text);
     return dedupeDiagnostics(diagnostics);
@@ -119,7 +118,7 @@ function addDuplicateCallableDiagnostics(diagnostics, ast) {
     }
 }
 
-function addBlockDiagnostics(diagnostics, ast, reachableCallables) {
+function addBlockDiagnostics(diagnostics, ast, reachableCallables, substrateBuiltinNames) {
     for (const block of flatten(ast.blocks)) {
         if (block.kind === "Namespace" || block.kind === "Function" || block.kind === "GraphFunction") {
             continue;
@@ -146,7 +145,7 @@ function addBlockDiagnostics(diagnostics, ast, reachableCallables) {
         }
 
         for (const section of block.sections || []) {
-            addSectionEntryDiagnostics(diagnostics, block, section, ast, reachableCallables);
+            addSectionEntryDiagnostics(diagnostics, block, section, ast, reachableCallables, substrateBuiltinNames);
         }
 
         addRequiredSectionDiagnostics(diagnostics, block, sectionsByName);
@@ -236,7 +235,7 @@ function addSubstrateSettingDiagnostics(diagnostics, block, sectionsByName) {
     }
 }
 
-function addSectionEntryDiagnostics(diagnostics, block, section, ast, reachableCallables) {
+function addSectionEntryDiagnostics(diagnostics, block, section, ast, reachableCallables, substrateBuiltinNames) {
     const seenNames = new Map();
     if (section.name === "Settings" || section.name === "Options") {
         for (const entry of section.entries || []) {
@@ -251,7 +250,7 @@ function addSectionEntryDiagnostics(diagnostics, block, section, ast, reachableC
     }
 
     if (section.name === "Graph") {
-        addGraphDiagnostics(diagnostics, block, section, ast, reachableCallables);
+        addGraphDiagnostics(diagnostics, block, section, ast, reachableCallables, substrateBuiltinNames);
         return;
     }
 
@@ -320,7 +319,7 @@ function validateOutputBinding(diagnostics, entry) {
     diagnostics.push(makeDiagnostic(entry.startOffset, entry.startOffset + target.length, "Outputs bindings should target Base.<Property> or Expression(...).Pin[n].", SEVERITY.Warning));
 }
 
-function addFunctionDiagnostics(diagnostics, ast, reachableCallables) {
+function addFunctionDiagnostics(diagnostics, ast, reachableCallables, substrateBuiltinNames) {
     for (const block of flatten(ast.blocks)) {
         if (block.kind !== "Function" && block.kind !== "GraphFunction") {
             continue;
@@ -348,7 +347,7 @@ function addFunctionDiagnostics(diagnostics, ast, reachableCallables) {
         if (block.kind === "Function") {
             addFunctionBodyDiagnostics(diagnostics, block);
         } else {
-            addGraphFunctionBodyDiagnostics(diagnostics, ast, block, reachableCallables);
+            addGraphFunctionBodyDiagnostics(diagnostics, ast, block, reachableCallables, substrateBuiltinNames);
         }
     }
 }
@@ -363,17 +362,17 @@ function addFunctionBodyDiagnostics(diagnostics, block) {
     }
 }
 
-function addGraphFunctionBodyDiagnostics(diagnostics, ast, block, reachableCallables) {
+function addGraphFunctionBodyDiagnostics(diagnostics, ast, block, reachableCallables, substrateBuiltinNames) {
     const context = { ast, block, kind: "GraphFunctionBody", section: null, offset: block.endOffset };
     const symbols = collectSymbols(ast, context, reachableCallables);
-    addGraphStatementDiagnostics(diagnostics, block.bodyText || "", block.bodyOffset || block.bodyOpenOffset + 1, symbols, reachableCallables);
+    addGraphStatementDiagnostics(diagnostics, block.bodyText || "", block.bodyOffset || block.bodyOpenOffset + 1, symbols, reachableCallables, substrateBuiltinNames);
 }
 
-function addGraphDiagnostics(diagnostics, block, section, ast, reachableCallables) {
+function addGraphDiagnostics(diagnostics, block, section, ast, reachableCallables, substrateBuiltinNames) {
     const context = { ast, block, section, kind: "Graph", offset: section.endOffset };
     const symbols = collectSymbols(ast, context, reachableCallables);
     addGraphRegionDirectiveDiagnostics(diagnostics, section.bodyText || "", section.bodyOffset);
-    addGraphStatementDiagnostics(diagnostics, section.bodyText || "", section.bodyOffset, symbols, reachableCallables);
+    addGraphStatementDiagnostics(diagnostics, section.bodyText || "", section.bodyOffset, symbols, reachableCallables, substrateBuiltinNames);
 }
 
 function addLayoutDiagnostics(diagnostics, section) {
@@ -506,9 +505,9 @@ function parseRegionDirectiveName(trimmedLine, directive) {
     return unquote(trimmedLine.slice(directive.length).trim()).trim();
 }
 
-function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols, reachableCallables) {
+function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols, reachableCallables, substrateBuiltinNames) {
     for (const statement of parseCodeStatements(bodyText, baseOffset)) {
-        if (!statement.terminated && statement.text.trim()) {
+        if (!statement.terminated && statement.text.trim() && !isIncompleteGraphStatementText(statement.text)) {
             diagnostics.push(makeDiagnostic(statement.endOffset, statement.endOffset, "Graph statement is missing a trailing ';'.", SEVERITY.Error));
         }
 
@@ -520,7 +519,7 @@ function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols
                     continue;
                 }
                 if (declaration.valueText) {
-                    addExpressionDiagnostics(diagnostics, declaration.valueText, declaration.valueOffset, symbols, reachableCallables);
+                    addExpressionDiagnostics(diagnostics, declaration.valueText, declaration.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
                 }
                 symbols.set(normalizeSymbolKey(declaration.name), {
                     name: declaration.name,
@@ -533,19 +532,24 @@ function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols
         }
 
         if (statement.kind === "assignment") {
-            addExpressionDiagnostics(diagnostics, statement.valueText, statement.valueOffset, symbols, reachableCallables);
+            addExpressionDiagnostics(diagnostics, statement.valueText, statement.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
             validateAssignmentTarget(diagnostics, statement, symbols);
             continue;
         }
 
         const callExpression = parseCallExpressionText(statement.text, statement.startOffset);
         if (callExpression) {
-            validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, true);
+            validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, substrateBuiltinNames, true);
             continue;
         }
 
-        addExpressionDiagnostics(diagnostics, statement.text, statement.startOffset, symbols, reachableCallables);
+        addExpressionDiagnostics(diagnostics, statement.text, statement.startOffset, symbols, reachableCallables, substrateBuiltinNames);
     }
+}
+
+function isIncompleteGraphStatementText(text) {
+    const clean = stripCommentsPreserveLayout(text).trim();
+    return /\b(?:UE|Substrate)\s*\.\s*[A-Za-z0-9_]*$/i.test(clean);
 }
 
 function validateAssignmentTarget(diagnostics, statement, symbols) {
@@ -573,7 +577,7 @@ function validateAssignmentTarget(diagnostics, statement, symbols) {
     }
 }
 
-function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reachableCallables) {
+function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reachableCallables, substrateBuiltinNames) {
     const clean = stripCommentsPreserveLayout(text);
     const known = new Set([...symbols.keys(), "ue", "substrate", "true", "false", "default"]);
     for (const symbol of symbols.values()) {
@@ -590,7 +594,7 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
     for (const match of clean.matchAll(callPattern)) {
         const callExpression = parseCallExpressionText(clean.slice(match.index), baseOffset + match.index);
         if (callExpression) {
-            validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, false);
+            validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, substrateBuiltinNames, false);
         }
     }
 
@@ -604,7 +608,11 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
             continue;
         }
         if (base === "substrate") {
-            if (!SUBSTRATE_BUILTIN_NAME_SET.has(member)) {
+            const memberEndOffset = baseOffset + match.index + match[0].length;
+            if (memberEndOffset >= baseOffset + clean.length && !/[;,) \t\r\n]/.test(clean[memberEndOffset - baseOffset] || "")) {
+                continue;
+            }
+            if (!substrateBuiltinNames.has(member)) {
                 diagnostics.push(makeDiagnostic(
                     baseOffset + match.index,
                     baseOffset + match.index + match[0].length,
@@ -646,20 +654,20 @@ function addExpressionDiagnostics(diagnostics, text, baseOffset, symbols, reacha
     }
 }
 
-function validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, standalone) {
-    if (!callExpression || isHlslKnownName(normalizeSymbolKey(callExpression.callee)) || normalizeSymbolKey(callExpression.callee).startsWith("ue.") || isKnownSubstrateBuiltinCall(callExpression.callee) || isTypeName(callExpression.callee) || normalizeSymbolKey(callExpression.callee) === "path") {
+function validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, substrateBuiltinNames, standalone) {
+    if (!callExpression || isHlslKnownName(normalizeSymbolKey(callExpression.callee)) || normalizeSymbolKey(callExpression.callee).startsWith("ue.") || isKnownSubstrateBuiltinCall(callExpression.callee, substrateBuiltinNames) || isTypeName(callExpression.callee) || normalizeSymbolKey(callExpression.callee) === "path") {
         for (let index = 0; index < (callExpression?.arguments || []).length; index += 1) {
             const arg = callExpression.arguments[index];
             if (arg.isNamed) {
                 if (shouldValidateNamedArgumentValue(callExpression.callee, arg.name, arg.valueText)) {
-                    addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables);
+                    addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
                 }
                 continue;
             }
             if (shouldSkipPositionalArgumentValue(callExpression.callee, arg.valueText, index)) {
                 continue;
             }
-            addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables);
+            addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
         }
         return;
     }
@@ -696,7 +704,7 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     for (let index = 0; index < inputArgumentCount; index += 1) {
         const arg = inputArguments[index];
         if (arg && !isDefaultArgumentText(arg.valueText)) {
-            addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables);
+            addExpressionDiagnostics(diagnostics, arg.valueText, arg.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
         }
     }
 
@@ -729,9 +737,17 @@ function validateCallableArguments(diagnostics, callExpression, symbols, reachab
     }
 }
 
-function isKnownSubstrateBuiltinCall(callee) {
+function isKnownSubstrateBuiltinCall(callee, substrateBuiltinNames) {
     const key = normalizeSymbolKey(callee);
-    return key.startsWith("substrate.") && SUBSTRATE_BUILTIN_NAME_SET.has(key.slice("substrate.".length));
+    return key.startsWith("substrate.") && substrateBuiltinNames.has(key.slice("substrate.".length));
+}
+
+function getSubstrateBuiltinNameSet(services) {
+    const serviceItems = callService(services, "getSubstrateBuiltinItems", null);
+    const items = Array.isArray(serviceItems) && serviceItems.length ? serviceItems : SUBSTRATE_BUILTIN_ITEMS;
+    return new Set(items
+        .map((item) => normalizeSymbolKey(item?.name))
+        .filter(Boolean));
 }
 
 function countOptionalTailInputs(inputs) {

@@ -103,6 +103,12 @@ const services = {
 
 assert(labelsAt("        fl").includes("float"), "Inputs section should offer type completions");
 assert(language.getCompletionSpecs("Sh", 2, {}).some((item) => item.label === "Shader"), "Top-level keyword completion should work while typing Sh");
+const topLevelTemplateLabels = language.getCompletionSpecs("", 0, {}).map((item) => item.label);
+assert(topLevelTemplateLabels.includes("Template"), "Top-level completion should include Template");
+assert(topLevelTemplateLabels.includes("Template Shader"), "Top-level completion should include Template Shader");
+assert(topLevelTemplateLabels.includes("Template ShaderFunction"), "Top-level completion should include Template ShaderFunction");
+assert(topLevelTemplateLabels.includes("Template ShaderLayer"), "Top-level completion should include Template ShaderLayer");
+assert(topLevelTemplateLabels.includes("Template ShaderLayerBlend"), "Top-level completion should include Template ShaderLayerBlend");
 const importItems = language.getCompletionSpecs("import \"", "import \"".length, services);
 const dsfImport = importItems.find((item) => item.label === "Functions/F_PulseTint.dsf");
 assert(dsfImport, "Import completion should include .dsf function files");
@@ -254,7 +260,10 @@ const semanticSource = `ShaderFunction(Name="Mat_Test/FuncTest", Root="Game")
 
 Function __Lerp(in float3 a, in float3 b, in float alpha, out float3 res)
 {
-    res = lerp(a, b, alpha);
+    const float t = saturate(alpha);
+    if (t > 0.0) {
+        res = lerp(a, b, t);
+    }
 }
 
 Function __Sample(in Texture2D texture, in float2 uv, out float3 color)
@@ -271,6 +280,12 @@ assert(semanticTokens.some((token) => token.text === "lerp" && token.type === "f
 assert(semanticTokens.some((token) => token.text === "saturate" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "HLSL intrinsics inside Graph should be highlighted as default library functions");
 assert(semanticTokens.some((token) => token.text === "mix" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "GLSL aliases should be highlighted as default library functions");
 assert(semanticTokens.some((token) => token.text === "Texture2DSample" && token.type === "function" && token.modifiers.includes("defaultLibrary")), "Texture sample helpers should be highlighted as default library functions");
+assert(semanticTokens.some((token) => token.text === "if" && token.type === "keyword"), "Function bodies should mark HLSL control keywords");
+assert(semanticTokens.some((token) => token.text === "const" && token.type === "modifier"), "Function bodies should mark HLSL modifiers");
+assert(semanticTokens.some((token) => token.text === "a" && token.type === "parameter"), "Function bodies should mark parameter references");
+assert(semanticTokens.some((token) => token.text === "t" && token.type === "variable"), "Function bodies should mark local variable references");
+assert(semanticTokens.some((token) => token.text === "Result" && token.type === "variable"), "Graph bodies should mark output variable references");
+assert(semanticTokens.some((token) => token.text === "rgb" && token.type === "property"), "Function bodies should mark member field access");
 
 const builtinFunctionDiagnostics = language.getDiagnostics(`Function SampleTex(in Texture2D texture, in float2 uv, out float3 color)
 {
@@ -618,6 +633,41 @@ const substrateSource = `Shader(Name="Materials/M_Substrate")
 const substrateOffset = substrateSource.indexOf("        Substrate.") + "        Substrate.".length;
 const substrateLabels = language.getCompletionSpecs(substrateSource, substrateOffset, {}).map((item) => item.label);
 assert(substrateLabels.includes("Slab") && substrateLabels.includes("VerticalLayer"), "Substrate namespace should offer current Substrate.* graph helpers");
+const substratePartialSource = substrateSource.replace("        Substrate.", "        Substrate.Sl");
+const substratePartialOffset = substratePartialSource.indexOf("        Substrate.Sl") + "        Substrate.Sl".length;
+const substratePartialCompletion = language.getCompletionSpecs(substratePartialSource, substratePartialOffset, {}).find((item) => item.label === "Slab");
+assert(substratePartialCompletion, "Substrate partial member access should offer matching builtins");
+assert.deepStrictEqual(substratePartialCompletion.range, [substratePartialOffset - 2, substratePartialOffset], "Substrate partial member completion should replace only the typed member prefix");
+const substrateVerticalLayerCompletion = language.getCompletionSpecs(substrateSource, substrateOffset, {}).find((item) => item.label === "VerticalLayer");
+assert(substrateVerticalLayerCompletion, "Substrate member completion should offer VerticalLayer");
+assert(!/^Substrate\./.test(String(substrateVerticalLayerCompletion.insertText || "")), "Substrate member completion should not insert a duplicate namespace prefix");
+const incompleteSubstrateDiagnostics = language.getDiagnostics(substratePartialSource, "M_SubstratePartial.dsm", {});
+assert(!incompleteSubstrateDiagnostics.some((diagnostic) => /Unknown Substrate builtin|missing a trailing/.test(diagnostic.message)), "Incomplete Substrate member access should not warn while typing");
+const substrateManifestServices = {
+    getSubstrateBuiltinItems: () => [{
+        name: "TestSurface",
+        qualifiedName: "Substrate.TestSurface",
+        snippet: "Substrate.TestSurface(Color=${1:Color})",
+        memberSnippet: "TestSurface(Color=${1:Color})",
+        detail: "Manifest-backed test Substrate node",
+        parameters: [{ qualifier: "in", type: "value", name: "Color" }]
+    }]
+};
+const substrateManifestLabels = language.getCompletionSpecs(substrateSource, substrateOffset, substrateManifestServices).map((item) => item.label);
+assert(substrateManifestLabels.includes("TestSurface"), "Substrate completions should include manifest-backed builtins");
+assert(!language.getDiagnostics(`Shader(Name="Materials/M_SubstrateManifest")
+{
+    Settings = {
+        ShadingModel = "Substrate";
+    }
+    Outputs = {
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+    }
+    Graph = {
+        Surface = Substrate.TestSurface(Color=float3(1, 0, 0));
+    }
+}`, "M_SubstrateManifest.dsm", substrateManifestServices).some((diagnostic) => /Unknown Substrate builtin 'TestSurface'/.test(diagnostic.message)), "Substrate diagnostics should accept manifest-backed builtins");
 assert(labelsAt("        Base.").includes("FrontMaterial"), "Base output completion should include FrontMaterial");
 assert(!language.getDiagnostics(`Shader(Name="Materials/M_Substrate")
 {
@@ -640,6 +690,39 @@ float Value;
 }
 }`);
 assert(/    Properties = \{/.test(formatted), "Formatter should indent sections");
+
+const templateSource = `Template ShaderFunction(Name="Templates/T_Tint", Root="Game")
+{
+    Inputs = {
+        float3 Color;
+    }
+
+    Outputs = {
+        float3 Result;
+    }
+
+    Graph = {
+        Result = Color;
+    }
+}`;
+const templateAst = language.parseDocument(templateSource);
+assert.strictEqual(templateAst.blocks[0]?.kind, "ShaderFunction", "Template ShaderFunction should parse as the inner block kind");
+assert.strictEqual(templateAst.blocks[0]?.template, true, "Template blocks should preserve template metadata");
+assert(templateAst.blocks[0]?.sections.some((section) => section.name === "Graph"), "Template ShaderFunction should parse inner sections");
+assert(language.getCompletionSpecs(templateSource, templateSource.indexOf("        Result = Color") + "        Result = Color".length, {}).some((item) => item.label === "Color"), "Template Graph should use normal Graph completions");
+const templateTokens = language.getSemanticTokens(templateSource)
+    .map((token) => ({ ...token, text: templateSource.slice(token.offset, token.offset + token.length) }));
+assert(templateTokens.some((token) => token.text === "Template" && token.type === "keyword"), "Template keyword should receive semantic tokens");
+assert(templateTokens.some((token) => token.text === "ShaderFunction" && token.type === "keyword"), "Template inner block keyword should receive semantic tokens");
+const formattedTemplate = language.formatDocument(`Template   ShaderLayerBlend(Name="Templates/T")
+{
+Inputs={
+MaterialAttributes Base;
+MaterialAttributes Layer;
+}
+}`);
+assert(/Template ShaderLayerBlend/.test(formattedTemplate), "Formatter should normalize Template block headers");
+assert(/    Inputs = \{/.test(formattedTemplate), "Formatter should indent Template inner sections");
 
 const indexed = language.buildDocumentIndex({
     fileName: "Root.dsm",

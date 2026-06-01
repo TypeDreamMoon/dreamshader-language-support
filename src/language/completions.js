@@ -22,7 +22,7 @@ const {
 const { FUNCTION_BUILTIN_ITEMS } = require("./functionBuiltins");
 const { analyzeContext } = require("./context");
 const { collectSymbols, collectCallables } = require("./symbols");
-const { normalizeSymbolKey, stripCommentsPreserveLayout } = require("./utils");
+const { escapeRegExp, normalizeSymbolKey, stripCommentsPreserveLayout } = require("./utils");
 
 const SETTING_MAPPING_FALLBACKS = new Map([
     ["MaterialDomain", ["Surface", "DeferredDecal", "LightFunction", "PostProcess", "UserInterface", "UI", "VirtualTexture"]],
@@ -108,6 +108,34 @@ const SWIZZLE_ITEMS = [
     "xy", "xyz", "xyzw", "rgb", "rgba"
 ].map((label) => ({ label, detail: "Vector swizzle" }));
 
+const TEMPLATE_BLOCK_COMPLETIONS = [
+    {
+        label: "Template",
+        detail: "Create a DreamShader template block",
+        snippet: "Template ${1|Shader,ShaderFunction,ShaderLayer,ShaderLayerBlend|}(Name=\"${2:Templates/T_New}\", Root=\"${3:Game}\")\n{\n\t$0\n}"
+    },
+    {
+        label: "Template Shader",
+        detail: "Create a material Shader template block",
+        snippet: "Template Shader(Name=\"Templates/${1:T_Surface}\", Root=\"${2:Game}\")\n{\n\tProperties = {\n\t\tVectorParameter ${3:BaseColor} = float4(0.8, 0.8, 0.8, 1.0);\n\t}\n\n\tOutputs = {\n\t\tfloat3 ${4:Color};\n\t\tBase.BaseColor = ${4:Color};\n\t}\n\n\tGraph = {\n\t\t${4:Color} = ${3:BaseColor}.rgb;\n\t}\n}"
+    },
+    {
+        label: "Template ShaderFunction",
+        detail: "Create a ShaderFunction template block",
+        snippet: "Template ShaderFunction(Name=\"Templates/${1:T_Function}\", Root=\"${2:Game}\")\n{\n\tInputs = {\n\t\tfloat3 ${3:Color};\n\t}\n\n\tOutputs = {\n\t\tfloat3 ${4:Result};\n\t}\n\n\tGraph = {\n\t\t${4:Result} = ${3:Color};\n\t}\n}"
+    },
+    {
+        label: "Template ShaderLayer",
+        detail: "Create a ShaderLayer template block",
+        snippet: "Template ShaderLayer(Name=\"Templates/${1:T_Layer}\", Root=\"${2:Game}\")\n{\n\tOutputs = {\n\t\tMaterialAttributes ${3:Attrs};\n\t}\n\n\tGraph = {\n\t\t${3:Attrs}.BaseColor = float3(0.8, 0.8, 0.8);\n\t}\n}"
+    },
+    {
+        label: "Template ShaderLayerBlend",
+        detail: "Create a ShaderLayerBlend template block",
+        snippet: "Template ShaderLayerBlend(Name=\"Templates/${1:T_LayerBlend}\", Root=\"${2:Game}\")\n{\n\tInputs = {\n\t\tMaterialAttributes ${3:Base};\n\t\tMaterialAttributes ${4:Layer};\n\t\topt float ${5:Alpha} = 1.0;\n\t}\n\n\tOutputs = {\n\t\tMaterialAttributes ${6:Result};\n\t}\n\n\tGraph = {\n\t\t${6:Result} = ${3:Base};\n\t\t${6:Result}.BaseColor = lerp(${3:Base}.BaseColor, ${4:Layer}.BaseColor, saturate(${5:Alpha}));\n\t}\n}"
+    }
+];
+
 function getCompletionSpecs(text, offset, services = {}) {
     const context = analyzeContext(text, offset);
     const specs = [];
@@ -146,7 +174,7 @@ function getCompletionSpecs(text, offset, services = {}) {
     }
 
     if (context.afterSubstrateAccessor && isGraphLike(context)) {
-        addSubstrateBuiltinMembers(add);
+        addSubstrateBuiltinMembers(add, services, context);
         return dedupe(specs);
     }
 
@@ -249,7 +277,7 @@ function getCompletionSpecs(text, offset, services = {}) {
         addTypeItems(add, "graph");
         addHlslKeywords(add);
         addHlslIntrinsics(add);
-        addSubstrateGraphItems(add, context);
+        addSubstrateGraphItems(add, context, services);
         addGraphSnippets(add);
         addUEBuiltins(add, services);
     }
@@ -302,8 +330,12 @@ function makeAdder(specs) {
 }
 
 function addKeywordAndTemplateItems(add) {
+    add({ label: "Template", kind: "Keyword", insertText: "Template", detail: "DreamShader template block keyword" });
     for (const item of DREAMSHADER_KEYWORD_COMPLETIONS) {
         add({ label: item.label, kind: "Keyword", insertText: item.insertText, detail: item.detail });
+    }
+    for (const item of TEMPLATE_BLOCK_COMPLETIONS) {
+        add({ label: item.label, kind: "Snippet", insertText: item.snippet, detail: item.detail });
     }
     for (const item of DREAMSHADER_TEMPLATE_COMPLETIONS) {
         add({ label: item.label, kind: "Snippet", insertText: item.snippet, detail: item.detail });
@@ -392,11 +424,11 @@ function addLayoutArguments(add) {
     }
 }
 
-function addSubstrateGraphItems(add, context) {
+function addSubstrateGraphItems(add, context, services) {
     if (!blockUsesSubstrate(context.block)) {
         return;
     }
-    for (const builtin of SUBSTRATE_BUILTIN_ITEMS) {
+    for (const builtin of getSubstrateBuiltins(services)) {
         add({ label: builtin.qualifiedName, kind: "Function", insertText: builtin.snippet, detail: builtin.detail });
     }
 }
@@ -519,16 +551,46 @@ function addUEBuiltins(add, services) {
     }
 }
 
-function addUEBuiltinMembers(add, services) {
+function addUEBuiltinMembers(add, services, context) {
+    const range = getMemberAccessReplacementRange(context);
     for (const builtin of getUEBuiltins(services)) {
-        add({ label: builtin.name, kind: "Function", insertText: builtin.memberSnippet || builtin.snippet || builtin.name, detail: builtin.detail });
+        add({ label: builtin.name, kind: "Function", insertText: getNamespaceMemberSnippet(builtin, "UE"), detail: builtin.detail, range });
     }
 }
 
-function addSubstrateBuiltinMembers(add) {
-    for (const builtin of SUBSTRATE_BUILTIN_ITEMS) {
-        add({ label: builtin.name, kind: "Function", insertText: builtin.memberSnippet || builtin.snippet || builtin.name, detail: builtin.detail });
+function addSubstrateBuiltinMembers(add, services, context) {
+    const range = getMemberAccessReplacementRange(context);
+    for (const builtin of getSubstrateBuiltins(services)) {
+        add({ label: builtin.name, kind: "Function", insertText: getNamespaceMemberSnippet(builtin, "Substrate"), detail: builtin.detail, range });
     }
+}
+
+function getNamespaceMemberSnippet(builtin, namespaceName) {
+    const namespacePattern = new RegExp(`^${escapeRegExp(namespaceName)}\\.`, "i");
+    const candidates = [
+        builtin?.memberSnippet,
+        builtin?.snippet,
+        builtin?.qualifiedName,
+        builtin?.name
+    ];
+    for (const candidate of candidates) {
+        const text = String(candidate || "").trim();
+        if (text) {
+            return text.replace(namespacePattern, "");
+        }
+    }
+    return "";
+}
+
+function getMemberAccessReplacementRange(context) {
+    return context?.memberAccess
+        ? [context.memberAccess.replaceStartOffset, context.memberAccess.replaceEndOffset]
+        : undefined;
+}
+
+function getSubstrateBuiltins(services) {
+    const items = callService(services, "getSubstrateBuiltinItems", null);
+    return Array.isArray(items) && items.length > 0 ? items : SUBSTRATE_BUILTIN_ITEMS;
 }
 
 function getUEBuiltins(services) {
