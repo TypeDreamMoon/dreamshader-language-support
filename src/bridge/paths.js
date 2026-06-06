@@ -15,6 +15,14 @@ function getDiagnosticsFilePath(projectRoot) {
     return normalizeFsPath(path.join(getBridgeDirectory(projectRoot), "diagnostics.json"));
 }
 
+function getPreviewFilePath(projectRoot) {
+    return normalizeFsPath(path.join(getBridgeDirectory(projectRoot), "preview.json"));
+}
+
+function getPreviewDirectory(projectRoot) {
+    return normalizeFsPath(path.join(getBridgeDirectory(projectRoot), "Preview"));
+}
+
 function getMaterialExpressionManifestPath(projectRoot) {
     return normalizeFsPath(path.join(getBridgeDirectory(projectRoot), "material-expressions.json"));
 }
@@ -31,6 +39,8 @@ module.exports = {
     getBridgeDirectory,
     getRequestDirectory,
     getDiagnosticsFilePath,
+    getPreviewFilePath,
+    getPreviewDirectory,
     getMaterialExpressionManifestPath,
     getSettingsManifestPath,
     getSubstrateBuiltinsManifestPath

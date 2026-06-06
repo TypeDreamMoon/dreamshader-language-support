@@ -31,8 +31,31 @@ function writeCleanGeneratedShadersRequest(projectRoot) {
     });
 }
 
+function writePreviewMaterialRequest(projectRoot, sourceFile, options = {}) {
+    const payload = {
+        action: "previewMaterial",
+        sourceFile: normalizeFsPath(sourceFile),
+        width: clampPreviewSize(options.width, 512),
+        height: clampPreviewSize(options.height, 512),
+        mesh: String(options.mesh || "sphere")
+    };
+    if (options.requestId) {
+        payload.requestId = String(options.requestId);
+    }
+    return writeBridgeRequest(projectRoot, payload);
+}
+
+function clampPreviewSize(value, fallback) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return fallback;
+    }
+    return Math.max(64, Math.min(2048, Math.floor(numeric)));
+}
+
 module.exports = {
     writeBridgeRequest,
     writeRecompileRequest,
-    writeCleanGeneratedShadersRequest
+    writeCleanGeneratedShadersRequest,
+    writePreviewMaterialRequest
 };

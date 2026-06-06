@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+
+- Added a DreamShader material preview command with WebSocket streaming and file bridge fallback support.
+
 ## 1.5.2
 
 - Added callable hover return and output pin metadata for DreamShader functions, UE builtins, and Substrate helpers.
