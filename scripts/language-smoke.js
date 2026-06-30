@@ -788,4 +788,56 @@ const indexed = language.buildDocumentIndex({
 assert(indexed.callables.has("a") && indexed.callables.has("b"), "Document index should collect imported callables");
 assert(indexed.cycles.length > 0, "Document index should detect function cycles across imports");
 
+// --- DreamShaderLang 1.5 syntax ---------------------------------------------------------
+const v15Source = `Shader("M_V15") {
+    Properties {
+        Group("Surface") {
+            ScalarParameter Rough = 0.5 [Slider(0, 1)];
+            TextureSampleParameter2D Albedo = "/Game/Tex/T_White";
+        }
+        ScalarParameter Loose = 2.0;
+    }
+    Outputs {
+        Base.BaseColor = Tint;
+        Base.Roughness = R;
+    }
+    Graph {
+        float l = Luma(float3(1, 0, 0));
+        float3 Tint = Albedo * l;
+        float R = Rough + Loose;
+    }
+}
+
+Function float Luma(in vec3 c) {
+    return dot(c, vec3(0.299, 0.587, 0.114));
+}`;
+const v15Ast = language.parseDocument(v15Source);
+const v15Props = v15Ast.blocks[0].sections.find((section) => section.name === "Properties");
+const v15Decls = v15Props.entries.filter((entry) => entry.kind === "declaration");
+assert.deepStrictEqual(v15Decls.map((entry) => entry.name), ["Rough", "Albedo", "Loose"], "Group scope should flatten its declarations in source order");
+assert.strictEqual(v15Decls[0].metadata?.group, "Surface", "Group scope should stamp the group name onto contained parameters");
+assert.strictEqual(v15Decls[1].metadata?.group, "Surface", "All parameters in a Group share its name");
+assert.strictEqual(v15Decls[2].metadata?.group, undefined, "Loose parameters outside a Group are not stamped");
+const lumaBlock = v15Ast.blocks.find((block) => block.name === "Luma");
+assert.strictEqual(lumaBlock.returnType, "float", "Return-type functions should record their return type");
+const v15Callables = language.collectCallables(v15Ast);
+assert(v15Callables.get("luma")[0].outputs.some((output) => output.type === "float"), "Return-type function exposes its return type as an output");
+assert.strictEqual(language.getDiagnostics(v15Source, "M_V15.dsm").length, 0, "Valid 1.5 syntax should produce no diagnostics");
+
+// optional '=' on a section keeps its body symbols
+const noEqSource = `Shader("M_NoEq") {
+    Properties { ScalarParameter A = 1.0; }
+    Graph { Base.BaseColor = float3(A, A, A); }
+}`;
+const noEqProps = language.parseDocument(noEqSource).blocks[0].sections.find((section) => section.name === "Properties");
+assert(noEqProps && noEqProps.entries.some((entry) => entry.name === "A"), "Sections without '=' should still be parsed and keep their symbols");
+
+// 1.5 completions: Slider metadata and propgroup declaration sugar
+const metaDoc = `Shader("M") {\n    Properties {\n        ScalarParameter A = 1.0 [];\n    }\n}`;
+const metaLabels = language.getCompletionSpecs(metaDoc, metaDoc.indexOf("[]") + 1, {}).map((item) => item.label);
+assert(metaLabels.includes("Slider"), "Metadata completion should offer the Slider shorthand");
+const propDoc = `Shader("M") {\n    Properties {\n        \n    }\n}`;
+const propLabels = language.getCompletionSpecs(propDoc, propDoc.indexOf("        \n") + 8, {}).map((item) => item.label);
+assert(propLabels.includes("propgroup"), "Properties completion should offer the propgroup scope snippet");
+
 console.log("language smoke tests passed");
