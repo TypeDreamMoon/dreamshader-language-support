@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0
+
+- Added support for the DreamShaderLang 1.5 syntax, kept fully backward compatible with the existing syntax:
+  - `Group("Name") { ... }` property scopes — highlighting, parsing (declarations flattened with their group), completion (`propgroup` snippet), and a `Slider(min, max)` metadata shorthand.
+  - Single-output return-value functions — `Function float Luma(...) { return ...; }` (and `GraphFunction`) highlight the return type, resolve as values when called, and no longer warn about a missing `out` parameter.
+  - Optional `=` between a section name and its body — `Properties { ... }` is treated identically to `Properties = { ... }`.
+  - Bare `"/Game/..."` asset paths in a parameter's `=` slot, plus a `texparampath` snippet.
+- Modernized the default "New DreamShader Material" scaffold to use Group scope, the `Slider` shorthand, and section blocks without `=`.
+
 ## 1.5.3
 
 - Added a DreamShader material preview command with WebSocket streaming and file bridge fallback support.

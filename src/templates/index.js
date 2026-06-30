@@ -202,28 +202,21 @@ Shader(Name="${shaderName}")
 
     return `Shader(Name="${shaderName}")
 {
-    Properties = {
-        VectorParameter BaseColor = float4(1.0, 0.45, 0.2, 1.0) [
-            Group="Surface";
-            SortPriority=10;
-        ];
-        ScalarParameter Roughness = 0.55 [
-            Group="Surface";
-            SortPriority=20;
-        ];
-        ScalarParameter Metallic = 0.0 [
-            Group="Surface";
-            SortPriority=30;
-        ];
+    Properties {
+        Group("Surface") {
+            VectorParameter BaseColor = float4(1.0, 0.45, 0.2, 1.0);
+            ScalarParameter Roughness = 0.55 [Slider(0, 1)];
+            ScalarParameter Metallic = 0.0 [Slider(0, 1)];
+        }
     }
 
-    Settings = {
+    Settings {
         Domain = "Surface";
         ShadingModel = "DefaultLit";
         BlendMode = "Opaque";
     }
 
-    Outputs = {
+    Outputs {
         vec3 Color;
         float Rough;
         float Metal;
@@ -232,7 +225,7 @@ Shader(Name="${shaderName}")
         Base.Metallic = Metal;
     }
 
-    Graph = {
+    Graph {
         Color = BaseColor.rgb;
         Rough = Roughness;
         Metal = Metallic;

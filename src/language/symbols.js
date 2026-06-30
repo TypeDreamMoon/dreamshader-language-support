@@ -48,12 +48,18 @@ function collectCallables(ast) {
     const result = new Map();
     for (const block of flatten(ast.blocks)) {
         if (block.kind === "Function" || block.kind === "GraphFunction") {
+            const outputs = (block.params || []).filter((param) => param.qualifier === "out");
+            if (block.returnType) {
+                // `Function float Luma(...)` exposes a single implicit output so it can be
+                // called as a value (`x = Luma(c)`). Mirrors the plugin's __return lowering.
+                outputs.unshift({ qualifier: "out", type: block.returnType, name: "__return" });
+            }
             addCallable(result, {
                 kind: block.kind,
                 name: block.name,
                 localName: block.localName || block.name,
                 inputs: (block.params || []).filter((param) => param.qualifier !== "out"),
-                outputs: (block.params || []).filter((param) => param.qualifier === "out")
+                outputs
             });
         } else if (["ShaderFunction", "ShaderLayer", "ShaderLayerBlend", "VirtualFunction"].includes(block.kind)) {
             const sections = new Map((block.sections || []).map((section) => [section.name, section]));

@@ -84,11 +84,12 @@
         },
         {
           "name": "meta.function.definition.dreamshader",
-          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
           "beginCaptures": {
             "1": { "name": "keyword.control.dreamshader" },
             "2": { "name": "storage.modifier.function.dreamshader" },
-            "3": { "name": "entity.name.function.definition.dreamshader" }
+            "3": { "name": "storage.type.dreamshader" },
+            "4": { "name": "entity.name.function.definition.dreamshader" }
           },
           "end": "(?=\\{)|$",
           "patterns": [
@@ -101,11 +102,12 @@
         },
         {
           "name": "meta.function.body.dreamshader",
-          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+([A-Za-z_][A-Za-z0-9_]*)\\b[^\\{]*\\{",
+          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()[^\\{]*\\{",
           "beginCaptures": {
             "1": { "name": "keyword.control.dreamshader" },
             "2": { "name": "storage.modifier.function.dreamshader" },
-            "3": { "name": "entity.name.function.definition.dreamshader" }
+            "3": { "name": "storage.type.dreamshader" },
+            "4": { "name": "entity.name.function.definition.dreamshader" }
           },
           "end": "\\}",
           "patterns": [
@@ -138,7 +140,7 @@
       "patterns": [
         {
           "name": "meta.section.properties.dreamshader",
-          "begin": "\\b(Properties)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Properties)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -160,7 +162,7 @@
       "patterns": [
         {
           "name": "meta.section.inputs.dreamshader",
-          "begin": "\\b(Inputs)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Inputs)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -183,7 +185,7 @@
       "patterns": [
         {
           "name": "meta.section.outputs.dreamshader",
-          "begin": "\\b(Outputs)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Outputs)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -203,7 +205,7 @@
       "patterns": [
         {
           "name": "meta.section.graph.dreamshader",
-          "begin": "\\b(Graph)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Graph)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -250,7 +252,7 @@
       "patterns": [
         {
           "name": "meta.section.layout.dreamshader",
-          "begin": "\\b(Layout)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Layout)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -268,7 +270,7 @@
       "patterns": [
         {
           "name": "meta.section.settings.dreamshader",
-          "begin": "\\b(Settings)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Settings)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -286,7 +288,7 @@
       "patterns": [
         {
           "name": "meta.section.options.dreamshader",
-          "begin": "\\b(Options)\\b\\s*=\\s*\\{",
+          "begin": "\\b(Options)\\b\\s*=?\\s*\\{",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -332,6 +334,8 @@
     },
     "declarationMetadataKeys": {
       "patterns": [
+        { "name": "keyword.control.group.dreamshader", "match": "\\b(?:Group)\\b(?=\\s*\\()" },
+        { "name": "support.function.attribute.dreamshader", "match": "\\b(?:Slider)\\b(?=\\s*\\()" },
         { "name": "variable.parameter.key.dreamshader", "match": "\\b(?:Group|Category|SortPriority|Sort|Description|Desc|Tooltip|DisplayName|ParameterName|DefaultValue|Curve|Atlas|CurveTime|UseCustomPrimitiveData|PrimitiveDataIndex|SamplerType|SamplerSource|MipValueMode|GatherMode|AutomaticViewMipBias|AutomaticViewMipBiasValue|Coordinates|MipValue|CoordinatesDX|CoordinatesDY|ConstCoordinate|ConstMipValue)\\b(?=\\s*=)" }
       ]
     },

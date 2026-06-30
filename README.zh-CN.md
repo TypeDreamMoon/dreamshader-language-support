@@ -8,13 +8,14 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.5.1` 版本在现有语言服务基础上新增 Template 块支持、DreamShader bridge 命令、包管理工具和创作模板。同时继续同步 `Function` 内置函数 metadata、UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出支持。
+`1.6.0` 版本新增对 DreamShaderLang 1.5 语法的支持——`Group("Name") { ... }` 属性作用域、单输出返回值函数（`Function float Luma(...) { return ...; }`）、区块名与 `{` 之间可选的 `=`、`Slider(min, max)` metadata 简写，以及裸 `"/Game/..."` 资产路径，全部向后兼容现有语法。同时继续提供 Template 块支持、DreamShader bridge 命令、包管理工具，并同步 `Function` 内置函数 metadata、UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出支持。
 
 ## 主要能力
 
 - `.dsm`、`.dsf` 和 `.dsh` 文件关联。
 - `Shader`、`ShaderFunction`、`ShaderLayer`、`ShaderLayerBlend`、`VirtualFunction`、`Function`、`GraphFunction`、`Namespace` 的上下文感知补全。
 - `Properties`、`Inputs`、`Outputs`、`Settings`、`Options`、`Graph`、`Layout` 的区块级补全。
+- DreamShaderLang 1.5 语法：`Group("Name") { ... }` 属性作用域（含 `propgroup` 代码片段）、单输出返回值 `Function`/`GraphFunction` 声明、区块名与 `{` 之间可选的 `=`、`Slider(min, max)` metadata 简写，以及参数 `=` 槽位上的裸 `"/Game/..."` 资产路径。
 - 声明、函数签名、Graph 代码和 HLSL helper 中的类型补全。
 - `UE.` 内置 Graph 节点补全。
 - UE 5.7 `Substrate.` 图节点补全和 `Base.FrontMaterial` 输出支持。
@@ -278,7 +279,7 @@ npm run package
 生成的 VSIX 文件：
 
 ```text
-dreamshaderlang-language-support-1.5.1.vsix
+dreamshaderlang-language-support-1.6.0.vsix
 ```
 
 ## License

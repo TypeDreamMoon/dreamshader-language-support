@@ -324,7 +324,15 @@ function addFunctionDiagnostics(diagnostics, ast, reachableCallables, substrateB
         if (block.kind !== "Function" && block.kind !== "GraphFunction") {
             continue;
         }
-        let sawOut = false;
+        // A return type (`Function float Luma(...)`) is itself the single output.
+        let sawOut = Boolean(block.returnType);
+        if (block.returnType && !isTypeName(block.returnType)) {
+            diagnostics.push(makeDiagnostic(
+                block.returnTypeOffset,
+                block.returnTypeOffset + String(block.returnType).length,
+                `Unknown DreamShader type '${block.returnType}'.`,
+                SEVERITY.Warning));
+        }
         for (const param of block.params || []) {
             if (param.kind === "invalid") {
                 diagnostics.push(makeDiagnostic(param.startOffset, param.endOffset, `${block.kind} '${block.name}' has an invalid parameter declaration.`, SEVERITY.Error));
@@ -534,6 +542,13 @@ function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols
         if (statement.kind === "assignment") {
             addExpressionDiagnostics(diagnostics, statement.valueText, statement.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
             validateAssignmentTarget(diagnostics, statement, symbols);
+            continue;
+        }
+
+        if (statement.kind === "return") {
+            if (statement.valueText && statement.valueText.trim()) {
+                addExpressionDiagnostics(diagnostics, statement.valueText, statement.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
+            }
             continue;
         }
 

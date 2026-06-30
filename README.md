@@ -8,7 +8,7 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.5.1` adds template block support, DreamShader bridge commands, package tooling, and authoring templates on top of the existing language service. It also keeps Function builtin metadata, UE 5.7 `Substrate.*` graph helpers, and `Base.FrontMaterial` output support synced with the current DreamShader plugin.
+Version `1.6.0` adds support for the DreamShaderLang 1.5 syntax — `Group("Name") { ... }` property scopes, single-output return-value functions (`Function float Luma(...) { return ...; }`), the optional `=` between a section name and its body, the `Slider(min, max)` metadata shorthand, and bare `"/Game/..."` asset paths — all fully backward compatible with the existing syntax. It also keeps template block support, DreamShader bridge commands, package tooling, Function builtin metadata, UE 5.7 `Substrate.*` graph helpers, and `Base.FrontMaterial` output support synced with the current DreamShader plugin.
 
 ## Highlights
 
@@ -16,6 +16,7 @@ Version `1.5.1` adds template block support, DreamShader bridge commands, packag
 - Syntax highlighting and semantic tokens for blocks, sections, types, variables, parameters, UE graph calls, and material outputs.
 - Context-aware completion for `Shader`, `ShaderFunction`, `ShaderLayer`, `ShaderLayerBlend`, `VirtualFunction`, `Function`, `GraphFunction`, and `Namespace`.
 - Section-aware completion for `Properties`, `Inputs`, `Outputs`, `Settings`, `Options`, `Graph`, and `Layout`.
+- DreamShaderLang 1.5 syntax: `Group("Name") { ... }` property scopes (with the `propgroup` snippet), single-output return-value `Function`/`GraphFunction` declarations, the optional `=` between a section name and its body, the `Slider(min, max)` metadata shorthand, and bare `"/Game/..."` asset paths in a parameter's `=` slot.
 - Type completion in declarations, function signatures, Graph code, and HLSL helper code.
 - UE graph node completion with `UE.` member suggestions.
 - UE 5.7 Substrate graph completion with `Substrate.` member suggestions and `Base.FrontMaterial` output support.
@@ -279,7 +280,7 @@ npm run package
 The packaged VSIX is generated as:
 
 ```text
-dreamshaderlang-language-support-1.5.1.vsix
+dreamshaderlang-language-support-1.6.0.vsix
 ```
 
 ## License
