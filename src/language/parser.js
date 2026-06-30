@@ -218,13 +218,26 @@ class Parser {
             }
         }
 
-        const nameToken = this.skipTriviaAndPeek();
-        if (nameToken && nameToken.type === "identifier") {
-            block.name = nameToken.value;
-            block.localName = nameToken.value;
-            block.nameOffset = nameToken.start;
-            block.nameRangeLength = nameToken.value.length;
+        const firstToken = this.skipTriviaAndPeek();
+        if (firstToken && firstToken.type === "identifier") {
             this.index += 1;
+            const secondToken = this.skipTriviaAndPeek();
+            if (secondToken && secondToken.type === "identifier") {
+                // `Function <returnType> <name>(...)` — two identifiers before '(' means the
+                // first is a single-output return type and the second is the function name.
+                block.returnType = firstToken.value;
+                block.returnTypeOffset = firstToken.start;
+                block.name = secondToken.value;
+                block.localName = secondToken.value;
+                block.nameOffset = secondToken.start;
+                block.nameRangeLength = secondToken.value.length;
+                this.index += 1;
+            } else {
+                block.name = firstToken.value;
+                block.localName = firstToken.value;
+                block.nameOffset = firstToken.start;
+                block.nameRangeLength = firstToken.value.length;
+            }
         }
 
         const openParen = this.skipTriviaAndPeek();
@@ -326,11 +339,11 @@ function parseSections(text, startOffset, endOffset) {
             continue;
         }
         let cursor = skipTrivia(tokens, index + 1);
-        if (!tokens[cursor] || tokens[cursor].value !== "=") {
-            index += 1;
-            continue;
+        // The '=' between a section name and its body is optional:
+        // `Properties { ... }` is equivalent to `Properties = { ... }`.
+        if (tokens[cursor] && tokens[cursor].value === "=") {
+            cursor = skipTrivia(tokens, cursor + 1);
         }
-        cursor = skipTrivia(tokens, cursor + 1);
         if (!tokens[cursor] || tokens[cursor].value !== "{") {
             index += 1;
             continue;
@@ -370,43 +383,107 @@ function parseSectionEntries(section) {
     }
 
     const entries = [];
-    for (const statement of splitTopLevel(section.bodyText, section.bodyOffset, ";")) {
-        const withoutMetadata = stripTrailingMetadata(statement.text);
-        const assignment = splitTopLevelAssignment(withoutMetadata.text);
-        const text = withoutMetadata.text.trim();
-        if (assignment) {
-            const declaration = parseDeclaration(assignment.left);
-            if (declaration) {
-                entries.push({
-                    kind: "declaration",
-                    ...statement,
-                    type: declaration.type,
-                    name: declaration.name,
-                    optional: declaration.optional,
-                    constant: declaration.constant,
-                    valueText: assignment.right,
-                    valueOffset: statement.startOffset + statement.text.indexOf(assignment.right),
-                    metadata: withoutMetadata.metadata
-                });
-            } else if (section.name === "Outputs") {
-                entries.push({
-                    kind: "binding",
-                    ...statement,
-                    target: assignment.left,
-                    valueText: assignment.right,
-                    valueOffset: statement.startOffset + statement.text.indexOf(assignment.right)
-                });
-            } else {
-                entries.push({ kind: "invalid", ...statement });
-            }
-            continue;
-        }
-        const declaration = parseDeclaration(text);
-        entries.push(declaration
-            ? { kind: "declaration", ...statement, ...declaration, valueText: "", metadata: withoutMetadata.metadata }
-            : { kind: "invalid", ...statement });
-    }
+    collectPropertyEntries(section.bodyText, section.bodyOffset, section, null, entries);
+    // Group("X") { ... } blocks are flattened back into source order.
+    entries.sort((a, b) => (a.startOffset || 0) - (b.startOffset || 0));
     return entries;
+}
+
+// Walk a Properties/Inputs/Outputs body, descending into any Group("X") { ... } scopes
+// and stamping each contained declaration with its group name. Recurses for nested groups
+// (the innermost group name wins, matching the flat-group intent of the language).
+function collectPropertyEntries(bodyText, bodyOffset, section, group, entries) {
+    const { residue, groups } = extractPropertyGroups(bodyText, bodyOffset);
+    for (const statement of splitTopLevel(residue, bodyOffset, ";")) {
+        pushPropertyStatement(entries, statement, section, group);
+    }
+    for (const sub of groups) {
+        collectPropertyEntries(sub.innerText, sub.innerOffset, section, sub.name, entries);
+    }
+}
+
+function pushPropertyStatement(entries, statement, section, group) {
+    const withoutMetadata = stripTrailingMetadata(statement.text);
+    const metadata = group ? { group, ...withoutMetadata.metadata } : withoutMetadata.metadata;
+    const assignment = splitTopLevelAssignment(withoutMetadata.text);
+    const text = withoutMetadata.text.trim();
+    if (assignment) {
+        const declaration = parseDeclaration(assignment.left);
+        if (declaration) {
+            entries.push({
+                kind: "declaration",
+                ...statement,
+                type: declaration.type,
+                name: declaration.name,
+                optional: declaration.optional,
+                constant: declaration.constant,
+                valueText: assignment.right,
+                valueOffset: statement.startOffset + statement.text.indexOf(assignment.right),
+                metadata
+            });
+        } else if (section.name === "Outputs") {
+            entries.push({
+                kind: "binding",
+                ...statement,
+                target: assignment.left,
+                valueText: assignment.right,
+                valueOffset: statement.startOffset + statement.text.indexOf(assignment.right)
+            });
+        } else {
+            entries.push({ kind: "invalid", ...statement });
+        }
+        return;
+    }
+    const declaration = parseDeclaration(text);
+    entries.push(declaration
+        ? { kind: "declaration", ...statement, ...declaration, valueText: "", metadata }
+        : { kind: "invalid", ...statement });
+}
+
+// Find top-level Group("Name") { ... } blocks in a property body. Returns the body with each
+// group region blanked out (layout preserved so offsets stay valid) plus the extracted groups.
+function extractPropertyGroups(bodyText, bodyOffset) {
+    const tokens = scan(bodyText);
+    const groups = [];
+    const blanks = [];
+    let i = 0;
+    while (i < tokens.length && tokens[i].type !== "eof") {
+        const token = tokens[i];
+        if (token.type === "identifier" && token.value === "Group") {
+            const parenIndex = skipTrivia(tokens, i + 1);
+            if (tokens[parenIndex] && tokens[parenIndex].value === "(") {
+                const closeParen = findMatchingInTokenList(tokens, parenIndex, "(", ")");
+                const braceIndex = closeParen >= 0 ? skipTrivia(tokens, closeParen + 1) : -1;
+                if (braceIndex >= 0 && tokens[braceIndex] && tokens[braceIndex].value === "{") {
+                    const closeBrace = findMatchingInTokenList(tokens, braceIndex, "{", "}");
+                    if (closeBrace >= 0) {
+                        const nameText = bodyText.slice(tokens[parenIndex].end, tokens[closeParen].start).trim();
+                        groups.push({
+                            name: trimQuotes(nameText),
+                            innerText: bodyText.slice(tokens[braceIndex].end, tokens[closeBrace].start),
+                            innerOffset: bodyOffset + tokens[braceIndex].end
+                        });
+                        blanks.push([token.start, tokens[closeBrace].end]);
+                        i = closeBrace + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    if (blanks.length === 0) {
+        return { residue: bodyText, groups };
+    }
+    const chars = bodyText.split("");
+    for (const [start, end] of blanks) {
+        for (let k = start; k < end; k += 1) {
+            if (chars[k] !== "\n" && chars[k] !== "\r") {
+                chars[k] = " ";
+            }
+        }
+    }
+    return { residue: chars.join(""), groups };
 }
 
 function parseAssignments(text, baseOffset) {
