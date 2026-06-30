@@ -39,6 +39,9 @@ const METADATA_ITEMS = [
     ["Category", "Category=\"${1:General}\"", "Alias of Group"],
     ["SortPriority", "SortPriority=${1:32}", "Material parameter sort priority"],
     ["Sort", "Sort=${1:32}", "Alias of SortPriority"],
+    ["Slider", "Slider(${1:0}, ${2:1})", "Slider range shorthand for SliderMin/SliderMax"],
+    ["SliderMin", "SliderMin=${1:0}", "Minimum slider value"],
+    ["SliderMax", "SliderMax=${1:1}", "Maximum slider value"],
     ["Description", "Description=\"${1:Description}\"", "Editor tooltip text"],
     ["Desc", "Desc=\"${1:Description}\"", "Alias of Description"],
     ["Tooltip", "Tooltip=\"${1:Description}\"", "Alias of Description"],
@@ -73,7 +76,10 @@ const DECLARATION_SNIPPET_ITEMS = [
     ["texparam", "TextureSampleParameter2D ${1:AlbedoMap} = Path(${2:Game}, \"${3:Textures/T_White}\") [\n\tGroup=\"${4:Textures}\";\n\tSortPriority=${5:10};\n\tSamplerType=\"${6:Color}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n];", "Texture sample parameter"],
     ["volumeparam", "VolumeTexture ${1:NoiseVolume} = Path(${2:Game}, \"${3:Textures/T_NoiseVolume}\");", "Volume texture object parameter"],
     ["volumesample", "TextureSampleParameterVolume ${1:VolumeMap} = Path(${2:Game}, \"${3:Textures/T_Volume}\") [\n\tGroup=\"${4:Textures}\";\n\tSortPriority=${5:10};\n\tSamplerType=\"${6:Color}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n];", "Volume texture sample parameter"],
-    ["constprop", "const ${1:float} ${2:Value} = ${3:0.0};", "Const property declaration"]
+    ["constprop", "const ${1:float} ${2:Value} = ${3:0.0};", "Const property declaration"],
+    ["propgroup", "Group(\"${1:Surface}\") {\n\tScalarParameter ${2:Roughness} = ${3:0.5} [Slider(${4:0}, ${5:1})];\n\t$0\n}", "Group scope: shared Group + auto SortPriority for the parameters inside"],
+    ["slider", "ScalarParameter ${1:Value} = ${2:0.5} [Slider(${3:0}, ${4:1})];", "Scalar parameter with a slider range"],
+    ["texparampath", "TextureSampleParameter2D ${1:AlbedoMap} = \"${2:/Game/Textures/T_White}\";", "Texture sample parameter bound to a bare asset path"]
 ];
 
 const GRAPH_SNIPPET_ITEMS = [
