@@ -255,8 +255,14 @@ function getCallableSignatures(document, callee, services = {}) {
 }
 
 function buildSignatureInformation(signature) {
-    const params = [...(signature.inputs || []), ...(signature.outputs || []), ...(signature.parameters || [])];
-    const label = `${signature.name || signature.qualifiedName || "call"}(${params.map((param) => `${param.qualifier || "in"} ${param.type || "value"} ${param.name || ""}`.trim()).join(", ")})`;
+    const allOutputs = signature.outputs || [];
+    // A return-type function's implicit output is shown as a `: <type>` return suffix, not as a
+    // bogus `out <type>` parameter leaking the internal lowering name.
+    const returnOutput = allOutputs.find((output) => output && output.isReturn);
+    const visibleOutputs = allOutputs.filter((output) => output && !output.isReturn);
+    const params = [...(signature.inputs || []), ...visibleOutputs, ...(signature.parameters || [])];
+    const returnSuffix = returnOutput ? ` : ${returnOutput.type || "value"}` : "";
+    const label = `${signature.name || signature.qualifiedName || "call"}(${params.map((param) => `${param.qualifier || "in"} ${param.type || "value"} ${param.name || ""}`.trim()).join(", ")})${returnSuffix}`;
     const info = new vscode.SignatureInformation(label, signature.detail || "");
     info.parameters = params.map((param) => new vscode.ParameterInformation(param.name || String(param)));
     return info;

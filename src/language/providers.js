@@ -58,6 +58,39 @@ function makeBlockSymbol(block) {
         symbol.children.push(makeSectionSymbol(section));
     }
 
+    // Function / GraphFunction parameters live on block.params (not in sections); surface them as
+    // child symbols so they appear in the outline, breadcrumbs, and Go-to-Symbol like declarations.
+    for (const param of block.params || []) {
+        if (param.kind === "invalid" || !param.name) {
+            continue;
+        }
+        const nameOffset = param.startOffset + String(param.text || "").lastIndexOf(param.name);
+        const hasNameOffset = nameOffset >= param.startOffset;
+        symbol.children.push({
+            name: param.name,
+            detail: `${param.qualifier || "in"} ${param.type || ""}`.trim(),
+            kind: "Variable",
+            startOffset: param.startOffset,
+            endOffset: param.endOffset,
+            selectionStartOffset: hasNameOffset ? nameOffset : param.startOffset,
+            selectionEndOffset: hasNameOffset ? nameOffset + param.name.length : param.endOffset,
+            children: []
+        });
+    }
+    if (block.returnType) {
+        const offset = block.returnTypeOffset >= 0 ? block.returnTypeOffset : block.nameOffset;
+        symbol.children.push({
+            name: "return",
+            detail: block.returnType,
+            kind: "Variable",
+            startOffset: offset,
+            endOffset: offset + String(block.returnType).length,
+            selectionStartOffset: offset,
+            selectionEndOffset: offset + String(block.returnType).length,
+            children: []
+        });
+    }
+
     return symbol;
 }
 

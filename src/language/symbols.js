@@ -51,8 +51,10 @@ function collectCallables(ast) {
             const outputs = (block.params || []).filter((param) => param.qualifier === "out");
             if (block.returnType) {
                 // `Function float Luma(...)` exposes a single implicit output so it can be
-                // called as a value (`x = Luma(c)`). Mirrors the plugin's __return lowering.
-                outputs.unshift({ qualifier: "out", type: block.returnType, name: "__return" });
+                // called as a value (`x = Luma(c)`). It is the lowered return value, so it carries
+                // no user-facing name (the internal `__return` token must not leak into hovers or
+                // signature help); isReturn lets consumers render it as a return type.
+                outputs.unshift({ qualifier: "out", type: block.returnType, name: "", isReturn: true });
             }
             addCallable(result, {
                 kind: block.kind,
