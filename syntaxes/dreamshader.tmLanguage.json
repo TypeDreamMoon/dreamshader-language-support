@@ -51,21 +51,6 @@
     "functionDefinitions": {
       "patterns": [
         {
-          "name": "meta.template.block.dreamshader",
-          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b",
-          "beginCaptures": {
-            "1": { "name": "keyword.control.dreamshader" },
-            "2": { "name": "keyword.control.dreamshader" }
-          },
-          "end": "(?=\\{)|$",
-          "patterns": [
-            { "include": "#strings" },
-            { "include": "#numbers" },
-            { "include": "#topLevelKeywords" },
-            { "include": "#operators" }
-          ]
-        },
-        {
           "name": "meta.template.body.dreamshader",
           "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b[^\\{]*\\{",
           "beginCaptures": {
@@ -83,20 +68,17 @@
           ]
         },
         {
-          "name": "meta.function.definition.dreamshader",
-          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
+          "name": "meta.template.block.dreamshader",
+          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b",
           "beginCaptures": {
             "1": { "name": "keyword.control.dreamshader" },
-            "2": { "name": "storage.modifier.function.dreamshader" },
-            "3": { "name": "storage.type.dreamshader" },
-            "4": { "name": "entity.name.function.definition.dreamshader" }
+            "2": { "name": "keyword.control.dreamshader" }
           },
           "end": "(?=\\{)|$",
           "patterns": [
             { "include": "#strings" },
             { "include": "#numbers" },
-            { "include": "#types" },
-            { "include": "#functionQualifiers" },
+            { "include": "#topLevelKeywords" },
             { "include": "#operators" }
           ]
         },
@@ -120,6 +102,24 @@
             { "include": "#namespaceCalls" },
             { "include": "#functionCalls" },
             { "include": "#booleans" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "name": "meta.function.definition.dreamshader",
+          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.dreamshader" },
+            "2": { "name": "storage.modifier.function.dreamshader" },
+            "3": { "name": "storage.type.dreamshader" },
+            "4": { "name": "entity.name.function.definition.dreamshader" }
+          },
+          "end": "(?=\\{)|$",
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#types" },
+            { "include": "#functionQualifiers" },
             { "include": "#operators" }
           ]
         }
@@ -148,6 +148,7 @@
             { "include": "#graphRegionDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
+            { "include": "#propertyGroupBlock" },
             { "include": "#declarationLines" },
             { "include": "#types" },
             { "include": "#declarationMetadataKeys" },
@@ -170,6 +171,7 @@
             { "include": "#graphRegionDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
+            { "include": "#propertyGroupBlock" },
             { "include": "#declarationLines" },
             { "include": "#types" },
             { "include": "#functionQualifiers" },
@@ -213,10 +215,10 @@
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#shaderKeywords" },
+            { "include": "#ueCalls" },
             { "include": "#types" },
             { "include": "#graphNestedBlock" },
             { "include": "#hlslIntrinsics" },
-            { "include": "#ueCalls" },
             { "include": "#namespaceCalls" },
             { "include": "#functionCalls" },
             { "include": "#booleans" },
@@ -236,12 +238,37 @@
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#shaderKeywords" },
+            { "include": "#ueCalls" },
             { "include": "#types" },
             { "include": "#graphNestedBlock" },
             { "include": "#hlslIntrinsics" },
-            { "include": "#ueCalls" },
             { "include": "#namespaceCalls" },
             { "include": "#functionCalls" },
+            { "include": "#booleans" },
+            { "include": "#operators" }
+          ]
+        }
+      ]
+    },
+    "propertyGroupBlock": {
+      "patterns": [
+        {
+          "name": "meta.block.property-group.dreamshader",
+          "begin": "\\b(Group)\\b\\s*(\\([^)]*\\))?\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.group.dreamshader" },
+            "2": { "name": "string.quoted.double.group-name.dreamshader" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#propertyGroupBlock" },
+            { "include": "#declarationLines" },
+            { "include": "#types" },
+            { "include": "#declarationMetadataKeys" },
+            { "include": "#pathHelpers" },
             { "include": "#booleans" },
             { "include": "#operators" }
           ]
@@ -369,15 +396,15 @@
     },
     "materialOutputs": {
       "patterns": [
-        { "name": "support.class.output-root.dreamshader", "match": "\\bBase\\b(?=\\s*\\.)" },
         { "name": "variable.language.output.dreamshader", "match": "\\bBase\\s*\\.\\s*(?:MaterialAttributes|Attributes|FrontMaterial|BaseColor|EmissiveColor|Emissive|Opacity|OpacityMask|Metallic|Specular|Roughness|Normal|AmbientOcclusion|AO|Refraction|WorldPositionOffset|WPO|PixelDepthOffset|PDO|SubsurfaceColor|ClearCoat|ClearCoatRoughness|CustomData0|CustomData1|DiffuseColor|SpecularColor|SurfaceThickness|Displacement|CustomizedUV0|CustomizedUV1|CustomizedUV2|CustomizedUV3|CustomizedUV4|CustomizedUV5|CustomizedUV6|CustomizedUV7|CustomizedUVs0|CustomizedUVs1|CustomizedUVs2|CustomizedUVs3|CustomizedUVs4|CustomizedUVs5|CustomizedUVs6|CustomizedUVs7|MooaEncodedAttribute0|MooaEncodedAttribute1|MooaEncodedAttribute2|MooaEncodedAttribute3|MooaEncodedAttribute4|Anisotropy|Tangent)\\b(?=\\s*=)" },
+        { "name": "support.class.output-root.dreamshader", "match": "\\bBase\\b(?=\\s*\\.)" },
         { "name": "support.function.output-node.dreamshader", "match": "\\bExpression\\b(?=\\s*\\()" },
         { "name": "variable.parameter.output-pin.dreamshader", "match": "\\bPin\\b(?=\\s*\\[)" }
       ]
     },
     "ueCalls": {
       "patterns": [
-        { "name": "support.class.namespace.dreamshader", "match": "\\bUE\\b(?=\\.)" },
+        { "name": "support.class.namespace.dreamshader", "match": "\\b(?:UE|Substrate)\\b(?=\\.)" },
         { "name": "support.function.ue.dreamshader", "match": "(?<=\\b(?:UE|Substrate)\\.)[A-Za-z_][A-Za-z0-9_]*\\b" }
       ]
     },
