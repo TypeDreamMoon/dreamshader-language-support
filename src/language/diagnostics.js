@@ -515,8 +515,27 @@ function parseRegionDirectiveName(trimmedLine, directive) {
 
 function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols, reachableCallables, substrateBuiltinNames) {
     for (const statement of parseCodeStatements(bodyText, baseOffset)) {
+        processGraphStatement(diagnostics, statement, symbols, reachableCallables, substrateBuiltinNames);
+    }
+}
+
+function processGraphStatement(diagnostics, statement, symbols, reachableCallables, substrateBuiltinNames) {
+    {
         if (!statement.terminated && statement.text.trim() && !isIncompleteGraphStatementText(statement.text)) {
             diagnostics.push(makeDiagnostic(statement.endOffset, statement.endOffset, "Graph statement is missing a trailing ';'.", SEVERITY.Error));
+        }
+
+        if (statement.kind === "control") {
+            // `if`/`for`/`while` blocks: validate the condition (for `for`, the condition clause is
+            // raw HLSL, so skip it) and recurse into the branch bodies, sharing the symbol map so
+            // branch-local declarations resolve. The block itself needs no trailing ';'.
+            if (statement.controlKeyword !== "for" && statement.conditionText && statement.conditionText.trim()) {
+                addExpressionDiagnostics(diagnostics, statement.conditionText, statement.conditionOffset, symbols, reachableCallables, substrateBuiltinNames);
+            }
+            for (const child of statement.children || []) {
+                processGraphStatement(diagnostics, child, symbols, reachableCallables, substrateBuiltinNames);
+            }
+            return;
         }
 
         if (statement.kind === "declarations") {
@@ -536,26 +555,26 @@ function addGraphStatementDiagnostics(diagnostics, bodyText, baseOffset, symbols
                     typeInfo
                 });
             }
-            continue;
+            return;
         }
 
         if (statement.kind === "assignment") {
             addExpressionDiagnostics(diagnostics, statement.valueText, statement.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
             validateAssignmentTarget(diagnostics, statement, symbols);
-            continue;
+            return;
         }
 
         if (statement.kind === "return") {
             if (statement.valueText && statement.valueText.trim()) {
                 addExpressionDiagnostics(diagnostics, statement.valueText, statement.valueOffset, symbols, reachableCallables, substrateBuiltinNames);
             }
-            continue;
+            return;
         }
 
         const callExpression = parseCallExpressionText(statement.text, statement.startOffset);
         if (callExpression) {
             validateCallableArguments(diagnostics, callExpression, symbols, reachableCallables, substrateBuiltinNames, true);
-            continue;
+            return;
         }
 
         addExpressionDiagnostics(diagnostics, statement.text, statement.startOffset, symbols, reachableCallables, substrateBuiltinNames);

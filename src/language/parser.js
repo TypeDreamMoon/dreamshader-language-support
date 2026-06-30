@@ -522,8 +522,203 @@ function parseLayoutEntries(section) {
     return entries;
 }
 
+// Match the closing delimiter for the bracket at `openIndex` (one bracket family at a time),
+// respecting string literals. Returns the index of the matching close, or -1 if unbalanced.
+function matchBracket(str, openIndex) {
+    const open = str[openIndex];
+    const close = open === "(" ? ")" : open === "{" ? "}" : open === "[" ? "]" : null;
+    if (!close) {
+        return -1;
+    }
+    let depth = 0;
+    let inString = false;
+    for (let k = openIndex; k < str.length; k += 1) {
+        const char = str[k];
+        if (inString) {
+            if (char === "\\") { k += 1; continue; }
+            if (char === "\"" || char === "\n" || char === "\r") { inString = false; }
+            continue;
+        }
+        if (char === "\"") { inString = true; }
+        else if (char === open) { depth += 1; }
+        else if (char === close) { depth -= 1; if (depth === 0) { return k; } }
+    }
+    return -1;
+}
+
+const CONTROL_KEYWORDS = ["if", "for", "while"];
+
+function isWordChar(char) {
+    return /[A-Za-z0-9_]/.test(char || "");
+}
+
+function matchesControlKeywordAt(str, index) {
+    if (isWordChar(str[index - 1])) {
+        return null;
+    }
+    for (const keyword of CONTROL_KEYWORDS) {
+        if (str.slice(index, index + keyword.length) === keyword && !isWordChar(str[index + keyword.length])) {
+            return keyword;
+        }
+    }
+    return null;
+}
+
+// Consume a control-flow statement `kw (cond) { body }` (with optional `else` / `else if` chains
+// for `if`), mirroring the plugin's FindIfStatementEnd. Returns the end index (just past the last
+// `}`) plus the condition and brace-body ranges. Tolerates a truncated trailing body (cursor mid
+// block) by extending the open branch to end-of-text. Returns null if it isn't a complete head.
+function findControlStatementEnd(str, start, keyword) {
+    const skipWs = (k) => { while (k < str.length && /\s/.test(str[k])) { k += 1; } return k; };
+    let k = skipWs(start + keyword.length);
+    if (str[k] !== "(") {
+        return null;
+    }
+    const conditionClose = matchBracket(str, k);
+    if (conditionClose < 0) {
+        return null;
+    }
+    const condition = { start: k + 1, end: conditionClose };
+    k = skipWs(conditionClose + 1);
+    if (str[k] !== "{") {
+        return null;
+    }
+    const bodyClose = matchBracket(str, k);
+    const branches = [];
+    if (bodyClose < 0) {
+        branches.push({ start: k + 1, end: str.length });
+        return { end: str.length, condition, branches, keyword };
+    }
+    branches.push({ start: k + 1, end: bodyClose });
+    let end = bodyClose + 1;
+    if (keyword === "if") {
+        let probe = skipWs(end);
+        while (str.slice(probe, probe + 4) === "else" && !isWordChar(str[probe + 4])) {
+            let m = skipWs(probe + 4);
+            if (str.slice(m, m + 2) === "if" && !isWordChar(str[m + 2])) {
+                m = skipWs(m + 2);
+                if (str[m] !== "(") { break; }
+                const condEnd = matchBracket(str, m);
+                if (condEnd < 0) { break; }
+                m = skipWs(condEnd + 1);
+                if (str[m] !== "{") { break; }
+                const branchEnd = matchBracket(str, m);
+                if (branchEnd < 0) { break; }
+                branches.push({ start: m + 1, end: branchEnd });
+                end = branchEnd + 1;
+                probe = skipWs(end);
+            } else if (str[m] === "{") {
+                const branchEnd = matchBracket(str, m);
+                if (branchEnd < 0) { break; }
+                branches.push({ start: m + 1, end: branchEnd });
+                end = branchEnd + 1;
+                break;
+            } else {
+                break;
+            }
+        }
+    }
+    return { end, condition, branches, keyword };
+}
+
+// Split a Graph / function code body into statements. Unlike splitTopLevel, this is control-flow
+// aware: an `if (...) {...} else {...}` (or `for`/`while`) block is a single self-terminating
+// statement whose brace bodies are recursed into, matching the plugin's SplitStatementsWithLocations.
+function splitCodeStatements(text, baseOffset) {
+    const normalized = stripCommentsPreserveLayout(text);
+    const length = normalized.length;
+    const segments = [];
+    const pushSegment = (start, end, terminated, extra) => {
+        const raw = normalized.slice(start, end);
+        const leading = raw.search(/\S|$/);
+        const trailing = raw.length - raw.trimEnd().length;
+        const value = raw.trim();
+        if (!value) {
+            return;
+        }
+        segments.push({
+            text: value,
+            startOffset: baseOffset + start + leading,
+            endOffset: baseOffset + end - trailing,
+            terminated,
+            ...(extra || {})
+        });
+    };
+    let index = 0;
+    while (index < length) {
+        while (index < length && /\s/.test(normalized[index])) {
+            index += 1;
+        }
+        if (index >= length) {
+            break;
+        }
+        const start = index;
+        const keyword = matchesControlKeywordAt(normalized, index);
+        if (keyword) {
+            const control = findControlStatementEnd(normalized, index, keyword);
+            if (control) {
+                pushSegment(start, control.end, true, {
+                    control: true,
+                    controlKeyword: keyword,
+                    conditionText: normalized.slice(control.condition.start, control.condition.end),
+                    conditionOffset: baseOffset + control.condition.start,
+                    branches: control.branches.map((branch) => ({
+                        text: normalized.slice(branch.start, branch.end),
+                        offset: baseOffset + branch.start
+                    }))
+                });
+                index = control.end;
+                continue;
+            }
+        }
+        let paren = 0;
+        let brace = 0;
+        let bracket = 0;
+        let inString = false;
+        let cursor = index;
+        for (; cursor < length; cursor += 1) {
+            const char = normalized[cursor];
+            if (inString) {
+                if (char === "\\") { cursor += 1; continue; }
+                if (char === "\"" || char === "\n" || char === "\r") { inString = false; }
+                continue;
+            }
+            if (char === "\"") { inString = true; }
+            else if (char === "(") { paren += 1; }
+            else if (char === ")") { paren = Math.max(0, paren - 1); }
+            else if (char === "{") { brace += 1; }
+            else if (char === "}") { brace = Math.max(0, brace - 1); }
+            else if (char === "[") { bracket += 1; }
+            else if (char === "]") { bracket = Math.max(0, bracket - 1); }
+            else if (char === ";" && paren === 0 && brace === 0 && bracket === 0) { break; }
+        }
+        const terminated = cursor < length;
+        const end = terminated ? cursor : length;
+        pushSegment(start, end, terminated);
+        index = terminated ? cursor + 1 : length;
+    }
+    return segments;
+}
+
 function parseCodeStatements(text, baseOffset) {
-    return splitTopLevel(stripGraphRegionDirectivesPreserveLayout(text), baseOffset, ";").map((segment) => {
+    return splitCodeStatements(stripGraphRegionDirectivesPreserveLayout(text), baseOffset).map((segment) => {
+        if (segment.control) {
+            const children = [];
+            // The init clause of a `for (init; cond; step)` introduces a loop-scoped local.
+            if (segment.controlKeyword === "for" && segment.conditionText) {
+                const initText = segment.conditionText.split(";")[0];
+                const initDecls = parseCodeDeclarationEntries(initText, segment.conditionOffset);
+                if (initDecls.length > 0) {
+                    children.push({ kind: "declarations", text: initText.trim(), startOffset: segment.conditionOffset, endOffset: segment.conditionOffset + initText.length, terminated: true, declarations: initDecls });
+                }
+            }
+            for (const branch of segment.branches || []) {
+                for (const child of parseCodeStatements(branch.text, branch.offset)) {
+                    children.push(child);
+                }
+            }
+            return { kind: "control", ...segment, children };
+        }
         const returnMatch = /^return\b\s*/.exec(segment.text);
         if (returnMatch) {
             // `return <expr>;` in a single-output function body — the plugin lowers this to the

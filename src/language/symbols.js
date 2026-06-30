@@ -103,12 +103,19 @@ function addSectionSymbols(symbols, section, cutoffOffset, detail) {
 function addCodeSymbols(symbols, bodyText, bodyOffset, cutoffOffset) {
     const visibleText = bodyText.slice(0, Math.max(0, cutoffOffset - bodyOffset));
     const { parseCodeStatements } = require("./parser");
-    for (const statement of parseCodeStatements(visibleText, bodyOffset)) {
-        if (statement.kind !== "declarations") {
-            continue;
-        }
-        for (const declaration of statement.declarations) {
-            addSymbol(symbols, declaration.name, declaration.type, "local variable");
+    collectLocalSymbols(symbols, parseCodeStatements(visibleText, bodyOffset));
+}
+
+// Harvest local-variable declarations from a parsed code body, descending into the branch bodies
+// of if/for/while control-flow statements so block-scoped locals are also offered as completions.
+function collectLocalSymbols(symbols, statements) {
+    for (const statement of statements) {
+        if (statement.kind === "declarations") {
+            for (const declaration of statement.declarations) {
+                addSymbol(symbols, declaration.name, declaration.type, "local variable");
+            }
+        } else if (statement.kind === "control" && Array.isArray(statement.children)) {
+            collectLocalSymbols(symbols, statement.children);
         }
     }
 }
