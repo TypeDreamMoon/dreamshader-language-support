@@ -524,6 +524,18 @@ function parseLayoutEntries(section) {
 
 function parseCodeStatements(text, baseOffset) {
     return splitTopLevel(stripGraphRegionDirectivesPreserveLayout(text), baseOffset, ";").map((segment) => {
+        const returnMatch = /^return\b\s*/.exec(segment.text);
+        if (returnMatch) {
+            // `return <expr>;` in a single-output function body — the plugin lowers this to the
+            // implicit __return output. Treat it as a value expression, not a declaration.
+            const valueText = segment.text.slice(returnMatch[0].length);
+            return {
+                kind: "return",
+                ...segment,
+                valueText,
+                valueOffset: segment.startOffset + returnMatch[0].length
+            };
+        }
         const declarations = parseCodeDeclarationEntries(segment.text, segment.startOffset);
         if (declarations.length > 0) {
             return { kind: "declarations", ...segment, declarations };
