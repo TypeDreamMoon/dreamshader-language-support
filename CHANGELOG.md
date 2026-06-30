@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.1
+
+- Fixed Graph and function-body control-flow parsing. An `if (...) { ... } else { ... }` block (and `for`/`while` blocks) is now recognized as a single self-terminating statement, eliminating a cluster of false positives on valid code:
+  - no more false "Graph statement is missing a trailing ';'" on if/else blocks;
+  - the statement after an if-block is no longer absorbed into it (was reported as "Unsupported Graph variable type '...'");
+  - variables declared inside a branch (or `for`/`while` body) now resolve in scope — no false "Identifier 'X' is not declared in this scope" — and are offered as completions, including swizzle and MaterialAttributes members and the `for` loop variable.
+- Fixed syntax highlighting:
+  - Function/GraphFunction and Template bodies are now highlighted (the body rule was dead, so `return`, intrinsics, and types in every body rendered unstyled);
+  - declarations after a `Group("X") { ... }` scope no longer lose their highlighting (the group's `}` ended the section early);
+  - `Base.<Attribute>` output members and `Substrate.<Node>()` receivers are now scoped correctly.
+- SignatureHelp no longer leaks the internal `__return` name for return-type functions (shown as a `: <type>` return suffix); Function/GraphFunction parameters now appear in the document outline.
+
 ## 1.6.0
 
 - Added support for the DreamShaderLang 1.5 syntax, kept fully backward compatible with the existing syntax:

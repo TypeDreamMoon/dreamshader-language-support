@@ -840,4 +840,49 @@ const propDoc = `Shader("M") {\n    Properties {\n        \n    }\n}`;
 const propLabels = language.getCompletionSpecs(propDoc, propDoc.indexOf("        \n") + 8, {}).map((item) => item.label);
 assert(propLabels.includes("propgroup"), "Properties completion should offer the propgroup scope snippet");
 
+// --- 1.6 correctness fixes: Graph/function control-flow (if/for/while) ----------------------
+const ctrlClean = (label, src) => {
+    const diags = language.getDiagnostics(src, "ctrl.dsm", services);
+    assert.strictEqual(diags.length, 0, `${label} should produce no diagnostics, got: ${diags.map((d) => d.message).join(" | ")}`);
+};
+// if/else block needs no trailing ';' and branch-local declarations resolve
+ctrlClean("if/else with branch local", `Shader(Name="X") {
+    Properties { float Mask = 0.6; }
+    Outputs { vec3 Color; Base.EmissiveColor = Color; }
+    Graph {
+        if (Mask > 0.5) { float3 Tint = float3(1, 0, 0); Color = Tint; } else { Color = float3(0, 0, 0); }
+    }
+}`);
+// a statement after an if-block must not be absorbed / mis-typed
+ctrlClean("statement after if-block", `Shader(Name="X") {
+    Outputs { vec3 Color; Base.EmissiveColor = Color; }
+    Graph {
+        if (1.0 > 0.5) { Color = vec3(1, 0, 0); }
+        float later = 2.0;
+        Color = vec3(later, later, later);
+    }
+}`);
+// branch-local variable is offered as a completion inside the branch
+const branchDoc = `Shader(Name="M") { Properties { float Mask = 0.6; } Outputs { vec3 Color; Base.EmissiveColor = Color; } Graph { if (Mask > 0.5) { float tone = 0.2; ` ;
+const branchLabels = language.getCompletionSpecs(branchDoc, branchDoc.length, services).map((item) => item.label);
+assert(branchLabels.includes("tone"), "A variable declared inside an if-branch should be offered as a completion within the branch");
+// swizzle members on a branch-local vector
+const swizzleDoc = `Shader(Name="M") { Outputs { vec3 Color; Base.EmissiveColor = Color; } Graph { if (1 > 0) { float3 local = float3(1, 1, 1); Color = local.`;
+const swizzleLabels = language.getCompletionSpecs(swizzleDoc, swizzleDoc.length, services).map((item) => item.label);
+assert(swizzleLabels.includes("rgb") && swizzleLabels.includes("x"), "Swizzle members should be offered for a vector local declared inside a branch");
+// for-loop body local and loop variable in a Function body
+const forDoc = `Function Foo(in float A, out float B) { for (int i = 0; i < 4; i++) { float acc = A; `;
+const forLabels = language.getCompletionSpecs(forDoc, forDoc.length, services).map((item) => item.label);
+assert(forLabels.includes("acc") && forLabels.includes("i"), "for-loop body local and loop variable should be offered in a Function body");
+
+// --- 1.6 correctness fixes: return-value function outline + no __return leak -----------------
+const fnDoc = `Function float Luma(in vec3 c) { return dot(c, vec3(0.3, 0.6, 0.1)); }`;
+const fnAst = language.parseDocument(fnDoc);
+const lumaCallable = language.collectCallables(fnAst).get("luma")[0];
+assert(lumaCallable.outputs.some((output) => output.isReturn && output.type === "float" && !output.name), "A return-type function's implicit output should be nameless and flagged isReturn (no __return leak)");
+const lumaSymbol = language.getDocumentSymbols(fnDoc)[0];
+const childNames = (lumaSymbol.children || []).map((child) => child.name);
+assert(childNames.includes("c"), "Function parameters should appear as document-symbol children");
+assert(!JSON.stringify(lumaSymbol).includes("__return"), "Document symbols must not leak the internal __return name");
+
 console.log("language smoke tests passed");
