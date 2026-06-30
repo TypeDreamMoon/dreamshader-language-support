@@ -329,6 +329,87 @@
       "\tCurveTime=${8:0.0})"
     ],
     "description": "Create a reflected CurveAtlasRowParameter expression"
+  },
+  "DreamShader Property Group Scope": {
+    "scope": "dreamshaderlang",
+    "prefix": "propgroup",
+    "body": [
+      "Group(\"${1:Surface}\") {",
+      "\tScalarParameter ${2:Roughness} = ${3:0.5} [Slider(${4:0}, ${5:1})];",
+      "\t$0",
+      "}"
+    ],
+    "description": "Group(\"X\") { ... } scope: shared Group and auto SortPriority for the parameters inside"
+  },
+  "DreamShader Scalar With Slider": {
+    "scope": "dreamshaderlang",
+    "prefix": "slider",
+    "body": [
+      "ScalarParameter ${1:Value} = ${2:0.5} [Slider(${3:0}, ${4:1})];"
+    ],
+    "description": "Scalar parameter with a slider range (Slider(min, max) shorthand)"
+  },
+  "DreamShader Texture Param Bare Path": {
+    "scope": "dreamshaderlang",
+    "prefix": "texparampath",
+    "body": [
+      "TextureSampleParameter2D ${1:AlbedoMap} = \"${2:/Game/Textures/T_White}\";"
+    ],
+    "description": "Texture sample parameter bound to a bare \"/Game/...\" asset path"
+  },
+  "DreamShader Return-Value Function": {
+    "scope": "dreamshaderlang",
+    "prefix": "returnfn",
+    "body": [
+      "Function ${1:float} ${2:Luma}(in ${3:vec3} ${4:c}) {",
+      "\treturn ${5:dot(${4:c}, vec3(0.299, 0.587, 0.114))};",
+      "}"
+    ],
+    "description": "Single-output Function that returns its value (Function <type> Name(...) { return ...; })"
+  },
+  "DreamShader Return-Value GraphFunction": {
+    "scope": "dreamshaderlang",
+    "prefix": "graphreturnfn",
+    "body": [
+      "GraphFunction ${1:float3} ${2:Tint}(in ${3:float3} ${4:color}, in ${5:float} ${6:strength}) {",
+      "\treturn ${7:${4:color} * ${6:strength}};",
+      "}"
+    ],
+    "description": "Single-output GraphFunction that returns its value"
+  },
+  "DreamShader ShaderTemplate (Group scope)": {
+    "scope": "dreamshaderlang",
+    "prefix": "ShaderTemplateGroup",
+    "body": [
+      "Shader(Name=\"Materials/${1:M_Surface}\", Root=\"${2:Game}\")",
+      "{",
+      "\tProperties {",
+      "\t\tGroup(\"Surface\") {",
+      "\t\t\tVectorParameter ${3:BaseColor} = float4(0.8, 0.8, 0.8, 1.0);",
+      "\t\t\tScalarParameter ${4:Roughness} = 0.55 [Slider(0, 1)];",
+      "\t\t\tScalarParameter ${5:Metallic} = 0.0 [Slider(0, 1)];",
+      "\t\t}",
+      "\t}",
+      "",
+      "\tSettings {",
+      "\t\tDomain = \"Surface\";",
+      "\t\tShadingModel = \"DefaultLit\";",
+      "\t\tBlendMode = \"Opaque\";",
+      "\t}",
+      "",
+      "\tOutputs {",
+      "\t\tfloat3 Color;",
+      "\t\tBase.BaseColor = Color;",
+      "\t\tBase.Roughness = ${4:Roughness};",
+      "\t\tBase.Metallic = ${5:Metallic};",
+      "\t}",
+      "",
+      "\tGraph {",
+      "\t\tColor = ${3:BaseColor}.rgb;",
+      "\t}",
+      "}"
+    ],
+    "description": "Material Shader using 1.5 syntax: Group(\"X\") scope, Slider shorthand, and section blocks without '='"
   }
 }
 
