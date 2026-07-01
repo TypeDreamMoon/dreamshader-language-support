@@ -885,4 +885,12 @@ const childNames = (lumaSymbol.children || []).map((child) => child.name);
 assert(childNames.includes("c"), "Function parameters should appear as document-symbol children");
 assert(!JSON.stringify(lumaSymbol).includes("__return"), "Document symbols must not leak the internal __return name");
 
+// --- 1.6.2: extensionless imports resolve to .dsh (mirrors the plugin's NormalizeImportSpecifier)
+const { normalizeImportSpecifier } = require("../src/project/imports");
+assert.strictEqual(normalizeImportSpecifier("ColorLib"), "ColorLib.dsh", "A bare import specifier should get a .dsh extension");
+assert.strictEqual(normalizeImportSpecifier("Shared/Common"), "Shared/Common.dsh", "A subpath import without extension should get .dsh");
+assert.strictEqual(normalizeImportSpecifier("./ColorLib"), "ColorLib.dsh", "A leading ./ should be stripped and .dsh appended");
+assert.strictEqual(normalizeImportSpecifier("ColorLib.dsh"), "ColorLib.dsh", "An explicit .dsh import should be left unchanged");
+assert.strictEqual(normalizeImportSpecifier("Functions/F_Tint.dsf"), "Functions/F_Tint.dsf", "An explicit .dsf import should be left unchanged");
+
 console.log("language smoke tests passed");

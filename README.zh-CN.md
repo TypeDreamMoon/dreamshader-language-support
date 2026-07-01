@@ -279,7 +279,7 @@ npm run package
 生成的 VSIX 文件：
 
 ```text
-dreamshaderlang-language-support-1.6.1.vsix
+dreamshaderlang-language-support-1.6.2.vsix
 ```
 
 ## License

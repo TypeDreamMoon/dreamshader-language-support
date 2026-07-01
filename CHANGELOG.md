@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.2
+
+- Fixed import resolution for extensionless specifiers. `import "ColorLib";` now resolves to a sibling `ColorLib.dsh` (the `.dsh` extension is appended when the specifier has no extension, and a leading `./` is stripped), matching the plugin's `NormalizeImportSpecifier`. Bare imports no longer produce a false "DreamShader import '...' could not be resolved." error; genuinely missing imports are still reported.
+
 ## 1.6.1
 
 - Fixed Graph and function-body control-flow parsing. An `if (...) { ... } else { ... }` block (and `for`/`while` blocks) is now recognized as a single self-terminating statement, eliminating a cluster of false positives on valid code:
