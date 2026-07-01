@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.3
+
+- Fixed syntax highlighting for Allman-style formatting (opening `{` on its own line). `Properties`, `Inputs`, `Outputs`, `Graph`, `Layout`, `Settings`, `Options`, `Group("Name") { ... }`, `Template Shader(...)`, and `Function`/`GraphFunction` bodies all previously required the `{` on the same line as the keyword — a `TextMate` grammar limitation, since scopes are matched one line at a time. Any of these written with the `{` on the next line (including the extension's own `Template Shader` completion snippet) lost all nested highlighting for their body.
+- Fixed `Group` completion: the `Group("Name") { ... }` snippet was only offered under the label `propgroup`, so typing `Group` inside a `Properties`/`Inputs` block surfaced nothing. It's now also offered under the label `Group` (the `propgroup` alias is unchanged).
+
 ## 1.6.2
 
 - Fixed import resolution for extensionless specifiers. `import "ColorLib";` now resolves to a sibling `ColorLib.dsh` (the `.dsh` extension is appended when the specifier has no extension, and a leading `./` is stripped), matching the plugin's `NormalizeImportSpecifier`. Bare imports no longer produce a false "DreamShader import '...' could not be resolved." error; genuinely missing imports are still reported.

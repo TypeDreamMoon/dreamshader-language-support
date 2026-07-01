@@ -77,6 +77,7 @@ const DECLARATION_SNIPPET_ITEMS = [
     ["volumeparam", "VolumeTexture ${1:NoiseVolume} = Path(${2:Game}, \"${3:Textures/T_NoiseVolume}\");", "Volume texture object parameter"],
     ["volumesample", "TextureSampleParameterVolume ${1:VolumeMap} = Path(${2:Game}, \"${3:Textures/T_Volume}\") [\n\tGroup=\"${4:Textures}\";\n\tSortPriority=${5:10};\n\tSamplerType=\"${6:Color}\";\n\tSamplerSource=\"${7:FromTextureAsset}\";\n];", "Volume texture sample parameter"],
     ["constprop", "const ${1:float} ${2:Value} = ${3:0.0};", "Const property declaration"],
+    ["Group", "Group(\"${1:Surface}\") {\n\tScalarParameter ${2:Roughness} = ${3:0.5} [Slider(${4:0}, ${5:1})];\n\t$0\n}", "Group scope: shared Group + auto SortPriority for the parameters inside"],
     ["propgroup", "Group(\"${1:Surface}\") {\n\tScalarParameter ${2:Roughness} = ${3:0.5} [Slider(${4:0}, ${5:1})];\n\t$0\n}", "Group scope: shared Group + auto SortPriority for the parameters inside"],
     ["slider", "ScalarParameter ${1:Value} = ${2:0.5} [Slider(${3:0}, ${4:1})];", "Scalar parameter with a slider range"],
     ["texparampath", "TextureSampleParameter2D ${1:AlbedoMap} = \"${2:/Game/Textures/T_White}\";", "Texture sample parameter bound to a bare asset path"]

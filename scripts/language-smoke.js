@@ -839,6 +839,7 @@ assert(metaLabels.includes("Slider"), "Metadata completion should offer the Slid
 const propDoc = `Shader("M") {\n    Properties {\n        \n    }\n}`;
 const propLabels = language.getCompletionSpecs(propDoc, propDoc.indexOf("        \n") + 8, {}).map((item) => item.label);
 assert(propLabels.includes("propgroup"), "Properties completion should offer the propgroup scope snippet");
+assert(propLabels.includes("Group"), "Properties completion should offer a 'Group' completion for the Group(\"Name\") { } block, not just the 'propgroup' snippet alias");
 
 // --- 1.6 correctness fixes: Graph/function control-flow (if/for/while) ----------------------
 const ctrlClean = (label, src) => {

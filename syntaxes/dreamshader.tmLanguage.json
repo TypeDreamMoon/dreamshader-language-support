@@ -52,7 +52,7 @@
       "patterns": [
         {
           "name": "meta.template.body.dreamshader",
-          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b[^\\{]*\\{",
+          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b",
           "beginCaptures": {
             "1": { "name": "keyword.control.dreamshader" },
             "2": { "name": "keyword.control.dreamshader" }
@@ -63,28 +63,14 @@
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#sectionBlocks" },
+            { "include": "#topLevelKeywords" },
             { "include": "#booleans" },
             { "include": "#operators" }
           ]
         },
         {
-          "name": "meta.template.block.dreamshader",
-          "begin": "\\b(Template)\\s+(Shader|ShaderFunction|ShaderLayer|ShaderLayerBlend)\\b",
-          "beginCaptures": {
-            "1": { "name": "keyword.control.dreamshader" },
-            "2": { "name": "keyword.control.dreamshader" }
-          },
-          "end": "(?=\\{)|$",
-          "patterns": [
-            { "include": "#strings" },
-            { "include": "#numbers" },
-            { "include": "#topLevelKeywords" },
-            { "include": "#operators" }
-          ]
-        },
-        {
           "name": "meta.function.body.dreamshader",
-          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()[^\\{]*\\{",
+          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
           "beginCaptures": {
             "1": { "name": "keyword.control.dreamshader" },
             "2": { "name": "storage.modifier.function.dreamshader" },
@@ -102,24 +88,6 @@
             { "include": "#namespaceCalls" },
             { "include": "#functionCalls" },
             { "include": "#booleans" },
-            { "include": "#operators" }
-          ]
-        },
-        {
-          "name": "meta.function.definition.dreamshader",
-          "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
-          "beginCaptures": {
-            "1": { "name": "keyword.control.dreamshader" },
-            "2": { "name": "storage.modifier.function.dreamshader" },
-            "3": { "name": "storage.type.dreamshader" },
-            "4": { "name": "entity.name.function.definition.dreamshader" }
-          },
-          "end": "(?=\\{)|$",
-          "patterns": [
-            { "include": "#strings" },
-            { "include": "#numbers" },
-            { "include": "#types" },
-            { "include": "#functionQualifiers" },
             { "include": "#operators" }
           ]
         }
@@ -140,7 +108,7 @@
       "patterns": [
         {
           "name": "meta.section.properties.dreamshader",
-          "begin": "\\b(Properties)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Properties)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -163,7 +131,7 @@
       "patterns": [
         {
           "name": "meta.section.inputs.dreamshader",
-          "begin": "\\b(Inputs)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Inputs)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -187,7 +155,7 @@
       "patterns": [
         {
           "name": "meta.section.outputs.dreamshader",
-          "begin": "\\b(Outputs)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Outputs)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -207,7 +175,7 @@
       "patterns": [
         {
           "name": "meta.section.graph.dreamshader",
-          "begin": "\\b(Graph)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Graph)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -254,7 +222,7 @@
       "patterns": [
         {
           "name": "meta.block.property-group.dreamshader",
-          "begin": "\\b(Group)\\b\\s*(\\([^)]*\\))?\\s*\\{",
+          "begin": "\\b(Group)\\b\\s*(\\([^)]*\\))",
           "beginCaptures": {
             "1": { "name": "keyword.control.group.dreamshader" },
             "2": { "name": "string.quoted.double.group-name.dreamshader" }
@@ -279,7 +247,7 @@
       "patterns": [
         {
           "name": "meta.section.layout.dreamshader",
-          "begin": "\\b(Layout)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Layout)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -297,7 +265,7 @@
       "patterns": [
         {
           "name": "meta.section.settings.dreamshader",
-          "begin": "\\b(Settings)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Settings)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
@@ -315,7 +283,7 @@
       "patterns": [
         {
           "name": "meta.section.options.dreamshader",
-          "begin": "\\b(Options)\\b\\s*=?\\s*\\{",
+          "begin": "\\b(Options)\\b\\s*=?",
           "beginCaptures": { "1": { "name": "entity.name.section.dreamshader" } },
           "end": "\\}",
           "patterns": [
