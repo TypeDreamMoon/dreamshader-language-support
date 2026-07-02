@@ -24,7 +24,11 @@ function formatDocument(text, options = {}) {
         const leadingClosers = countLeadingClosers(trimmed);
         const lineDepth = Math.max(0, depth - leadingClosers);
         formatted.push(indentText.repeat(lineDepth) + formatLine(trimmed));
-        depth = Math.max(0, lineDepth + getLineDepthDelta(trimmed));
+        // Depth for the *next* line must accumulate off the pre-line depth, not the display-only
+        // lineDepth -- lineDepth already subtracted the leading closers once for indentation, so
+        // adding the line's full brace delta (which counts those same closers again) on top of it
+        // would double-subtract and collapse a level every time 3+ blocks close in a row.
+        depth = Math.max(0, depth + getLineDepthDelta(trimmed));
     }
 
     let result = formatted.join("\n").replace(/[ \t]+$/gm, "");

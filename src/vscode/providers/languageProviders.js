@@ -28,6 +28,7 @@ function registerLanguageProviders(context, localDiagnostics, services = {}) {
         vscode.languages.registerReferenceProvider({ language: LANGUAGE_ID }, createReferenceProvider(services)),
         vscode.languages.registerDocumentFormattingEditProvider({ language: LANGUAGE_ID }, createFormattingProvider()),
         vscode.languages.registerCodeLensProvider({ language: LANGUAGE_ID }, createCodeLensProvider(codeLensChangeEmitter)),
+        vscode.languages.registerColorProvider({ language: LANGUAGE_ID }, createColorProvider()),
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration("dreamshader.enableCodeLens")) {
                 codeLensChangeEmitter.fire();
@@ -102,6 +103,9 @@ function completionSpecToVscodeItem(document, spec, defaultRange) {
     item.range = Array.isArray(spec.range)
         ? new vscode.Range(document.positionAt(spec.range[0]), document.positionAt(spec.range[1]))
         : defaultRange;
+    if (spec.sortText) {
+        item.sortText = spec.sortText;
+    }
     return item;
 }
 
@@ -359,6 +363,34 @@ function createFoldingRangeProvider() {
         provideFoldingRanges(document) {
             return languageCore.getFoldingRanges(document.getText()).map((range) =>
                 new vscode.FoldingRange(document.positionAt(range.startOffset).line, document.positionAt(range.endOffset).line));
+        }
+    };
+}
+
+function createColorProvider() {
+    return {
+        provideDocumentColors(document) {
+            return languageCore.getDocumentColorRanges(document.getText()).map((entry) => new vscode.ColorInformation(
+                new vscode.Range(document.positionAt(entry.startOffset), document.positionAt(entry.endOffset)),
+                new vscode.Color(entry.color.red, entry.color.green, entry.color.blue, entry.color.alpha)
+            ));
+        },
+        provideColorPresentations(color, presentationContext) {
+            // Re-derive the original constructor spelling (float3/float4 vs the vec3/vec4 alias)
+            // from the range's pre-edit text rather than threading extra state through VS Code's
+            // color APIs -- presentationContext.range still points at what provideDocumentColors
+            // originally reported, before this presentation is applied.
+            const originalText = presentationContext.document.getText(presentationContext.range).trim();
+            const nameMatch = /^([A-Za-z_][A-Za-z0-9_]*)/.exec(originalText);
+            const constructorName = nameMatch ? nameMatch[1] : "float4";
+            const componentCount = constructorName.endsWith("3") ? 3 : 4;
+            const label = languageCore.formatColorPresentation(constructorName, componentCount, {
+                red: color.red,
+                green: color.green,
+                blue: color.blue,
+                alpha: color.alpha
+            });
+            return [new vscode.ColorPresentation(label)];
         }
     };
 }

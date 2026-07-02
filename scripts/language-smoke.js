@@ -257,7 +257,65 @@ assert.strictEqual(reflectedAbsCompletion.insertText, "Expression(Class=\"Abs\",
 const bundledReflectedCompletions = language.getCompletionSpecs(reflectedMemberSource, reflectedMemberOffset, {});
 const bundledAbsCompletion = bundledReflectedCompletions.find((item) => item.label === "Abs");
 assert(bundledAbsCompletion, "UE. completion should include bundled material-expressions.json entries without adapter services");
-assert(String(bundledAbsCompletion.insertText || "").startsWith("Expression(Class=\"Abs\""), "Bundled UE. completion should expand to UE.Expression syntax");
+// "Abs" isn't one of the compiler's hard-coded UE.* sugar builtins, so the DreamShader compiler's
+// generic reflection fallback (UE.<ClassName>(...) resolves the class from the call name itself)
+// applies -- the completion should insert that shorter, equivalent form rather than the redundant
+// UE.Expression(Class="Abs", ...) long form.
+assert(String(bundledAbsCompletion.insertText || "").startsWith("Abs(OutputType=\"float1\""), "Bundled UE. completion should use the short UE.<Name>(...) reflection sugar when it's unambiguous");
+
+// a manifest entry whose name collides with one of the compiler's hard-coded UE.* sugar builtins
+// (Time, VertexNormalWS, StaticSwitchParameter, ...) must keep the long Expression(Class=...)
+// form -- the compiler checks its sugar table by call name BEFORE falling back to generic
+// reflection, so a short UE.VertexNormalWS(OutputType=...) call would hit the sugar builtin
+// (which takes no OutputType) instead of the reflected MaterialExpressionVertexNormalWS class.
+// "VertexNormalWS" isn't in the hard-coded UE_BUILTINS list (unlike "Time"), so this also proves
+// the manifest-derived guard -- not just dedup against a hard-coded entry -- is what's keeping it safe.
+const bundledVertexNormalCompletion = bundledReflectedCompletions.find((item) => item.label === "VertexNormalWS");
+assert(bundledVertexNormalCompletion, "UE. completion should include the bundled reflected VertexNormalWS expression");
+assert(String(bundledVertexNormalCompletion.insertText || "").startsWith("Expression(Class=\"VertexNormalWS\""), "A reflected name that collides with a compiler UE.* sugar builtin must keep the long UE.Expression(Class=...) form");
+
+// direct unit coverage of the bundled-manifest builder itself, independent of UE_BUILTINS dedup.
+const { getBundledMaterialExpressionBuiltinItems } = require("../src/languageData");
+const bundledItems = getBundledMaterialExpressionBuiltinItems();
+const findBundled = (name) => bundledItems.find((item) => item.name === name);
+assert(String(findBundled("Arcsine")?.memberSnippet || "").startsWith("Arcsine(OutputType="), "A non-colliding reflected name should get the short UE.<Name>(...) sugar form");
+assert(String(findBundled("Time")?.memberSnippet || "").startsWith("Expression(Class=\"Time\""), "A reflected name colliding with a UE.* sugar builtin (Time) should keep the long form");
+assert(String(findBundled("VertexColor")?.memberSnippet || "").startsWith("Expression(Class=\"VertexColor\""), "A reflected name colliding with a UE.* sugar builtin (VertexColor) should keep the long form");
+
+// "Expression" (the generic Class="..." reflection escape hatch) must sort behind every other
+// UE.* member so a specific match like "Sine" always wins a completion race against it -- e.g.
+// typing "UE.Si" and accepting the top suggestion should confidently produce the short
+// "Sine(...)" sugar, never the generic "Expression(Class=\"Sine\", ...)" form.
+const ueSiSource = `Shader(Name="M") {
+    Outputs { float3 Color; Base.EmissiveColor = Color; }
+    Graph { Color = float3(UE.Si, 0, 0); }
+}`;
+const ueSiOffset = ueSiSource.indexOf("UE.Si") + "UE.Si".length;
+const ueSiSpecs = language.getCompletionSpecs(ueSiSource, ueSiOffset, {});
+const sineSpec = ueSiSpecs.find((item) => item.label === "Sine");
+const expressionSpec = ueSiSpecs.find((item) => item.label === "Expression");
+assert(sineSpec, "UE.Si should offer the reflected Sine member");
+assert(expressionSpec, "UE.Si should still offer the generic Expression escape hatch as a fallback");
+assert.strictEqual(sineSpec.sortText, undefined, "A specific member's sortText should be untouched (defaults to its label)");
+assert(typeof expressionSpec.sortText === "string" && expressionSpec.sortText > "Sine", "Expression's sortText must sort after specific members like Sine so it never wins a completion race against a more useful match");
+
+// hover parameter types should be real (int/float/bool/string) rather than the generic "value"
+// placeholder wherever the data actually supports it -- for hard-coded UE_BUILTINS entries (whose
+// types are hand-authored, no manifest regen needed) and for the always-synthetic OutputType/
+// Output/OutputName/OutputIndex parameters every reflected manifest entry gets.
+const findParam = (parameters, name) => (parameters || []).find((parameter) => parameter.name === name);
+const texCoordParams = language.getHoverInfoSpec("UE.TexCoord", "UE.TexCoord".length - 2, {})?.parameters;
+assert.strictEqual(findParam(texCoordParams, "Index")?.type, "int", "UE.TexCoord's Index parameter should be typed as int, not the generic 'value' placeholder");
+assert.strictEqual(findParam(texCoordParams, "UTiling")?.type, "float", "UE.TexCoord's UTiling parameter should be typed as float");
+assert.strictEqual(findParam(texCoordParams, "UnMirrorU")?.type, "bool", "UE.TexCoord's UnMirrorU parameter should be typed as bool");
+const arcsineHoverSource = "UE.Arcsine";
+const arcsineParams = language.getHoverInfoSpec(arcsineHoverSource, arcsineHoverSource.length - 2, {})?.parameters;
+assert.strictEqual(findParam(arcsineParams, "OutputType")?.type, "string", "A reflected builtin's synthetic OutputType parameter should be typed as string, not 'value'");
+assert.strictEqual(findParam(arcsineParams, "OutputIndex")?.type, "int", "A reflected builtin's synthetic OutputIndex parameter should be typed as int, not 'value'");
+// input-pin types come from the C++ compiler's manifest export (GetInputValueType); until that's
+// regenerated, older cached manifests still carry the literal "input" placeholder for every input
+// pin -- that must fall back to "value" rather than leaking the placeholder text itself as a type.
+assert.strictEqual(findParam(arcsineParams, "Input")?.type, "value", "An un-regenerated manifest's literal 'input' placeholder should still fall back to 'value', not leak through as a fake type");
 
 const reflectedExpressionDiagnostics = language.getDiagnostics(`Shader(Name="Materials/M_ReflectedExpression")
 {
@@ -746,6 +804,32 @@ float Value;
 }`);
 assert(/    Properties = \{/.test(formatted), "Formatter should indent sections");
 
+// three-or-more levels of nested braces (e.g. nested Group scopes) must not collapse indentation
+// when several closing lines stack up in a row.
+const deepNested = language.formatDocument(`Shader("M") {
+Properties {
+Group("Surface") {
+Group("SS") {
+ScalarParameter Test = 0.5;
+}
+ScalarParameter Rough = 0.2;
+}
+}
+}`);
+const deepNestedLines = deepNested.split("\n").map((line) => line.replace(/\s+$/, ""));
+assert.deepStrictEqual(deepNestedLines, [
+    "Shader(\"M\") {",
+    "    Properties {",
+    "        Group(\"Surface\") {",
+    "            Group(\"SS\") {",
+    "                ScalarParameter Test = 0.5;",
+    "            }",
+    "            ScalarParameter Rough = 0.2;",
+    "        }",
+    "    }",
+    "}"
+], "Formatter should not lose an indent level when 3+ nested blocks close in a row");
+
 const templateSource = `Template ShaderFunction(Name="Templates/T_Tint", Root="Game")
 {
     Inputs = {
@@ -824,6 +908,30 @@ const v15Callables = language.collectCallables(v15Ast);
 assert(v15Callables.get("luma")[0].outputs.some((output) => output.type === "float"), "Return-type function exposes its return type as an output");
 assert.strictEqual(language.getDiagnostics(v15Source, "M_V15.dsm").length, 0, "Valid 1.5 syntax should produce no diagnostics");
 
+// nested Group("Outer") { Group("Inner") { ... } } composes into "Outer|Inner"
+const nestedGroupSource = `Shader("M_NestedGroup") {
+    Properties {
+        Group("Surface") {
+            Group("SS") {
+                ScalarParameter Test = 0.5 [Slider(0, 1)];
+            }
+            ScalarParameter Rough = 0.2;
+        }
+        Group("Manual|Literal") {
+            ScalarParameter Explicit = 1.0;
+        }
+    }
+    Outputs { vec3 Color; Base.EmissiveColor = Color; }
+    Graph { Color = vec3(Rough, Rough, Rough); }
+}`;
+const nestedGroupProps = language.parseDocument(nestedGroupSource).blocks[0].sections.find((section) => section.name === "Properties");
+const nestedGroupDecls = nestedGroupProps.entries.filter((entry) => entry.kind === "declaration");
+const findDecl = (name) => nestedGroupDecls.find((entry) => entry.name === name);
+assert.strictEqual(findDecl("Test").metadata?.group, "Surface|SS", "Group(\"SS\") nested inside Group(\"Surface\") should compose to 'Surface|SS'");
+assert.strictEqual(findDecl("Rough").metadata?.group, "Surface", "A direct child of Group(\"Surface\") keeps just 'Surface', not the nested sibling's path");
+assert.strictEqual(findDecl("Explicit").metadata?.group, "Manual|Literal", "A single Group(\"A|B\") literal name should pass through unchanged");
+assert.strictEqual(language.getDiagnostics(nestedGroupSource, "M_NestedGroup.dsm").length, 0, "Nested Group scopes should produce no diagnostics");
+
 // optional '=' on a section keeps its body symbols
 const noEqSource = `Shader("M_NoEq") {
     Properties { ScalarParameter A = 1.0; }
@@ -893,5 +1001,44 @@ assert.strictEqual(normalizeImportSpecifier("Shared/Common"), "Shared/Common.dsh
 assert.strictEqual(normalizeImportSpecifier("./ColorLib"), "ColorLib.dsh", "A leading ./ should be stripped and .dsh appended");
 assert.strictEqual(normalizeImportSpecifier("ColorLib.dsh"), "ColorLib.dsh", "An explicit .dsh import should be left unchanged");
 assert.strictEqual(normalizeImportSpecifier("Functions/F_Tint.dsf"), "Functions/F_Tint.dsf", "An explicit .dsf import should be left unchanged");
+
+// --- 1.7.0: color picker support for float3(...)/float4(...)/vec3(...)/vec4(...) literals -------
+const colorSource = `Shader(Name="M") {
+    Properties {
+        VectorParameter BaseColor = float4(0.8, 0.3, 0.1, 1.0);
+    }
+    Outputs {
+        vec3 Tint;
+        Base.EmissiveColor = Tint;
+    }
+    Graph {
+        // float4(1, 0, 0, 1) inside a comment must not be picked up
+        vec3 Tint = vec3(1, 0, 0);
+        float3 Splat = float3(0.5);
+        float4 Dynamic = float4(A, B, C, D);
+    }
+}`;
+const colorRanges = language.getDocumentColorRanges(colorSource);
+const findColorRange = (needle) => colorRanges.find((entry) => colorSource.slice(entry.startOffset, entry.endOffset) === needle);
+
+const baseColorRange = findColorRange('float4(0.8, 0.3, 0.1, 1.0)');
+assert(baseColorRange, "A float4(...) literal with all-numeric arguments should get a color range");
+assert.deepStrictEqual(baseColorRange.color, { red: 0.8, green: 0.3, blue: 0.1, alpha: 1 }, "float4(...) color components should map directly to red/green/blue/alpha");
+
+const tintRange = findColorRange("vec3(1, 0, 0)");
+assert(tintRange, "vec3(...) (the GLSL alias) should also get a color range");
+assert.strictEqual(tintRange.color.alpha, 1, "A 3-component constructor should report alpha=1 (no alpha channel to read)");
+
+const splatRange = findColorRange("float3(0.5)");
+assert(splatRange, "The scalar-splat form float3(0.5) should get a color range");
+assert.deepStrictEqual(splatRange.color, { red: 0.5, green: 0.5, blue: 0.5, alpha: 1 }, "A splat constructor should report the same value for every component");
+
+assert(!findColorRange("float4(A, B, C, D)"), "A constructor with non-literal (identifier) arguments should not get a color range -- there's no concrete color to show or safely rewrite");
+assert(!colorRanges.some((entry) => colorSource.slice(Math.max(0, entry.startOffset - 40), entry.endOffset).includes("must not be picked up")), "A color-shaped literal inside a comment must not be picked up");
+assert.strictEqual(colorRanges.length, 3, "Only the three genuinely all-literal constructors should produce color ranges");
+
+assert.strictEqual(language.formatColorPresentation("float4", 4, { red: 0.8, green: 0.3, blue: 0.1, alpha: 1 }), "float4(0.8, 0.3, 0.1, 1.0)", "Editing a color back should preserve the original constructor spelling and format each component cleanly");
+assert.strictEqual(language.formatColorPresentation("vec3", 3, { red: 1, green: 0, blue: 0, alpha: 0.5 }), "vec3(1.0, 0.0, 0.0)", "A 3-component constructor's presentation should drop the alpha component entirely");
+assert.strictEqual(language.formatColorPresentation("float4", 4, { red: 1 / 3, green: 0, blue: 0, alpha: 1 }), "float4(0.333, 0.0, 0.0, 1.0)", "Component values should round to 3 decimal places");
 
 console.log("language smoke tests passed");

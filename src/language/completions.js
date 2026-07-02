@@ -554,15 +554,25 @@ function addOutputTargets(add) {
 
 function addUEBuiltins(add, services) {
     for (const builtin of getUEBuiltins(services)) {
-        add({ label: builtin.qualifiedName || `UE.${builtin.name}`, kind: "Function", insertText: builtin.snippet || builtin.qualifiedName, detail: builtin.detail });
+        add({ label: builtin.qualifiedName || `UE.${builtin.name}`, kind: "Function", insertText: builtin.snippet || builtin.qualifiedName, detail: builtin.detail, sortText: getUEBuiltinSortText(builtin) });
     }
 }
 
 function addUEBuiltinMembers(add, services, context) {
     const range = getMemberAccessReplacementRange(context);
     for (const builtin of getUEBuiltins(services)) {
-        add({ label: builtin.name, kind: "Function", insertText: getNamespaceMemberSnippet(builtin, "UE"), detail: builtin.detail, range });
+        add({ label: builtin.name, kind: "Function", insertText: getNamespaceMemberSnippet(builtin, "UE"), detail: builtin.detail, range, sortText: getUEBuiltinSortText(builtin) });
     }
+}
+
+// "Expression" is the generic Class="..." reflection escape hatch -- every other UE.* member is a
+// more specific, more useful match whenever its name is even a plausible fuzzy hit (e.g. typing
+// "UE.Si" should confidently complete to the short "Sine(...)" sugar, not the generic
+// "Expression(Class=\"Sine\", ...)" form). "~" sorts after every normal label VS Code would
+// otherwise default sortText to, so "Expression" only wins a completion race when it's the only
+// remaining candidate, never when a same-named specific member is also in play.
+function getUEBuiltinSortText(builtin) {
+    return normalizeSymbolKey(builtin?.name) === "expression" ? `~${builtin.name}` : undefined;
 }
 
 function addSubstrateBuiltinMembers(add, services, context) {
@@ -867,5 +877,7 @@ module.exports = {
     getCompletionSpecs,
     HLSL_INTRINSIC_ITEMS: FUNCTION_BUILTIN_ITEMS,
     SETTING_MAPPING_FALLBACKS,
-    METADATA_ITEMS
+    METADATA_ITEMS,
+    getSettingMappingNameForKey,
+    isBooleanSetting
 };

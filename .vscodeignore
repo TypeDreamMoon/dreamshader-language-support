@@ -5,3 +5,12 @@ test/**
 .gitignore
 .github/**
 .vscode/**
+
+# sql.js ships asm.js/browser/worker/debug builds we never load (only dist/sql-wasm.{js,wasm} is
+# used, via src/bridge/database.js's locateFile) -- excluding the rest saves ~18MB in the .vsix.
+node_modules/sql.js/dist/sql-asm*.js
+node_modules/sql.js/dist/sql-wasm-browser*
+node_modules/sql.js/dist/sql-wasm-debug*
+node_modules/sql.js/dist/worker.*
+node_modules/sql.js/*.md
+node_modules/sql.js/.*

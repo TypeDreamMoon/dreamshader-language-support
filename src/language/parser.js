@@ -390,15 +390,18 @@ function parseSectionEntries(section) {
 }
 
 // Walk a Properties/Inputs/Outputs body, descending into any Group("X") { ... } scopes
-// and stamping each contained declaration with its group name. Recurses for nested groups
-// (the innermost group name wins, matching the flat-group intent of the language).
+// and stamping each contained declaration with its group name. Recurses for nested groups,
+// composing "Outer|Inner" (matching Unreal's native '|' sub-category syntax and the plugin's
+// own ParsePropertyBlock composition), so a sibling statement directly inside the outer group
+// keeps just the outer name while nested-group members get the full path.
 function collectPropertyEntries(bodyText, bodyOffset, section, group, entries) {
     const { residue, groups } = extractPropertyGroups(bodyText, bodyOffset);
     for (const statement of splitTopLevel(residue, bodyOffset, ";")) {
         pushPropertyStatement(entries, statement, section, group);
     }
     for (const sub of groups) {
-        collectPropertyEntries(sub.innerText, sub.innerOffset, section, sub.name, entries);
+        const composedGroup = group ? `${group}|${sub.name}` : sub.name;
+        collectPropertyEntries(sub.innerText, sub.innerOffset, section, composedGroup, entries);
     }
 }
 

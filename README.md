@@ -280,7 +280,7 @@ npm run package
 The packaged VSIX is generated as:
 
 ```text
-dreamshaderlang-language-support-1.6.3.vsix
+dreamshaderlang-language-support-1.7.0.vsix
 ```
 
 ## License

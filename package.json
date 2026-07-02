@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm materials, .dsf function files, and .dsh shared headers.",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -43,6 +43,7 @@
     "onCommand:dreamshader.openBridgeDiagnosticLocation",
     "onCommand:dreamshader.cleanGeneratedShaders",
     "onCommand:dreamshader.showMaterialPreview",
+    "onCommand:dreamshader.showMaterialDetails",
     "onCommand:dreamshader.installPackageFromGitHub",
     "onCommand:dreamshader.browsePackages",
     "onCommand:dreamshader.updatePackages",
@@ -84,6 +85,11 @@
         "command": "dreamshader.showMaterialPreview",
         "title": "DreamShaderLang: Show Material Preview",
         "icon": "$(preview)"
+      },
+      {
+        "command": "dreamshader.showMaterialDetails",
+        "title": "DreamShaderLang: Show Details",
+        "icon": "$(checklist)"
       },
       {
         "command": "dreamshader.refreshBridgeDiagnostics",
@@ -264,7 +270,7 @@
           "type": "number",
           "default": 2,
           "minimum": 0,
-          "maximum": 10,
+          "maximum": 60,
           "description": "Maximum streamed material preview frame rate. Set to 0 to disable continuous live frames."
         }
       }
@@ -304,14 +310,19 @@
           "group": "navigation@3"
         },
         {
-          "command": "dreamshader.cleanGeneratedShaders",
+          "command": "dreamshader.showMaterialDetails",
           "when": "resourceLangId == dreamshaderlang",
           "group": "navigation@4"
         },
         {
-          "command": "dreamshader.showBridgeDiagnostics",
+          "command": "dreamshader.cleanGeneratedShaders",
           "when": "resourceLangId == dreamshaderlang",
           "group": "navigation@5"
+        },
+        {
+          "command": "dreamshader.showBridgeDiagnostics",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@6"
         }
       ],
       "editor/context": [
@@ -326,9 +337,14 @@
           "group": "navigation@2"
         },
         {
-          "command": "dreamshader.cleanGeneratedShaders",
+          "command": "dreamshader.showMaterialDetails",
           "when": "resourceLangId == dreamshaderlang",
           "group": "navigation@3"
+        },
+        {
+          "command": "dreamshader.cleanGeneratedShaders",
+          "when": "resourceLangId == dreamshaderlang",
+          "group": "navigation@4"
         }
       ],
       "view/title": [
@@ -376,5 +392,8 @@
   "devDependencies": {
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.2"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.1"
   }
 }

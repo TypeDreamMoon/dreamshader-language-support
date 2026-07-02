@@ -7,12 +7,13 @@ const {
 } = require("./languageData");
 const { createDebouncedDisposable } = require("./common/debounce");
 const { createEmptyBridgeDiagnosticsState, refreshBridgeDiagnostics } = require("./bridge/diagnostics");
+const { initializeBridgeDatabaseSupport } = require("./bridge/database");
 const { createBridgeDiagnosticsTreeProvider } = require("./vscode/views/bridgeDiagnostics");
 const { registerLanguageProviders, refreshAllLocalDiagnostics, refreshLocalDiagnosticsForDocument } = require("./vscode/providers/languageProviders");
 const { createLanguageIndexCache } = require("./vscode/languageIndexCache");
 const { updateStatusBar } = require("./vscode/statusBar");
 const { registerCommands } = require("./vscode/commands");
-const { collectKnownProjectRoots } = require("./project/projects");
+const { collectKnownProjectRoots, invalidateProjectRootCache } = require("./project/projects");
 
 function activate(context) {
     const bridgeDiagnostics = vscode.languages.createDiagnosticCollection(BRIDGE_DIAGNOSTIC_COLLECTION_NAME);
@@ -88,6 +89,7 @@ function activate(context) {
             void refreshBridge();
         }),
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            invalidateProjectRootCache();
             languageIndexCache.invalidateAll();
             refreshAllLocalDiagnostics(localDiagnostics, languageServices);
             refreshBridgeWatchers();
@@ -97,6 +99,7 @@ function activate(context) {
             if (!event.affectsConfiguration("dreamshader")) {
                 return;
             }
+            invalidateProjectRootCache();
             languageIndexCache.invalidateAll();
             refreshAllLocalDiagnostics(localDiagnostics, languageServices);
             void refreshBridge();
@@ -112,6 +115,17 @@ function activate(context) {
     refreshAllLocalDiagnostics(localDiagnostics, languageServices);
     void refreshBridge();
     refreshUi();
+
+    // sql.js's WASM module loads asynchronously; refresh once it's ready so completions/hover and
+    // the diagnostics view pick up bridge.db instead of the (now deprecated) JSON Bridge files as
+    // soon as possible, rather than waiting for the next unrelated trigger.
+    void initializeBridgeDatabaseSupport().then((SQL) => {
+        if (SQL) {
+            languageIndexCache.invalidateAll();
+            refreshAllLocalDiagnostics(localDiagnostics, languageServices);
+            void refreshBridge();
+        }
+    });
 }
 
 function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {
@@ -136,9 +150,12 @@ function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {
     };
 
     registerWatcher(vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/diagnostics.json"));
+    registerWatcher(vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/bridge.db"));
     for (const root of roots) {
         registerWatcher(vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/diagnostics.json")));
+        registerWatcher(vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/bridge.db")));
     }
 }
 

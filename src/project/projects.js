@@ -22,7 +22,31 @@ function getConfiguredProjectRoot() {
     return configured ? path.resolve(configured) : "";
 }
 
+// Walking up from a file to find its .uproject is a handful of fs.readdirSync calls per ancestor
+// directory -- cheap once, but every totally-independent completion/hover/diagnostics call re-runs
+// it from scratch (there's no other shared per-document cache upstream of these functions), and a
+// language-server completion trigger fires on every keystroke. A project's root relative to a given
+// file/workspace practically never changes mid-session, so this is memoized by input path/root and
+// only invalidated when something that could actually change the answer happens (workspace folders
+// or the dreamshader.projectRoot setting changing) -- see invalidateProjectRootCache().
+const projectRootCache = new Map();
+const knownProjectRootsCache = new Map();
+
+function invalidateProjectRootCache() {
+    projectRootCache.clear();
+    knownProjectRootsCache.clear();
+}
+
 function findProjectRoot(inputPath = "") {
+    if (projectRootCache.has(inputPath)) {
+        return projectRootCache.get(inputPath);
+    }
+    const result = computeProjectRoot(inputPath);
+    projectRootCache.set(inputPath, result);
+    return result;
+}
+
+function computeProjectRoot(inputPath) {
     const configured = getConfiguredProjectRoot();
     if (configured && fs.existsSync(configured)) {
         return normalizeFsPath(configured);
@@ -110,6 +134,10 @@ function findProjectRootFromDirectory(startDirectory) {
 }
 
 function collectKnownProjectRoots(activePath = "") {
+    if (knownProjectRootsCache.has(activePath)) {
+        return knownProjectRootsCache.get(activePath);
+    }
+
     const roots = new Set();
     const configured = getConfiguredProjectRoot();
     if (configured && fs.existsSync(configured)) {
@@ -125,7 +153,10 @@ function collectKnownProjectRoots(activePath = "") {
             roots.add(normalizeFsPath(root));
         }
     }
-    return Array.from(roots);
+
+    const result = Array.from(roots);
+    knownProjectRootsCache.set(activePath, result);
+    return result;
 }
 
 function getDShaderRoot(projectRoot) {
@@ -172,6 +203,7 @@ module.exports = {
     findProjectRootFromCandidate,
     findProjectRootFromDirectory,
     collectKnownProjectRoots,
+    invalidateProjectRootCache,
     getDShaderRoot,
     getPackagesDirectory,
     isDreamShaderDocument

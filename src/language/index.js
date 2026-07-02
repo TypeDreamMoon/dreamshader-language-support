@@ -11,6 +11,7 @@ const indexer = require("./indexer");
 const formatter = require("./formatter");
 const functionBuiltins = require("./functionBuiltins");
 const features = require("./features");
+const colors = require("./colors");
 
 module.exports = {
     ...parser,
@@ -23,5 +24,6 @@ module.exports = {
     ...indexer,
     ...formatter,
     ...functionBuiltins,
-    ...features
+    ...features,
+    ...colors
 };

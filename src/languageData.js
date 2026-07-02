@@ -295,6 +295,20 @@ function getBundledMaterialExpressionBuiltinItems() {
     return bundledMaterialExpressionBuiltinItems;
 }
 
+// UE.* names the DreamShader compiler special-cases as their own dedicated builtins (see
+// DreamShaderMaterialGeneratorCodeUE.cpp's `Builtins` table plus the separately-handled
+// StaticSwitchParameter/CollectionParam(eter)/Expression). The compiler checks these BEFORE
+// falling back to the generic `UE.<ClassName>(...)` reflection dispatch, so a manifest
+// expression sharing one of these names must keep the `UE.Expression(Class="X", ...)` long
+// form -- writing `UE.Time(OutputType=...)`, for example, would route into the sugar Time
+// builtin (which takes a `Period` argument, not `OutputType`), not the reflected class.
+const UE_SUGAR_BUILTIN_RESERVED_NAMES = new Set([
+    "texcoord", "time", "panner", "worldposition", "objectpositionws", "cameravectorws",
+    "vertexnormalws", "vertextangentws", "screenposition", "vertexcolor", "transformvector",
+    "transformposition", "staticswitchparameter", "collectionparam", "collectionparameter",
+    "expression"
+]);
+
 function createUEBuiltinItemFromManifestExpression(expression) {
     const name = String(expression?.name || "").trim();
     if (!name) {
@@ -307,7 +321,13 @@ function createUEBuiltinItemFromManifestExpression(expression) {
     const preferredProperties = (Array.isArray(expression.properties) ? expression.properties : [])
         .filter(isPreferredManifestCompletionProperty)
         .slice(0, 4);
-    const snippetParts = [`Class="${name}"`, `OutputType="${outputType}"`];
+    // The short `UE.<Name>(...)` form is sugar the compiler resolves via reflection using the
+    // call's own member name as the MaterialExpression class -- so it's shorter than (and
+    // equivalent to) `UE.Expression(Class="<Name>", ...)`, except for names reserved above.
+    const isShortFormSafe = !UE_SUGAR_BUILTIN_RESERVED_NAMES.has(name.toLowerCase());
+    const snippetParts = isShortFormSafe
+        ? [`OutputType="${outputType}"`]
+        : [`Class="${name}"`, `OutputType="${outputType}"`];
     preferredProperties.forEach((property, index) => {
         snippetParts.push(`${property.name}=\${${index + 1}:${getManifestPropertyPlaceholder(property)}}`);
     });
@@ -316,23 +336,26 @@ function createUEBuiltinItemFromManifestExpression(expression) {
         ? expression.className.trim()
         : `MaterialExpression${name}`;
     const parameters = [
-        { qualifier: "in", type: "value", name: "OutputType" },
-        { qualifier: "in", type: "value", name: "Output" },
-        { qualifier: "in", type: "value", name: "OutputName" },
-        { qualifier: "in", type: "value", name: "OutputIndex" },
+        { qualifier: "in", type: "string", name: "OutputType" },
+        { qualifier: "in", type: "string", name: "Output" },
+        { qualifier: "in", type: "string", name: "OutputName" },
+        { qualifier: "in", type: "int", name: "OutputIndex" },
         ...(Array.isArray(expression.properties) ? expression.properties : []).map((property) => ({
             qualifier: "in",
-            type: property.isInput ? "value" : property.type || "value",
+            // Older cached manifests still use the literal placeholder "input" for every input pin
+            // (before the compiler learned to report the pin's real GetInputValueType); treat that
+            // the same as "no type" rather than showing the placeholder text itself as if it were real.
+            type: (property.type && property.type !== "input") ? property.type : "value",
             name: property.name
         }))
     ];
 
     return createUEBuiltinItem(
         name,
-        `UE.Expression(${snippetParts.join(", ")})`,
+        isShortFormSafe ? `UE.${name}(${snippetParts.join(", ")})` : `UE.Expression(${snippetParts.join(", ")})`,
         `Reflected ${className} material expression.`,
         parameters,
-        `UE.Expression(Class="${name}", OutputType="${outputType}")`,
+        isShortFormSafe ? `UE.${name}(OutputType="${outputType}")` : `UE.Expression(Class="${name}", OutputType="${outputType}")`,
         {
             outputType,
             returnType: outputType,
@@ -693,11 +716,11 @@ const UE_BUILTINS = [
         "UE.TexCoord(Index=${1:0})",
         "Creates a TextureCoordinate material expression.",
         [
-            { qualifier: "in", type: "value", name: "Index" },
-            { qualifier: "in", type: "value", name: "UTiling" },
-            { qualifier: "in", type: "value", name: "VTiling" },
-            { qualifier: "in", type: "value", name: "UnMirrorU" },
-            { qualifier: "in", type: "value", name: "UnMirrorV" }
+            { qualifier: "in", type: "int", name: "Index" },
+            { qualifier: "in", type: "float", name: "UTiling" },
+            { qualifier: "in", type: "float", name: "VTiling" },
+            { qualifier: "in", type: "bool", name: "UnMirrorU" },
+            { qualifier: "in", type: "bool", name: "UnMirrorV" }
         ],
         "UE.TexCoord(Index=0)"
     ),
@@ -706,8 +729,8 @@ const UE_BUILTINS = [
         "UE.Time(Period=${1:4.0})",
         "Creates a Time material expression.",
         [
-            { qualifier: "in", type: "value", name: "Period" },
-            { qualifier: "in", type: "value", name: "IgnorePause" }
+            { qualifier: "in", type: "float", name: "Period" },
+            { qualifier: "in", type: "bool", name: "IgnorePause" }
         ],
         "UE.Time(Period=4.0)"
     ),
@@ -716,12 +739,12 @@ const UE_BUILTINS = [
         "UE.Panner(Coordinate=${1:UV}, Time=${2:UE.Time()}, Speed=${3:float2(0.1, 0.0)})",
         "Creates a Panner material expression.",
         [
-            { qualifier: "in", type: "value", name: "Coordinate" },
-            { qualifier: "in", type: "value", name: "Time" },
-            { qualifier: "in", type: "value", name: "Speed" },
-            { qualifier: "in", type: "value", name: "SpeedX" },
-            { qualifier: "in", type: "value", name: "SpeedY" },
-            { qualifier: "in", type: "value", name: "FractionalPart" }
+            { qualifier: "in", type: "float2", name: "Coordinate" },
+            { qualifier: "in", type: "float", name: "Time" },
+            { qualifier: "in", type: "float2", name: "Speed" },
+            { qualifier: "in", type: "float", name: "SpeedX" },
+            { qualifier: "in", type: "float", name: "SpeedY" },
+            { qualifier: "in", type: "bool", name: "FractionalPart" }
         ],
         "UE.Panner(Coordinate=UV, Time=UE.Time(), Speed=float2(0.1, 0.0))"
     ),
@@ -735,9 +758,9 @@ const UE_BUILTINS = [
         "UE.TransformVector(Input=${1:NormalTS}, Source=\"${2:Tangent}\", Destination=\"${3:World}\")",
         "Creates a TransformVector material expression.",
         [
-            { qualifier: "in", type: "value", name: "Input" },
-            { qualifier: "in", type: "value", name: "Source" },
-            { qualifier: "in", type: "value", name: "Destination" }
+            { qualifier: "in", type: "float3", name: "Input" },
+            { qualifier: "in", type: "string", name: "Source" },
+            { qualifier: "in", type: "string", name: "Destination" }
         ],
         "UE.TransformVector(Input=NormalTS, Source=\"Tangent\", Destination=\"World\")"
     ),
@@ -746,11 +769,11 @@ const UE_BUILTINS = [
         "UE.TransformPosition(Input=${1:WorldPos}, Source=\"${2:Local}\", Destination=\"${3:World}\")",
         "Creates a TransformPosition material expression.",
         [
-            { qualifier: "in", type: "value", name: "Input" },
-            { qualifier: "in", type: "value", name: "Source" },
-            { qualifier: "in", type: "value", name: "Destination" },
-            { qualifier: "in", type: "value", name: "PeriodicWorldTileSize" },
-            { qualifier: "in", type: "value", name: "FirstPersonInterpolationAlpha" }
+            { qualifier: "in", type: "float3", name: "Input" },
+            { qualifier: "in", type: "string", name: "Source" },
+            { qualifier: "in", type: "string", name: "Destination" },
+            { qualifier: "in", type: "float3", name: "PeriodicWorldTileSize" },
+            { qualifier: "in", type: "float", name: "FirstPersonInterpolationAlpha" }
         ],
         "UE.TransformPosition(Input=WorldPos, Source=\"Local\", Destination=\"World\")"
     ),
@@ -759,48 +782,51 @@ const UE_BUILTINS = [
         "UE.Expression(Class=\"${1:Sine}\", OutputType=\"${2:float1}\", Input=${3:UE.Time()})",
         "Creates any reflected MaterialExpression class.",
         [
-            { qualifier: "in", type: "value", name: "Class" },
-            { qualifier: "in", type: "value", name: "OutputType" },
-            { qualifier: "in", type: "value", name: "ResultType" },
-            { qualifier: "in", type: "value", name: "Output" },
-            { qualifier: "in", type: "value", name: "OutputName" },
-            { qualifier: "in", type: "value", name: "OutputIndex" },
+            { qualifier: "in", type: "string", name: "Class" },
+            { qualifier: "in", type: "string", name: "OutputType" },
+            { qualifier: "in", type: "string", name: "ResultType" },
+            { qualifier: "in", type: "string", name: "Output" },
+            { qualifier: "in", type: "string", name: "OutputName" },
+            { qualifier: "in", type: "int", name: "OutputIndex" },
+            // Input/A/B are generic expression-wire slots whose real type depends on which Class is
+            // chosen -- there's no single fixed type to show for this generic escape hatch (unlike a
+            // specific reflected node's own hover, which can name its actual pin type).
             { qualifier: "in", type: "value", name: "Input" },
             { qualifier: "in", type: "value", name: "A" },
             { qualifier: "in", type: "value", name: "B" },
             { qualifier: "in", type: "value", name: "True" },
             { qualifier: "in", type: "value", name: "False" },
-            { qualifier: "in", type: "value", name: "ParameterName" },
-            { qualifier: "in", type: "value", name: "DefaultValue" },
-            { qualifier: "in", type: "value", name: "DefaultR" },
-            { qualifier: "in", type: "value", name: "DefaultG" },
-            { qualifier: "in", type: "value", name: "DefaultB" },
-            { qualifier: "in", type: "value", name: "DefaultA" },
+            { qualifier: "in", type: "string", name: "ParameterName" },
+            { qualifier: "in", type: "float", name: "DefaultValue" },
+            { qualifier: "in", type: "bool", name: "DefaultR" },
+            { qualifier: "in", type: "bool", name: "DefaultG" },
+            { qualifier: "in", type: "bool", name: "DefaultB" },
+            { qualifier: "in", type: "bool", name: "DefaultA" },
             { qualifier: "in", type: "Path", name: "Texture" },
             { qualifier: "in", type: "Path", name: "TextureObject" },
             { qualifier: "in", type: "Path", name: "Curve" },
             { qualifier: "in", type: "Path", name: "Atlas" },
-            { qualifier: "in", type: "value", name: "CurveTime" },
-            { qualifier: "in", type: "value", name: "Coordinates" },
-            { qualifier: "in", type: "value", name: "MipValue" },
-            { qualifier: "in", type: "value", name: "CoordinatesDX" },
-            { qualifier: "in", type: "value", name: "CoordinatesDY" },
-            { qualifier: "in", type: "value", name: "AutomaticViewMipBiasValue" },
-            { qualifier: "in", type: "value", name: "SamplerType" },
-            { qualifier: "in", type: "value", name: "SamplerSource" },
-            { qualifier: "in", type: "value", name: "MipValueMode" },
-            { qualifier: "in", type: "value", name: "GatherMode" },
-            { qualifier: "in", type: "value", name: "AutomaticViewMipBias" },
-            { qualifier: "in", type: "value", name: "ConstCoordinate" },
-            { qualifier: "in", type: "value", name: "ConstMipValue" },
-            { qualifier: "in", type: "value", name: "UseCustomPrimitiveData" },
-            { qualifier: "in", type: "value", name: "PrimitiveDataIndex" },
-            { qualifier: "in", type: "value", name: "DynamicBranch" },
-            { qualifier: "in", type: "value", name: "Code" },
-            { qualifier: "in", type: "value", name: "Description" },
-            { qualifier: "in", type: "value", name: "Desc" },
-            { qualifier: "in", type: "value", name: "Group" },
-            { qualifier: "in", type: "value", name: "SortPriority" }
+            { qualifier: "in", type: "float", name: "CurveTime" },
+            { qualifier: "in", type: "float2", name: "Coordinates" },
+            { qualifier: "in", type: "float", name: "MipValue" },
+            { qualifier: "in", type: "float2", name: "CoordinatesDX" },
+            { qualifier: "in", type: "float2", name: "CoordinatesDY" },
+            { qualifier: "in", type: "float", name: "AutomaticViewMipBiasValue" },
+            { qualifier: "in", type: "string", name: "SamplerType" },
+            { qualifier: "in", type: "string", name: "SamplerSource" },
+            { qualifier: "in", type: "string", name: "MipValueMode" },
+            { qualifier: "in", type: "string", name: "GatherMode" },
+            { qualifier: "in", type: "bool", name: "AutomaticViewMipBias" },
+            { qualifier: "in", type: "int", name: "ConstCoordinate" },
+            { qualifier: "in", type: "int", name: "ConstMipValue" },
+            { qualifier: "in", type: "bool", name: "UseCustomPrimitiveData" },
+            { qualifier: "in", type: "int", name: "PrimitiveDataIndex" },
+            { qualifier: "in", type: "bool", name: "DynamicBranch" },
+            { qualifier: "in", type: "string", name: "Code" },
+            { qualifier: "in", type: "string", name: "Description" },
+            { qualifier: "in", type: "string", name: "Desc" },
+            { qualifier: "in", type: "string", name: "Group" },
+            { qualifier: "in", type: "int", name: "SortPriority" }
         ],
         "UE.Expression(Class=\"Sine\", OutputType=\"float1\", Input=UE.Time())"
     ),
@@ -810,10 +836,10 @@ const UE_BUILTINS = [
         "Reads a scalar or vector from a MaterialParameterCollection.",
         [
             { qualifier: "in", type: "Path", name: "Collection" },
-            { qualifier: "in", type: "value", name: "Parameter" },
-            { qualifier: "in", type: "value", name: "Group" },
-            { qualifier: "in", type: "value", name: "SortPriority" },
-            { qualifier: "in", type: "value", name: "Description" }
+            { qualifier: "in", type: "string", name: "Parameter" },
+            { qualifier: "in", type: "string", name: "Group" },
+            { qualifier: "in", type: "int", name: "SortPriority" },
+            { qualifier: "in", type: "string", name: "Description" }
         ],
         "UE.CollectionParam(Collection=Path(Game, MaterialParameterCollections/MPC_Global), Parameter=\"Value\")"
     ),
@@ -822,16 +848,17 @@ const UE_BUILTINS = [
         "UE.StaticSwitchParameter(Name=\"${1:UseDetail}\", Default=${2:true}, True=${3:Detail}, False=${4:Base})",
         "Creates an inline StaticSwitchParameter with True and False branches.",
         [
-            { qualifier: "in", type: "value", name: "Name" },
-            { qualifier: "in", type: "value", name: "ParameterName" },
-            { qualifier: "in", type: "value", name: "Default" },
-            { qualifier: "in", type: "value", name: "DefaultValue" },
+            { qualifier: "in", type: "string", name: "Name" },
+            { qualifier: "in", type: "string", name: "ParameterName" },
+            { qualifier: "in", type: "bool", name: "Default" },
+            { qualifier: "in", type: "bool", name: "DefaultValue" },
+            // True/False are the branch-value wires -- whatever type flows through both sides.
             { qualifier: "in", type: "value", name: "True" },
             { qualifier: "in", type: "value", name: "False" },
-            { qualifier: "in", type: "value", name: "DynamicBranch" },
-            { qualifier: "in", type: "value", name: "Group" },
-            { qualifier: "in", type: "value", name: "SortPriority" },
-            { qualifier: "in", type: "value", name: "Description" }
+            { qualifier: "in", type: "bool", name: "DynamicBranch" },
+            { qualifier: "in", type: "string", name: "Group" },
+            { qualifier: "in", type: "int", name: "SortPriority" },
+            { qualifier: "in", type: "string", name: "Description" }
         ],
         "UE.StaticSwitchParameter(Name=\"UseDetail\", Default=true, True=Detail, False=Base)"
     ),
@@ -840,16 +867,17 @@ const UE_BUILTINS = [
         "UE.StaticComponentMaskParameter(OutputType=\"${1:float3}\", Input=${2:Value}, ParameterName=\"${3:Mask}\", DefaultR=${4:true}, DefaultG=${5:true}, DefaultB=${6:true}, DefaultA=${7:false})",
         "Creates a reflected StaticComponentMaskParameter node.",
         [
-            { qualifier: "in", type: "value", name: "OutputType" },
+            { qualifier: "in", type: "string", name: "OutputType" },
+            // Input is the vector being masked -- its component count follows OutputType, not a fixed type.
             { qualifier: "in", type: "value", name: "Input" },
-            { qualifier: "in", type: "value", name: "ParameterName" },
-            { qualifier: "in", type: "value", name: "DefaultR" },
-            { qualifier: "in", type: "value", name: "DefaultG" },
-            { qualifier: "in", type: "value", name: "DefaultB" },
-            { qualifier: "in", type: "value", name: "DefaultA" },
-            { qualifier: "in", type: "value", name: "Group" },
-            { qualifier: "in", type: "value", name: "SortPriority" },
-            { qualifier: "in", type: "value", name: "Description" }
+            { qualifier: "in", type: "string", name: "ParameterName" },
+            { qualifier: "in", type: "bool", name: "DefaultR" },
+            { qualifier: "in", type: "bool", name: "DefaultG" },
+            { qualifier: "in", type: "bool", name: "DefaultB" },
+            { qualifier: "in", type: "bool", name: "DefaultA" },
+            { qualifier: "in", type: "string", name: "Group" },
+            { qualifier: "in", type: "int", name: "SortPriority" },
+            { qualifier: "in", type: "string", name: "Description" }
         ],
         "UE.StaticComponentMaskParameter(OutputType=\"float3\", Input=Value, ParameterName=\"Mask\", DefaultR=true, DefaultG=true, DefaultB=true, DefaultA=false)"
     ),
@@ -858,18 +886,18 @@ const UE_BUILTINS = [
         "UE.CurveAtlasRowParameter(OutputType=\"${1:float3}\", ParameterName=\"${2:CurveColor}\", DefaultValue=${3:0.0}, Curve=Path(${4:Game}, \"${5:Curves/C_Color}\"), Atlas=Path(${6:Game}, \"${7:Curves/CA_Atlas}\"), CurveTime=${8:0.0})",
         "Creates a reflected CurveAtlasRowParameter node. Its primary output is a 3-component color.",
         [
-            { qualifier: "in", type: "value", name: "OutputType" },
-            { qualifier: "in", type: "value", name: "ParameterName" },
-            { qualifier: "in", type: "value", name: "DefaultValue" },
+            { qualifier: "in", type: "string", name: "OutputType" },
+            { qualifier: "in", type: "string", name: "ParameterName" },
+            { qualifier: "in", type: "float", name: "DefaultValue" },
             { qualifier: "in", type: "Path", name: "Curve" },
             { qualifier: "in", type: "Path", name: "Atlas" },
-            { qualifier: "in", type: "value", name: "CurveTime" },
-            { qualifier: "in", type: "value", name: "UseCustomPrimitiveData" },
-            { qualifier: "in", type: "value", name: "PrimitiveDataIndex" },
-            { qualifier: "in", type: "value", name: "Group" },
-            { qualifier: "in", type: "value", name: "SortPriority" },
-            { qualifier: "in", type: "value", name: "Description" },
-            { qualifier: "in", type: "value", name: "Desc" }
+            { qualifier: "in", type: "float", name: "CurveTime" },
+            { qualifier: "in", type: "bool", name: "UseCustomPrimitiveData" },
+            { qualifier: "in", type: "int", name: "PrimitiveDataIndex" },
+            { qualifier: "in", type: "string", name: "Group" },
+            { qualifier: "in", type: "int", name: "SortPriority" },
+            { qualifier: "in", type: "string", name: "Description" },
+            { qualifier: "in", type: "string", name: "Desc" }
         ],
         "UE.CurveAtlasRowParameter(OutputType=\"float3\", ParameterName=\"CurveColor\", DefaultValue=0.0)"
     )

@@ -6,7 +6,8 @@ const vscode = require("vscode");
 const { readJsonFile } = require("../common/json");
 const { normalizeFsPath } = require("../common/path");
 const { collectKnownProjectRoots } = require("../project/projects");
-const { getDiagnosticsFilePath } = require("./paths");
+const { getDiagnosticsFilePath, getBridgeDatabasePath } = require("./paths");
+const { queryDiagnosticsFromDatabase } = require("./database");
 
 function createEmptyBridgeDiagnosticsState() {
     return {
@@ -26,12 +27,17 @@ function refreshBridgeDiagnostics(collection, state, activePath = "") {
     resetState(state);
     const roots = collectKnownProjectRoots(activePath);
     for (const root of roots) {
+        // The plugin dual-writes diagnostics to bridge.db alongside diagnostics.json (the JSON file
+        // is deprecated, scheduled for removal in DreamShader plugin 1.7.0). Prefer the database;
+        // fall back to JSON for older plugin versions or before the database has been generated once.
         const diagnosticsFilePath = getDiagnosticsFilePath(root);
-        if (!fs.existsSync(diagnosticsFilePath)) {
+        const fromDatabase = queryDiagnosticsFromDatabase(root);
+        const sourcePath = fromDatabase ? getBridgeDatabasePath(root) : diagnosticsFilePath;
+        if (!fromDatabase && !fs.existsSync(diagnosticsFilePath)) {
             continue;
         }
         state.hasAnyBridgeFile = true;
-        const parsed = readJsonFile(diagnosticsFilePath, null);
+        const parsed = fromDatabase || readJsonFile(diagnosticsFilePath, null);
         if (!parsed || !Array.isArray(parsed.files)) {
             continue;
         }
@@ -39,7 +45,7 @@ function refreshBridgeDiagnostics(collection, state, activePath = "") {
             type: "project",
             label: path.basename(root),
             projectRoot: normalizeFsPath(root),
-            diagnosticsFilePath,
+            diagnosticsFilePath: sourcePath,
             updatedAtUtc: parsed.updatedAtUtc || "",
             counts: createBridgeDiagnosticCounts(),
             fileEntries: []

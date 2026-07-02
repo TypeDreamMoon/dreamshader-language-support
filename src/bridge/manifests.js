@@ -1,5 +1,6 @@
 "use strict";
 
+const fs = require("fs");
 const path = require("path");
 const { readJsonFile } = require("../common/json");
 const {
@@ -11,9 +12,63 @@ const {
 } = require("../languageData");
 const { normalizeSymbolKey } = require("../language/utils");
 const { collectKnownProjectRoots, findProjectRoot } = require("../project/projects");
-const { getMaterialExpressionManifestPath, getSettingsManifestPath, getSubstrateBuiltinsManifestPath } = require("./paths");
+const {
+    getMaterialExpressionManifestPath,
+    getSettingsManifestPath,
+    getSubstrateBuiltinsManifestPath,
+    getBridgeDatabasePath
+} = require("./paths");
+const {
+    queryMaterialExpressionsFromDatabase,
+    querySubstrateBuiltinsFromDatabase,
+    querySettingsMappingsFromDatabase
+} = require("./database");
 
 const bundledMaterialExpressionManifestPath = path.join(__dirname, "..", "..", "resources", MATERIAL_EXPRESSION_MANIFEST_NAME);
+
+// Every completion keystroke re-triggers these lookups (every letter is a registered completion
+// trigger character), so re-reading/re-merging Bridge manifests from scratch on every call is
+// disk- and CPU-bound work repeated dozens of times a second while typing -- exactly the kind of
+// latency that can make a completion request lag behind the keystrokes that immediately follow it
+// (e.g. a stale "UE." completion list still being shown/accepted after "UE.A" was typed). These
+// functions are memoized against a cheap "file version" fingerprint (mtime+size, no content read)
+// of everything that can affect their result, so unless a Bridge file actually changed, repeat
+// calls just return the previously computed value instead of redoing the work.
+function getFileVersionTag(filePath) {
+    if (!filePath) {
+        return "0";
+    }
+    try {
+        const stat = fs.statSync(filePath);
+        return `${stat.mtimeMs}:${stat.size}`;
+    } catch (_error) {
+        return "0";
+    }
+}
+
+function memoizeByFileVersion(computeCacheKey, compute) {
+    let cache = { key: null, value: null };
+    return (...args) => {
+        const key = computeCacheKey(...args);
+        if (cache.key === key) {
+            return cache.value;
+        }
+        const value = compute(...args);
+        cache = { key, value };
+        return value;
+    };
+}
+
+// The plugin dual-writes these manifests to bridge.db alongside the legacy JSON files (the JSON
+// files are deprecated, scheduled for removal in DreamShader plugin 1.7.0). Prefer the database;
+// fall back to JSON for older plugin versions or before the database has been generated once.
+function readBridgeManifest(projectRoot, queryDatabase, jsonPath, fallback) {
+    const fromDatabase = queryDatabase(projectRoot);
+    if (fromDatabase) {
+        return fromDatabase;
+    }
+    return readJsonFile(jsonPath, fallback);
+}
 
 function getVscode() {
     try {
@@ -23,11 +78,26 @@ function getVscode() {
     }
 }
 
-function collectMaterialExpressionSymbols(document) {
+function getConfiguredMaterialExpressionManifestPath() {
+    return getVscode()?.workspace.getConfiguration("dreamshader").get("materialExpressionManifestPath", "") || "";
+}
+
+function computeMaterialExpressionSymbolsCacheKey(document) {
+    const activePath = document?.uri?.fsPath || document?.fileName || "";
+    const roots = collectKnownProjectRoots(activePath);
+    const configured = getConfiguredMaterialExpressionManifestPath();
+    const parts = [];
+    for (const root of roots) {
+        parts.push(getFileVersionTag(getBridgeDatabasePath(root)), getFileVersionTag(getMaterialExpressionManifestPath(root)));
+    }
+    parts.push(getFileVersionTag(configured), getFileVersionTag(bundledMaterialExpressionManifestPath));
+    return parts.join("|");
+}
+
+const collectMaterialExpressionSymbols = memoizeByFileVersion(computeMaterialExpressionSymbolsCacheKey, (document) => {
     const expressions = new Map();
-    const addManifest = (manifestPath) => {
-        const manifest = readJsonFile(manifestPath, { expressions: [] });
-        for (const expression of manifest.expressions || []) {
+    const addExpressions = (list) => {
+        for (const expression of list || []) {
             const name = String(expression.name || "").trim();
             const key = normalizeSymbolKey(name);
             if (name && !expressions.has(key)) {
@@ -38,20 +108,23 @@ function collectMaterialExpressionSymbols(document) {
 
     const activePath = document?.uri?.fsPath || document?.fileName || "";
     for (const root of collectKnownProjectRoots(activePath)) {
-        addManifest(getMaterialExpressionManifestPath(root));
+        const manifest = readBridgeManifest(root, queryMaterialExpressionsFromDatabase, getMaterialExpressionManifestPath(root), { expressions: [] });
+        addExpressions(manifest.expressions);
     }
 
-    const configured = getVscode()?.workspace.getConfiguration("dreamshader").get("materialExpressionManifestPath", "") || "";
+    // A user-configured override path and the extension's own bundled fallback are plain files,
+    // not part of a project's live Bridge output, so they're always read as JSON.
+    const configured = getConfiguredMaterialExpressionManifestPath();
     if (configured) {
-        addManifest(configured);
+        addExpressions(readJsonFile(configured, { expressions: [] }).expressions);
     }
-    addManifest(bundledMaterialExpressionManifestPath);
+    addExpressions(readJsonFile(bundledMaterialExpressionManifestPath, { expressions: [] }).expressions);
 
     return Array.from(expressions.values()).sort((left, right) =>
         String(left.name || "").localeCompare(String(right.name || "")));
-}
+});
 
-function getUEBuiltinItemsForDocument(document) {
+const getUEBuiltinItemsForDocument = memoizeByFileVersion(computeMaterialExpressionSymbolsCacheKey, (document) => {
     const items = [...UE_BUILTINS];
     const seen = new Set(items.flatMap((item) => [
         normalizeSymbolKey(item.name),
@@ -73,45 +146,58 @@ function getUEBuiltinItemsForDocument(document) {
         seen.add(qualifiedKey);
     }
     return items;
-}
+});
 
-function collectDreamShaderSettingMappings(document, mappingName) {
-    const projectRoot = findProjectRoot(document?.uri?.fsPath || document?.fileName || "");
-    const manifest = readJsonFile(getSettingsManifestPath(projectRoot), { mappings: {} });
-    const values = manifest.mappings?.[mappingName] || [];
-    return values
-        .map((entry) => typeof entry === "string" ? { alias: entry, name: entry, displayName: entry } : entry)
-        .filter((entry) => entry && entry.alias);
-}
+const collectDreamShaderSettingMappings = memoizeByFileVersion(
+    (document, mappingName) => {
+        const projectRoot = findProjectRoot(document?.uri?.fsPath || document?.fileName || "");
+        return `${mappingName}|${getFileVersionTag(getBridgeDatabasePath(projectRoot))}|${getFileVersionTag(getSettingsManifestPath(projectRoot))}`;
+    },
+    (document, mappingName) => {
+        const projectRoot = findProjectRoot(document?.uri?.fsPath || document?.fileName || "");
+        const manifest = readBridgeManifest(projectRoot, querySettingsMappingsFromDatabase, getSettingsManifestPath(projectRoot), { mappings: {} });
+        const values = manifest.mappings?.[mappingName] || [];
+        return values
+            .map((entry) => typeof entry === "string" ? { alias: entry, name: entry, displayName: entry } : entry)
+            .filter((entry) => entry && entry.alias);
+    }
+);
 
-function getSubstrateBuiltinItemsForDocument(document) {
-    const activePath = document?.uri?.fsPath || document?.fileName || "";
-    const items = [];
-    const seen = new Set();
+const getSubstrateBuiltinItemsForDocument = memoizeByFileVersion(
+    (document) => {
+        const activePath = document?.uri?.fsPath || document?.fileName || "";
+        const roots = collectKnownProjectRoots(activePath);
+        return roots.map((root) => `${getFileVersionTag(getBridgeDatabasePath(root))}|${getFileVersionTag(getSubstrateBuiltinsManifestPath(root))}`).join(",");
+    },
+    (document) => {
+        const activePath = document?.uri?.fsPath || document?.fileName || "";
+        const items = [];
+        const seen = new Set();
 
-    const addItem = (item) => {
-        const normalized = normalizeSubstrateBuiltinManifestEntry(item);
-        const key = normalizeSymbolKey(normalized?.name);
-        if (!normalized || !key || seen.has(key)) {
-            return;
+        const addItem = (item) => {
+            const normalized = normalizeSubstrateBuiltinManifestEntry(item);
+            const key = normalizeSymbolKey(normalized?.name);
+            if (!normalized || !key || seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            items.push(normalized);
+        };
+
+        for (const root of collectKnownProjectRoots(activePath)) {
+            const manifest = readBridgeManifest(root, querySubstrateBuiltinsFromDatabase, getSubstrateBuiltinsManifestPath(root), { builtins: [] });
+            for (const item of manifest.builtins || []) {
+                addItem(item);
+            }
         }
-        seen.add(key);
-        items.push(normalized);
-    };
 
-    for (const root of collectKnownProjectRoots(activePath)) {
-        const manifest = readJsonFile(getSubstrateBuiltinsManifestPath(root), { builtins: [] });
-        for (const item of manifest.builtins || []) {
+        for (const item of SUBSTRATE_BUILTIN_ITEMS) {
             addItem(item);
         }
-    }
 
-    for (const item of SUBSTRATE_BUILTIN_ITEMS) {
-        addItem(item);
+        return items.sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")));
     }
-
-    return items.sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")));
-}
+);
 
 function normalizeSubstrateBuiltinManifestEntry(entry) {
     const name = String(entry?.name || "").trim();
