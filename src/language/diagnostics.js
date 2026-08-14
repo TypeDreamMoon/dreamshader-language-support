@@ -386,9 +386,15 @@ function addFunctionDiagnostics(diagnostics, ast, reachableCallables, substrateB
             }
         }
         if (!sawOut) {
-            // The compiler makes this an error ("must declare"); kept a warning here, but carrying
-            // its code so the two are recognisably the same rule.
-            diagnostics.push(makeDiagnostic(block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length), `${block.kind} '${block.name}' should declare at least one out parameter.`, SEVERITY.Warning, "DSH3011"));
+            // An error, as it is in the compiler: a function with no output is a hard parse failure
+            // there, and the condition is decided entirely from this block's own signature, so
+            // there is no uncertainty for a warning to represent. Reporting it softer than the
+            // build does is the "editor says fine, build says no" failure in miniature.
+            //
+            // The kind is this file's ("GraphFunction 'X'..." where the compiler always says
+            // "Function 'X'..."), which the compiler's own code contract allows: the DSHnnnn is the
+            // identity, and that is precisely what frees the text.
+            diagnostics.push(makeDiagnostic(block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length), `${block.kind} '${block.name}' must declare at least one out parameter.`, SEVERITY.Error, "DSH3011"));
         }
 
         addBareReturnDiagnostics(diagnostics, block);

@@ -20,9 +20,13 @@ than none, because the code is the half that is promised not to change.
 message, and every `DSHnnnn` this extension emits must appear in the compiler's published pages, so
 a typo or a renumbering fails the build.
 
-> `DSH3011` is an error in the compiler ("must declare at least one out parameter") and stays a
-> warning here. The code is shared because the rule is the same; the severity difference is
-> deliberate and unchanged from before.
+**`DSH3011` is now an error, not a warning.** A function with no output is a hard parse failure in
+the compiler, and the condition is decided entirely from the block's own signature — there is no
+uncertainty for a warning to represent, so reporting it softer than the build does was the "editor
+says fine, build says no" failure in miniature. The message follows suit ("must declare at least one
+out parameter"), except that it still names the actual kind: the compiler says "Function" even for a
+GraphFunction, and its own code contract is what allows the difference — the `DSHnnnn` is the
+identity, which is precisely what frees the text.
 
 ### Aligned with the compiler
 
