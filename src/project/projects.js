@@ -4,21 +4,10 @@ const fs = require("fs");
 const path = require("path");
 const { DREAMSHADER_EXTENSIONS } = require("../languageData");
 const { normalizeFsPath } = require("../common/path");
-
-function getVscode() {
-    try {
-        return require("vscode");
-    } catch (_error) {
-        return null;
-    }
-}
+const { host } = require("../host");
 
 function getConfiguredProjectRoot() {
-    const vscode = getVscode();
-    if (!vscode) {
-        return "";
-    }
-    const configured = vscode.workspace.getConfiguration("dreamshader").get("projectRoot", "");
+    const configured = host().getSetting("projectRoot", "");
     return configured ? path.resolve(configured) : "";
 }
 
@@ -54,18 +43,14 @@ function computeProjectRoot(inputPath) {
 
     const startPath = inputPath
         ? (fs.existsSync(inputPath) && fs.statSync(inputPath).isDirectory() ? inputPath : path.dirname(inputPath))
-        : getVscode()?.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
-    const discovered = findUp(startPath, (directory) =>
-        fs.readdirSync(directory, { withFileTypes: true }).some((entry) =>
-            entry.isFile() && entry.name.toLowerCase().endsWith(".uproject")));
+        : host().getWorkspaceFolderPaths()[0] || "";
+    const discovered = findUp(startPath, containsUproject);
     if (discovered) {
         return normalizeFsPath(discovered);
     }
 
-    for (const folder of getVscode()?.workspace.workspaceFolders || []) {
-        const root = findUp(folder.uri.fsPath, (directory) =>
-            fs.readdirSync(directory, { withFileTypes: true }).some((entry) =>
-                entry.isFile() && entry.name.toLowerCase().endsWith(".uproject")));
+    for (const folderPath of host().getWorkspaceFolderPaths()) {
+        const root = findUp(folderPath, containsUproject);
         if (root) {
             return normalizeFsPath(root);
         }
@@ -80,24 +65,14 @@ function findProjectRootForCommand() {
         return configuredRoot;
     }
 
-    const vscode = getVscode();
-    const candidates = [];
-    const document = vscode?.window.activeTextEditor?.document;
-    if (document?.uri?.fsPath) {
-        candidates.push(document.uri.fsPath);
-    }
-
-    for (const openDocument of vscode?.workspace.textDocuments || []) {
-        if (openDocument?.uri?.fsPath) {
-            candidates.push(openDocument.uri.fsPath);
-        }
-    }
-
-    for (const folder of vscode?.workspace.workspaceFolders || []) {
-        if (folder?.uri?.fsPath) {
-            candidates.push(folder.uri.fsPath);
-        }
-    }
+    // Commands only, which is why this is the one place that reaches for the focused editor. On the
+    // server side every one of these is empty and the configured root above is the only answer --
+    // correctly so: nothing here is reachable from a language request.
+    const candidates = [
+        host().getActiveDocumentPath(),
+        ...host().getOpenDocumentPaths(),
+        ...host().getWorkspaceFolderPaths()
+    ].filter(Boolean);
 
     for (const candidate of candidates) {
         const root = findProjectRootFromCandidate(candidate);
@@ -147,8 +122,8 @@ function collectKnownProjectRoots(activePath = "") {
     if (activeRoot) {
         roots.add(normalizeFsPath(activeRoot));
     }
-    for (const folder of getVscode()?.workspace.workspaceFolders || []) {
-        const root = findProjectRoot(folder.uri.fsPath);
+    for (const folderPath of host().getWorkspaceFolderPaths()) {
+        const root = findProjectRoot(folderPath);
         if (root) {
             roots.add(normalizeFsPath(root));
         }

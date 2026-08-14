@@ -385,8 +385,10 @@
   },
   "scripts": {
     "test:language": "node scripts/language-smoke.js",
+    "test:server": "node scripts/server-smoke.js",
+    "test:corpus": "node scripts/corpus-smoke.js",
     "test:extension": "node scripts/run-extension-tests.js",
-    "test": "npm run test:language && npm run test:extension",
+    "test": "npm run test:language && npm run test:server && npm run test:corpus && npm run test:extension",
     "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
@@ -394,6 +396,10 @@
     "@vscode/vsce": "^3.2.2"
   },
   "dependencies": {
-    "sql.js": "^1.14.1"
+    "sql.js": "^1.14.1",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "vscode-uri": "^3.1.0"
   }
 }

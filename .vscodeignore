@@ -14,3 +14,16 @@ node_modules/sql.js/dist/sql-wasm-debug*
 node_modules/sql.js/dist/worker.*
 node_modules/sql.js/*.md
 node_modules/sql.js/.*
+
+# The language-server stack ships source maps and typings alongside its JavaScript. Nothing loads
+# either at runtime -- they are for people developing against the packages, not for the editor
+# running them -- and together they are close to a megabyte, about a third of what the .vsix carries
+# in node_modules. The extension is not bundled (src/bridge/database.js resolves sql.js's WASM
+# through require.resolve, which a bundler would leave pointing at nothing), so this is the trim
+# that is available instead.
+node_modules/vscode-json*/**/*.js.map
+node_modules/vscode-json*/**/*.d.ts
+node_modules/vscode-language*/**/*.js.map
+node_modules/vscode-language*/**/*.d.ts
+node_modules/vscode-uri/**/*.js.map
+node_modules/vscode-uri/**/*.d.ts

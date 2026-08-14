@@ -11,8 +11,14 @@ async function run() {
     const workspaceRoot = prepareWorkspace();
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     assert(extension, `Expected extension ${EXTENSION_ID} to be installed`);
-    await extension.activate();
+    const api = await extension.activate();
     assert.strictEqual(extension.isActive, true, "Extension should activate");
+
+    // Activation deliberately does not wait for the language server -- a server that fails to start
+    // should not take the commands down with it. Everything below asks the editor to run a provider,
+    // though, and until the client has finished starting there is nothing registered to answer.
+    assert(api?.ready, "Extension should expose its language-server readiness");
+    await api.ready;
 
     await assertContributedCommandsRegistered();
 

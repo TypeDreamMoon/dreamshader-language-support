@@ -265,11 +265,39 @@ Install dependencies:
 npm install
 ```
 
-Run language smoke tests:
+Run the tests. Four tiers, each catching what the one below it cannot: `test:language` imports the
+language layer directly, `test:server` spawns the language server and holds an LSP conversation with
+it over stdio, `test:corpus` checks this half against the compiler's own corpus, and
+`test:extension` drives a real VS Code:
 
 ```powershell
-npm run test:language
+npm test
 ```
+
+`test:corpus` is opt-in, because the plugin is not part of this repository. Point it at one and it
+asserts both directions — nothing flagged on a source the compiler accepts, and a matching
+diagnostic on each source it rejects for a reason visible in the text:
+
+```powershell
+$env:DREAMSHADER_CORPUS_DIR = 'I:\...\Plugins\DreamShader'; npm run test:corpus
+```
+
+### Architecture
+
+The extension is two processes. `src/server/` is a standard LSP server carrying all fourteen
+language providers and the diagnostics derived from the source; `src/activate.js` is the client,
+which keeps everything that is not a question about the text — the preview, the package store, the
+Bridge diagnostics tree and its `dreamshader` collection, the status bar, the commands.
+
+`src/language/` imports neither `vscode` nor the protocol, which is what let the providers move
+without touching it. Where the layer needs to know about the world around it — a setting, the
+workspace folders — it asks `src/host.js`, which each process fills in for itself.
+
+It is deliberately not bundled: `src/bridge/database.js` locates sql.js's WASM through
+`require.resolve`, which a bundler would leave pointing at nothing.
+
+`F5` launches an Extension Development Host. To put breakpoints in the server as well, run the
+**Extension + Server** compound, which attaches a second debugger to port 6018.
 
 Package the extension:
 

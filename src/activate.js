@@ -1,28 +1,40 @@
 "use strict";
 
+// DreamShaderLang: the client half.
+//
+// What is left here after the language moved into `src/server/` is everything that is not a question
+// about the text: the Bridge diagnostics the engine reported, the tree and status bar that show
+// them, the preview, the package store, and the commands. None of it has a protocol spelling, and
+// inventing one would have meant a second protocol carrying webviews.
+//
+// The two diagnostic collections stay separate and stay where they always were on the page: this
+// process owns `dreamshader`, which is what a recompile said; the server owns `dreamshader-local`,
+// which is what the source says. One owner would let either result wipe the other depending on
+// which finished last -- a hazard that the split into two processes does not change and does not
+// create.
+
 const vscode = require("vscode");
-const {
-    BRIDGE_DIAGNOSTIC_COLLECTION_NAME,
-    LOCAL_DIAGNOSTIC_COLLECTION_NAME
-} = require("./languageData");
+const { BRIDGE_DIAGNOSTIC_COLLECTION_NAME } = require("./languageData");
 const { createDebouncedDisposable } = require("./common/debounce");
 const { createEmptyBridgeDiagnosticsState, refreshBridgeDiagnostics } = require("./bridge/diagnostics");
 const { initializeBridgeDatabaseSupport } = require("./bridge/database");
 const { createBridgeDiagnosticsTreeProvider } = require("./vscode/views/bridgeDiagnostics");
-const { registerLanguageProviders, refreshAllLocalDiagnostics, refreshLocalDiagnosticsForDocument } = require("./vscode/providers/languageProviders");
-const { createLanguageIndexCache } = require("./vscode/languageIndexCache");
 const { updateStatusBar } = require("./vscode/statusBar");
 const { registerCommands } = require("./vscode/commands");
+const { installVscodeHost } = require("./vscode/host");
+const { createLanguageClient } = require("./vscode/languageClient");
 const { collectKnownProjectRoots, invalidateProjectRootCache } = require("./project/projects");
 
 function activate(context) {
+    // First, before anything asks for a project root: the shared language modules resolve one
+    // through the host, and this process has to say which one it is.
+    installVscodeHost();
+
     const bridgeDiagnostics = vscode.languages.createDiagnosticCollection(BRIDGE_DIAGNOSTIC_COLLECTION_NAME);
-    const localDiagnostics = vscode.languages.createDiagnosticCollection(LOCAL_DIAGNOSTIC_COLLECTION_NAME);
-    const languageIndexCache = createLanguageIndexCache();
-    const languageServices = { languageIndexCache };
     const bridgeState = createEmptyBridgeDiagnosticsState();
     const bridgeTreeProvider = createBridgeDiagnosticsTreeProvider(bridgeState);
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    const language = createLanguageClient(context);
 
     const refreshUi = () => {
         bridgeTreeProvider.refresh();
@@ -31,67 +43,44 @@ function activate(context) {
     const refreshBridge = async () => {
         refreshBridgeDiagnostics(bridgeDiagnostics, bridgeState, vscode.window.activeTextEditor?.document?.fileName || "");
         refreshUi();
+        // The same files feed the manifests the server reads for completion and for the local
+        // diagnostics, and it has no watcher of its own on them -- see the note in lspProtocol.js.
+        language.notifyBridgeChanged();
     };
     const debouncedBridgeRefresh = createDebouncedDisposable(() => void refreshBridge(), 200);
-    const debouncedLocalRefresh = createDebouncedDisposable((document) => {
-        refreshLocalDiagnosticsForDocument(document, localDiagnostics, languageServices);
-    }, 150);
-    const debouncedAllLocalRefresh = createDebouncedDisposable(() => {
-        refreshAllLocalDiagnostics(localDiagnostics, languageServices);
-    }, 150);
     const bridgeWatcherState = { rootsKey: "", watchers: [] };
     const refreshBridgeWatchers = () => updateBridgeWatchers(context, bridgeWatcherState, debouncedBridgeRefresh);
-    const importWatcher = vscode.workspace.createFileSystemWatcher("**/*.{dsh,dsf}");
-    const handleImportFileChange = (uri) => {
-        languageIndexCache.invalidatePath(uri.fsPath);
-        debouncedAllLocalRefresh.run();
-    };
-    importWatcher.onDidCreate(() => {
-        languageIndexCache.invalidateAll();
-        debouncedAllLocalRefresh.run();
-    });
-    importWatcher.onDidChange(handleImportFileChange);
-    importWatcher.onDidDelete(handleImportFileChange);
 
     context.subscriptions.push(
         bridgeDiagnostics,
-        localDiagnostics,
         bridgeTreeProvider,
         statusBar,
         debouncedBridgeRefresh,
-        debouncedLocalRefresh,
-        debouncedAllLocalRefresh,
-        importWatcher,
+        { dispose: () => void language.stop() },
         vscode.window.createTreeView("dreamshader.bridgeDiagnostics", {
             treeDataProvider: bridgeTreeProvider,
             showCollapseAll: true
         })
     );
 
-    registerLanguageProviders(context, localDiagnostics, languageServices);
     registerCommands(context, { refreshBridge });
 
     context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument((document) => {
-            refreshLocalDiagnosticsForDocument(document, localDiagnostics, languageServices);
+        vscode.workspace.onDidOpenTextDocument(() => {
             refreshBridgeWatchers();
             void refreshBridge();
         }),
-        vscode.workspace.onDidChangeTextDocument((event) => {
-            languageIndexCache.invalidateDocument(event.document.uri);
-            debouncedLocalRefresh.run(event.document);
+        vscode.workspace.onDidChangeTextDocument(() => {
             refreshUi();
         }),
-        vscode.workspace.onDidCloseTextDocument((document) => {
-            languageIndexCache.invalidateDocument(document.uri);
-            localDiagnostics.delete(document.uri);
+        vscode.workspace.onDidCloseTextDocument(() => {
             refreshBridgeWatchers();
             void refreshBridge();
         }),
         vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            // The server keeps its own copy of this cache and clears it from its own
+            // `didChangeWorkspaceFolders`; this one is for the commands that run on this side.
             invalidateProjectRootCache();
-            languageIndexCache.invalidateAll();
-            refreshAllLocalDiagnostics(localDiagnostics, languageServices);
             refreshBridgeWatchers();
             void refreshBridge();
         }),
@@ -100,8 +89,6 @@ function activate(context) {
                 return;
             }
             invalidateProjectRootCache();
-            languageIndexCache.invalidateAll();
-            refreshAllLocalDiagnostics(localDiagnostics, languageServices);
             void refreshBridge();
         }),
         vscode.window.onDidChangeActiveTextEditor(() => {
@@ -112,20 +99,32 @@ function activate(context) {
     );
 
     refreshBridgeWatchers();
-    refreshAllLocalDiagnostics(localDiagnostics, languageServices);
     void refreshBridge();
     refreshUi();
 
-    // sql.js's WASM module loads asynchronously; refresh once it's ready so completions/hover and
-    // the diagnostics view pick up bridge.db instead of the (now deprecated) JSON Bridge files as
-    // soon as possible, rather than waiting for the next unrelated trigger.
+    // sql.js's WASM module loads asynchronously; refresh once it's ready so the diagnostics view
+    // picks up bridge.db instead of the (now deprecated) JSON Bridge files as soon as possible,
+    // rather than waiting for the next unrelated trigger. The server loads its own copy for the
+    // manifests behind completion, and does the same thing when it lands.
     void initializeBridgeDatabaseSupport().then((SQL) => {
         if (SQL) {
-            languageIndexCache.invalidateAll();
-            refreshAllLocalDiagnostics(localDiagnostics, languageServices);
             void refreshBridge();
         }
     });
+
+    // Not awaited: a server that failed to start should cost completion and the live diagnostics,
+    // not the recompile button or the preview. Attaching the handler here is also what keeps a
+    // failure from surfacing as an unhandled rejection when nobody holds the promise below.
+    const ready = language.start();
+    ready.catch((error) => {
+        void vscode.window.showErrorMessage(
+            `DreamShaderLang: the language server did not start (${String(error)}), so completion, hover and live diagnostics are off.`);
+    });
+
+    // Returned so that a caller who does need the language features to exist can wait for them.
+    // The integration tests are that caller: they ask the editor to run a completion, and before
+    // the client has finished starting there is no provider registered to answer.
+    return { ready };
 }
 
 function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {

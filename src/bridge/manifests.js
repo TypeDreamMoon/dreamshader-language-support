@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { readJsonFile } = require("../common/json");
+const { host } = require("../host");
 const {
     MATERIAL_EXPRESSION_MANIFEST_NAME,
     SETTINGS_MANIFEST_NAME,
@@ -70,20 +71,15 @@ function readBridgeManifest(projectRoot, queryDatabase, jsonPath, fallback) {
     return readJsonFile(jsonPath, fallback);
 }
 
-function getVscode() {
-    try {
-        return require("vscode");
-    } catch (_error) {
-        return null;
-    }
-}
-
 function getConfiguredMaterialExpressionManifestPath() {
-    return getVscode()?.workspace.getConfiguration("dreamshader").get("materialExpressionManifestPath", "") || "";
+    return host().getSetting("materialExpressionManifestPath", "") || "";
 }
 
-function computeMaterialExpressionSymbolsCacheKey(document) {
-    const activePath = document?.uri?.fsPath || document?.fileName || "";
+// Everything below takes `activePath` -- the absolute path of the file being served -- rather than
+// a document. It only ever wanted the path, and taking the document meant taking a `vscode` one:
+// the protocol's `TextDocument.uri` is a string, so `document.uri.fsPath` would have read as
+// undefined here and quietly narrowed every lookup to the no-project case.
+function computeMaterialExpressionSymbolsCacheKey(activePath) {
     const roots = collectKnownProjectRoots(activePath);
     const configured = getConfiguredMaterialExpressionManifestPath();
     const parts = [];
@@ -94,7 +90,7 @@ function computeMaterialExpressionSymbolsCacheKey(document) {
     return parts.join("|");
 }
 
-const collectMaterialExpressionSymbols = memoizeByFileVersion(computeMaterialExpressionSymbolsCacheKey, (document) => {
+const collectMaterialExpressionSymbols = memoizeByFileVersion(computeMaterialExpressionSymbolsCacheKey, (activePath) => {
     const expressions = new Map();
     const addExpressions = (list) => {
         for (const expression of list || []) {
@@ -106,7 +102,6 @@ const collectMaterialExpressionSymbols = memoizeByFileVersion(computeMaterialExp
         }
     };
 
-    const activePath = document?.uri?.fsPath || document?.fileName || "";
     for (const root of collectKnownProjectRoots(activePath)) {
         const manifest = readBridgeManifest(root, queryMaterialExpressionsFromDatabase, getMaterialExpressionManifestPath(root), { expressions: [] });
         addExpressions(manifest.expressions);
@@ -124,14 +119,14 @@ const collectMaterialExpressionSymbols = memoizeByFileVersion(computeMaterialExp
         String(left.name || "").localeCompare(String(right.name || "")));
 });
 
-const getUEBuiltinItemsForDocument = memoizeByFileVersion(computeMaterialExpressionSymbolsCacheKey, (document) => {
+const getUEBuiltinItems = memoizeByFileVersion(computeMaterialExpressionSymbolsCacheKey, (activePath) => {
     const items = [...UE_BUILTINS];
     const seen = new Set(items.flatMap((item) => [
         normalizeSymbolKey(item.name),
         normalizeSymbolKey(item.qualifiedName)
     ]));
 
-    for (const expression of collectMaterialExpressionSymbols(document)) {
+    for (const expression of collectMaterialExpressionSymbols(activePath)) {
         const item = createUEBuiltinItemFromManifestExpression(expression);
         if (!item) {
             continue;
@@ -149,12 +144,12 @@ const getUEBuiltinItemsForDocument = memoizeByFileVersion(computeMaterialExpress
 });
 
 const collectDreamShaderSettingMappings = memoizeByFileVersion(
-    (document, mappingName) => {
-        const projectRoot = findProjectRoot(document?.uri?.fsPath || document?.fileName || "");
+    (activePath, mappingName) => {
+        const projectRoot = findProjectRoot(activePath);
         return `${mappingName}|${getFileVersionTag(getBridgeDatabasePath(projectRoot))}|${getFileVersionTag(getSettingsManifestPath(projectRoot))}`;
     },
-    (document, mappingName) => {
-        const projectRoot = findProjectRoot(document?.uri?.fsPath || document?.fileName || "");
+    (activePath, mappingName) => {
+        const projectRoot = findProjectRoot(activePath);
         const manifest = readBridgeManifest(projectRoot, querySettingsMappingsFromDatabase, getSettingsManifestPath(projectRoot), { mappings: {} });
         const values = manifest.mappings?.[mappingName] || [];
         return values
@@ -163,14 +158,12 @@ const collectDreamShaderSettingMappings = memoizeByFileVersion(
     }
 );
 
-const getSubstrateBuiltinItemsForDocument = memoizeByFileVersion(
-    (document) => {
-        const activePath = document?.uri?.fsPath || document?.fileName || "";
+const getSubstrateBuiltinItems = memoizeByFileVersion(
+    (activePath) => {
         const roots = collectKnownProjectRoots(activePath);
         return roots.map((root) => `${getFileVersionTag(getBridgeDatabasePath(root))}|${getFileVersionTag(getSubstrateBuiltinsManifestPath(root))}`).join(",");
     },
-    (document) => {
-        const activePath = document?.uri?.fsPath || document?.fileName || "";
+    (activePath) => {
         const items = [];
         const seen = new Set();
 
@@ -286,8 +279,8 @@ function getSubstrateBuiltinFallbackOutputs(entry) {
 
 module.exports = {
     collectMaterialExpressionSymbols,
-    getUEBuiltinItemsForDocument,
-    getSubstrateBuiltinItemsForDocument,
+    getUEBuiltinItems,
+    getSubstrateBuiltinItems,
     collectDreamShaderSettingMappings,
     MATERIAL_EXPRESSION_MANIFEST_NAME,
     SETTINGS_MANIFEST_NAME
