@@ -79,7 +79,8 @@ function addShaderBlockDiagnostics(diagnostics, ast) {
             block.kindOffset,
             block.kindOffset + "Shader".length,
             "Only one top-level Shader block is currently supported.",
-            SEVERITY.Error));
+            SEVERITY.Error,
+            "DSH3030"));
     }
 
     for (const block of shaders) {
@@ -92,7 +93,8 @@ function addShaderBlockDiagnostics(diagnostics, ast) {
                 block.kindOffset,
                 block.kindOffset + "Shader".length,
                 "Shader(Name=\"...\") is required.",
-                SEVERITY.Error));
+                SEVERITY.Error,
+                "DSH3031"));
         }
     }
 }
@@ -384,7 +386,9 @@ function addFunctionDiagnostics(diagnostics, ast, reachableCallables, substrateB
             }
         }
         if (!sawOut) {
-            diagnostics.push(makeDiagnostic(block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length), `${block.kind} '${block.name}' should declare at least one out parameter.`, SEVERITY.Warning));
+            // The compiler makes this an error ("must declare"); kept a warning here, but carrying
+            // its code so the two are recognisably the same rule.
+            diagnostics.push(makeDiagnostic(block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length), `${block.kind} '${block.name}' should declare at least one out parameter.`, SEVERITY.Warning, "DSH3011"));
         }
 
         addBareReturnDiagnostics(diagnostics, block);
@@ -444,7 +448,8 @@ function addBareReturnDiagnostics(diagnostics, block) {
                 block.bodyOffset + index,
                 block.bodyOffset + probe + 1,
                 "A function with a return type cannot use a bare 'return;'. Return a value, e.g. 'return expr;'.",
-                SEVERITY.Error));
+                SEVERITY.Error,
+                "DSH3012"));
         }
         index += 5;
     }
@@ -501,7 +506,7 @@ function addLayoutDiagnostics(diagnostics, section) {
         }
 
         for (const duplicate of args.duplicates) {
-            diagnostics.push(makeDiagnostic(duplicate.nameOffset, duplicate.nameOffset + duplicate.name.length, `Layout argument '${duplicate.name}' is declared more than once.`, SEVERITY.Error));
+            diagnostics.push(makeDiagnostic(duplicate.nameOffset, duplicate.nameOffset + duplicate.name.length, `Layout argument '${duplicate.name}' is declared more than once.`, SEVERITY.Error, "DSH3105"));
         }
 
         if (layoutKind === "node") {
@@ -562,7 +567,7 @@ function validateOptionalColorLayoutArgument(diagnostics, args) {
         return;
     }
     if (!/^float4\s*\(\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*,\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[fF])?\s*\)$/i.test(unquote(arg.valueText).trim())) {
-        diagnostics.push(makeDiagnostic(arg.valueOffset, arg.endOffset, "Layout Comment Color must be a float4 literal.", SEVERITY.Error));
+        diagnostics.push(makeDiagnostic(arg.valueOffset, arg.endOffset, "Layout Comment Color must be a float4 literal.", SEVERITY.Error, "DSH3110"));
     }
 }
 
@@ -1340,13 +1345,30 @@ function normalizePath(value) {
     return String(value || "").replace(/\\/g, "/").toLowerCase();
 }
 
-function makeDiagnostic(startOffset, endOffset, message, severity = SEVERITY.Error) {
-    return {
+/**
+ * `code` is the compiler's DSHnnnn, on the sites that report the same rule it does.
+ *
+ * From `DreamShaderDiagnostic.h`: "The code is the identity. Tests, the diagnose skill, the corpus
+ * expectations and the editor extensions all key off it, so it must not change once published --
+ * which is precisely what frees the message text to be reworded." So a code is only attached where
+ * this reports the *same rule*, not merely something that reads alike; a wrong code is worse than
+ * none, because it is the half that is promised to be stable.
+ *
+ * Most diagnostics here have no code, and that is the expected state rather than a gap. Some are
+ * this extension's own (nothing in the compiler corresponds), and the compiler's own migration is
+ * partway through -- four of its nine ranges are tagged so far.
+ */
+function makeDiagnostic(startOffset, endOffset, message, severity = SEVERITY.Error, code = "") {
+    const diagnostic = {
         startOffset: Math.max(0, startOffset || 0),
         endOffset: Math.max(Math.max(0, startOffset || 0), endOffset || startOffset || 0),
         message,
         severity
     };
+    if (code) {
+        diagnostic.code = code;
+    }
+    return diagnostic;
 }
 
 function dedupeDiagnostics(diagnostics) {

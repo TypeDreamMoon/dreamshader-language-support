@@ -479,18 +479,34 @@ function formatting(document, options) {
 
 // ------------------------------------------------------------------- diagnostics
 
+const DIAGNOSTIC_SOURCE = "dreamshaderlang";
+const DIAGNOSTIC_DOCS_BASE = "https://github.com/TypeDreamMoon/DreamShader/blob/main/Docs/diagnostics";
+
 function diagnostics(document, services) {
     return languageCore
         .getDiagnostics(document.getText(), fileNameOf(document), createLanguageServices(document, services))
-        .map((entry) => ({
-            range: rangeFromOffsets(document, entry.startOffset, entry.endOffset),
-            message: entry.message,
-            severity: entry.severity === "Error"
-                ? DiagnosticSeverity.Error
-                : entry.severity === "Information"
-                    ? DiagnosticSeverity.Information
-                    : DiagnosticSeverity.Warning
-        }));
+        .map((entry) => {
+            const diagnostic = {
+                range: rangeFromOffsets(document, entry.startOffset, entry.endOffset),
+                message: entry.message,
+                severity: entry.severity === "Error"
+                    ? DiagnosticSeverity.Error
+                    : entry.severity === "Information"
+                        ? DiagnosticSeverity.Information
+                        : DiagnosticSeverity.Warning,
+                source: DIAGNOSTIC_SOURCE
+            };
+
+            // A DSHnnnn is the compiler's stable identity for a rule, and each range owns the doc
+            // page of the same name -- so the code is worth carrying, and worth making clickable.
+            if (entry.code) {
+                diagnostic.code = entry.code;
+                diagnostic.codeDescription = {
+                    href: `${DIAGNOSTIC_DOCS_BASE}/${entry.code.slice(0, 4)}xxx.md#${entry.code.toLowerCase()}`
+                };
+            }
+            return diagnostic;
+        });
 }
 
 // --------------------------------------------------------------------- code lens

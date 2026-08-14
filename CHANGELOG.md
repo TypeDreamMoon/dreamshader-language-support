@@ -4,6 +4,26 @@
 
 First Marketplace release. The extension now ships with the plugin's own icon.
 
+### DSHnnnn diagnostic codes
+
+The compiler now gives each rule a stable `DSHnnnn` code, and names the editor extensions as one of
+the things keying off it. Diagnostics raised here that report the *same rule* now carry the same
+code, and the Problems entry links to the page that documents it.
+
+Six so far — `DSH3011`, `DSH3012`, `DSH3030`, `DSH3031`, `DSH3105`, `DSH3110`. Most diagnostics
+still carry no code, which is the expected state rather than a gap: some are this extension's own,
+and the compiler's own migration has tagged four of its nine ranges. A code is attached only where
+the rule is genuinely the same, never merely where the wording reads alike — a wrong code is worse
+than none, because the code is the half that is promised not to change.
+
+`test:corpus` now checks the codes two ways: the expected rejections assert on code as well as
+message, and every `DSHnnnn` this extension emits must appear in the compiler's published pages, so
+a typo or a renumbering fails the build.
+
+> `DSH3011` is an error in the compiler ("must declare at least one out parameter") and stays a
+> warning here. The code is shared because the rule is the same; the severity difference is
+> deliberate and unchanged from before.
+
 ### Aligned with the compiler
 
 Checked against the DreamShader plugin's own `Tests/Corpus` — the files the C++ parser is tested

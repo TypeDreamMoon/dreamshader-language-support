@@ -33,13 +33,53 @@ const CORPUS = process.env.DREAMSHADER_CORPUS_DIR;
  * disagreeing.
  */
 const EXPECTED_REJECTIONS = new Map([
-    ["L_UnterminatedBlock.bad.dsm", /Unclosed '\{'/],
-    ["L_UnterminatedString.bad.dsm", /missing a trailing ';'/],
-    ["T_FunctionNoOut.bad.dsh", /must declare at least one out parameter|should declare at least one out parameter/],
-    ["T_FunctionReturnVoid.bad.dsh", /cannot use a bare 'return;'/],
-    ["T_ShaderNoName.bad.dsm", /Shader\(Name="\.\.\."\) is required\./],
-    ["T_TwoShaders.bad.dsm", /Only one top-level Shader block is currently supported\./]
+    ["L_UnterminatedBlock.bad.dsm", { message: /Unclosed '\{'/ }],
+    ["L_UnterminatedString.bad.dsm", { message: /missing a trailing ';'/ }],
+    ["T_FunctionNoOut.bad.dsh", { message: /must declare at least one out parameter|should declare at least one out parameter/, code: "DSH3011" }],
+    ["T_FunctionReturnVoid.bad.dsh", { message: /cannot use a bare 'return;'/, code: "DSH3012" }],
+    ["T_ShaderNoName.bad.dsm", { message: /Shader\(Name="\.\.\."\) is required\./, code: "DSH3031" }],
+    ["T_TwoShaders.bad.dsm", { message: /Only one top-level Shader block is currently supported\./, code: "DSH3030" }]
 ]);
+
+/**
+ * Every DSHnnnn this extension emits, checked against the compiler's published pages.
+ *
+ * The code is the compiler's stable identity for a rule -- `DreamShaderDiagnostic.h` says as much,
+ * and names the editor extensions as one of the things keying off it. So a code here that the
+ * compiler does not publish is either a typo or a rule that has since been renumbered, and both are
+ * worse than emitting no code at all.
+ */
+function assertCodesArePublished(corpusRoot) {
+    const emitted = new Set();
+    const walkSource = (file) => {
+        for (const match of fs.readFileSync(file, "utf8").matchAll(/"(DSH\d{4})"/g)) {
+            emitted.add(match[1]);
+        }
+    };
+    walkSource(path.join(__dirname, "..", "src", "language", "diagnostics.js"));
+    if (emitted.size === 0) {
+        return 0;
+    }
+
+    const published = new Set();
+    const docsDirectory = path.join(corpusRoot, "Docs", "diagnostics");
+    let pages;
+    try {
+        pages = fs.readdirSync(docsDirectory);
+    } catch (_error) {
+        console.log("  (no Docs/diagnostics in the corpus; skipped the code check)");
+        return 0;
+    }
+    for (const page of pages) {
+        for (const match of fs.readFileSync(path.join(docsDirectory, page), "utf8").matchAll(/generated:begin (DSH\d{4})/g)) {
+            published.add(match[1]);
+        }
+    }
+
+    const unknown = [...emitted].filter((code) => !published.has(code)).sort();
+    assert.deepStrictEqual(unknown, [], "DSH codes emitted here that the compiler does not publish");
+    return emitted.size;
+}
 
 function collect(root) {
     const good = [];
@@ -97,13 +137,19 @@ function main() {
         if (!expected) {
             continue;
         }
-        const messages = language.getDiagnostics(fs.readFileSync(file, "utf8"), file, {})
-            .map((diagnostic) => diagnostic.message);
-        if (!messages.some((message) => expected.test(message))) {
-            misses.push(`${name}: expected ${expected}, got ${messages.length ? messages.join(" | ") : "nothing"}`);
+        const found = language.getDiagnostics(fs.readFileSync(file, "utf8"), file, {});
+        const match = found.find((diagnostic) => expected.message.test(diagnostic.message));
+        if (!match) {
+            misses.push(`${name}: expected ${expected.message}, got ${found.length ? found.map((d) => d.message).join(" | ") : "nothing"}`);
+            continue;
+        }
+        if (expected.code && match.code !== expected.code) {
+            misses.push(`${name}: expected code ${expected.code}, got ${match.code || "none"}`);
         }
     }
     assert.deepStrictEqual(misses, [], `${misses.length} rejections the compiler makes and this does not`);
+
+    const codeCount = assertCodesArePublished(CORPUS);
 
     // A name in the list that is no longer in the corpus is a stale expectation, which would
     // otherwise sit there passing forever without checking anything.
@@ -111,7 +157,7 @@ function main() {
     const stale = [...EXPECTED_REJECTIONS.keys()].filter((name) => !present.has(name));
     assert.deepStrictEqual(stale, [], "expected rejections naming files that are no longer in the corpus");
 
-    console.log(`corpus smoke tests passed (${good.length} accepted, ${EXPECTED_REJECTIONS.size} of ${bad.length} rejected sources owned here)`);
+    console.log(`corpus smoke tests passed (${good.length} accepted, ${EXPECTED_REJECTIONS.size} of ${bad.length} rejected sources owned here, ${codeCount} DSH codes all published)`);
 }
 
 main();
