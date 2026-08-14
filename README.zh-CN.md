@@ -264,11 +264,26 @@ Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
 npm install
 ```
 
-运行语言核心 smoke test：
+跑测试。三层，每一层都能抓住下一层抓不到的东西：`test:language` 直接 import 语言层，`test:server`
+拉起语言服务器走 stdio 跟它进行一次真实的 LSP 对话，`test:extension` 驱动一个真的 VS Code：
 
 ```powershell
-npm run test:language
+npm test
 ```
+
+### 架构
+
+扩展是两个进程。`src/server/` 是标准 LSP 服务器，承载全部 14 个语言 provider 以及从源码推导出的诊断；
+`src/activate.js` 是客户端，保留所有「跟文本无关」的东西 —— 预览、包管理、Bridge 诊断树及其
+`dreamshader` 集合、状态栏、命令。
+
+`src/language/` 既不 import `vscode` 也不 import 协议，正因如此 provider 才能搬走而不必改动它。语言层
+需要了解外部世界时（某项配置、workspace 目录），它问 `src/host.js`，由两个进程各自填充。
+
+刻意不打包：`src/bridge/database.js` 通过 `require.resolve` 定位 sql.js 的 WASM，打包器会让那个路径指空。
+
+`F5` 启动 Extension Development Host。要在 server 里下断点，用 **Extension + Server** 复合配置，
+它会额外挂一个调试器到 6018 端口。
 
 打包扩展：
 

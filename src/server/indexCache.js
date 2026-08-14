@@ -1,15 +1,27 @@
 "use strict";
 
+// The cross-file index, cached per document version.
+//
+// A near-verbatim move of what was `vscode/languageIndexCache.js`: the key was already
+// `uri#version`, and uri and version are exactly what the protocol's `TextDocument` carries, so the
+// cache came across without a change of shape. The only edit is the source of the root path --
+// `document.fileName` became a conversion from the uri, because there is no `fileName` here.
+//
+// Dependency freshness is still stat-based rather than watcher-based. A watcher would be tidier but
+// would also be trusting an event to have arrived; an import edited by a tool outside the editor is
+// exactly the case where it would not have.
+
 const fs = require("fs");
 const languageCore = require("../language");
 const { normalizeFsPath } = require("../common/path");
 const { resolveImportPath } = require("../project/imports");
+const { toFsPath } = require("./documents");
 
 function createLanguageIndexCache() {
     const entries = new Map();
 
     function get(document) {
-        const key = getDocumentKey(document);
+        const key = `${document.uri}#${document.version}`;
         const cached = entries.get(key);
         if (cached && dependenciesAreFresh(cached.dependencies)) {
             return cached.index;
@@ -20,7 +32,7 @@ function createLanguageIndexCache() {
         }
 
         const dependencies = new Map();
-        const rootPath = normalizeFsPath(document.fileName);
+        const rootPath = normalizeFsPath(toFsPath(document.uri));
         const index = languageCore.buildDocumentIndex({
             fileName: rootPath,
             text: document.getText(),
@@ -39,9 +51,9 @@ function createLanguageIndexCache() {
     }
 
     function invalidateDocument(uri) {
-        const uriText = getUriText(uri);
+        const prefix = `${uri}#`;
         for (const key of Array.from(entries.keys())) {
-            if (key.startsWith(`${uriText}#`)) {
+            if (key.startsWith(prefix)) {
                 entries.delete(key);
             }
         }
@@ -67,14 +79,6 @@ function createLanguageIndexCache() {
         invalidatePath,
         invalidateAll
     };
-}
-
-function getDocumentKey(document) {
-    return `${getUriText(document.uri)}#${document.version}`;
-}
-
-function getUriText(uri) {
-    return typeof uri?.toString === "function" ? uri.toString() : String(uri || "");
 }
 
 function dependenciesAreFresh(dependencies) {

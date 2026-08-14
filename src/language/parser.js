@@ -28,10 +28,45 @@ const SECTION_NAME_ALIASES = new Map([
     ["Results", "Outputs"]
 ]);
 
+// One parse per distinct document text, shared by everything that asks for it.
+//
+// There are thirteen `parseDocument` call sites and fourteen language providers, and on a single
+// keystroke a good few of them run against the same text: folding, symbols, semantic tokens,
+// diagnostics, inlay hints, code lenses. In-process those were unrelated providers and the repeated
+// parse was merely wasteful; behind a pipe it is wasteful in one event loop, so it is worth not
+// doing. Completion makes it sharper still -- the trigger characters include the entire alphabet, so
+// this runs on every character typed.
+//
+// Keyed on the text itself, which needs no invalidation: edited text is a different key, and the
+// entry for the old version falls off the end. It relies on every consumer treating the tree as
+// read-only, which all thirteen do -- even the recursive parse below rebuilds rather than mutates,
+// via `offsetBlock`. A consumer that started writing to a block would corrupt every later reader,
+// so: do not.
+//
+// Sixteen entries covers the provider fan-out for the open documents several times over. The import
+// closure a `buildDocumentIndex` walks can be larger than that, but those parses are already cached
+// a level up, keyed by document version and dependency mtimes.
+const PARSE_CACHE_LIMIT = 16;
+const parseCache = new Map();
+
 function parseDocument(text) {
+    const cached = parseCache.get(text);
+    if (cached) {
+        // Re-inserting is what makes the Map's insertion order an LRU order.
+        parseCache.delete(text);
+        parseCache.set(text, cached);
+        return cached;
+    }
+
     const tokens = scan(text);
     const parser = new Parser(text, tokens);
-    return parser.parse();
+    const ast = parser.parse();
+
+    parseCache.set(text, ast);
+    if (parseCache.size > PARSE_CACHE_LIMIT) {
+        parseCache.delete(parseCache.keys().next().value);
+    }
+    return ast;
 }
 
 class Parser {

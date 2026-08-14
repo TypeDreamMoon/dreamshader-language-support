@@ -409,7 +409,7 @@ function formatValueForSource(type, rawValue) {
 }
 
 function collectEnumOptions(document, mappingName) {
-    const mapped = collectDreamShaderSettingMappings(document, mappingName);
+    const mapped = collectDreamShaderSettingMappings(document?.uri?.fsPath || document?.fileName || "", mappingName);
     if (Array.isArray(mapped) && mapped.length > 0) {
         return mapped;
     }

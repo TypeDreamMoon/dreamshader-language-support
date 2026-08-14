@@ -72,11 +72,33 @@ async function cleanGeneratedShaders() {
 }
 
 async function getTargetDocument(targetUri) {
-    if (targetUri instanceof vscode.Uri) {
-        return vscode.workspace.textDocuments.find((entry) => entry.uri.toString() === targetUri.toString())
-            || vscode.workspace.openTextDocument(targetUri);
+    const uri = asUri(targetUri);
+    if (uri) {
+        return vscode.workspace.textDocuments.find((entry) => entry.uri.toString() === uri.toString())
+            || vscode.workspace.openTextDocument(uri);
     }
     return vscode.window.activeTextEditor?.document;
+}
+
+/**
+ * The recompile lens is now built by the language server, so its argument arrives as JSON -- a uri
+ * string, not a `vscode.Uri`. Both are accepted because the command is also invoked from the command
+ * palette with no argument at all, and because an unrecognised one used to fall through silently to
+ * the *active* editor: clicking the lens on a background file would have recompiled the foreground
+ * one, which is a wrong answer rather than a missing one.
+ */
+function asUri(value) {
+    if (value instanceof vscode.Uri) {
+        return value;
+    }
+    if (typeof value !== "string" || !value) {
+        return null;
+    }
+    try {
+        return vscode.Uri.parse(value, true);
+    } catch (_error) {
+        return null;
+    }
 }
 
 async function openBridgeDiagnosticLocation(entry) {

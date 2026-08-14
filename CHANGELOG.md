@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+The language half is now a language server.
+
+`src/language/` never imported `vscode` and already answered every provider as a plain object
+carrying offsets, so it moved across untouched; what was rewritten is the 532 lines of converter
+that used to wrap it, plus the two modules that reached for the editor behind its back.
+
+- **All fourteen providers and the `dreamshader-local` diagnostics now run in a separate process.**
+  The collection keeps its name, and the split with `dreamshader` — this for what the source says,
+  that for what a recompile reported — is unchanged. The preview, the package store, the Bridge
+  diagnostics tree, the status bar and the commands all stay on the client.
+- **One parse per document text, shared.** `parseDocument` is now memoised on the text, sixteen
+  entries deep. There are thirteen call sites and fourteen providers, and completion is triggered by
+  every letter of the alphabet, so on one keystroke a good few of them were re-parsing the same
+  buffer. Verified safe first: all thirteen consumers read the tree without writing to it.
+- **`vscode` is no longer reached for from the language path.** `project/projects.js` and
+  `bridge/manifests.js` used a `require("vscode")` in a try/catch to read settings, the workspace
+  folders and the focused editor; they now ask `src/host.js`, which each process fills in. The
+  manifest lookups took a whole document only to read a path off it, and take the path now — passing
+  them the protocol's `TextDocument`, whose `uri` is a string, would have silently narrowed every
+  one of them to the no-project case.
+- **Fixed: the recompile CodeLens could act on the wrong file.** Its argument is a uri, and now
+  crosses as JSON rather than as a `vscode.Uri`; the handler's `instanceof` check would have failed
+  and fallen through to whatever editor had focus. It accepts both forms.
+- **Fixed: a failed capability registration could kill the server.** The registration promise was
+  left floating, so a client that refused one would take the process down by unhandled rejection.
+- The .vsix grew from 523 KB to 898 KB — the language-server stack, less its source maps and
+  typings, which are now excluded the same way sql.js's unused builds already were.
+- New `npm run test:server`: spawns the built server over stdio and exercises all fourteen providers
+  against the fixture. The extension tests now wait on the client being ready, which activation
+  exposes rather than blocking on — a server that fails to start costs completion, not the
+  recompile button.
+
 ## 1.7.0
 
 - Added nested `Group("Outer") { Group("Inner") { ... } }` scopes, composing to `"Outer|Inner"` (matching Unreal's native `|` sub-category syntax for the Group/Category property) instead of the inner name silently replacing the outer one. `Group("A|B")` typed as a single literal name already worked and is unchanged.

@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "${workspaceFolder}/test/extension/workspace"
+      ]
+    },
+    {
+      // The language server is a second process, so its breakpoints need a second debugger. Start
+      // the extension first: the port is opened by the server the client spawns, and only in debug
+      // mode. Use the compound below to do both at once.
+      "name": "Attach to Server",
+      "type": "node",
+      "request": "attach",
+      "port": 6018,
+      "restart": true,
+      "outFiles": ["${workspaceFolder}/src/server/*.js"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Extension + Server",
+      "configurations": ["Run Extension", "Attach to Server"],
+      "stopAll": true
+    }
+  ]
+}

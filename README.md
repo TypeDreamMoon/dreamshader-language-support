@@ -265,11 +265,30 @@ Install dependencies:
 npm install
 ```
 
-Run language smoke tests:
+Run the tests. Three tiers, each catching what the one below it cannot: `test:language` imports the
+language layer directly, `test:server` spawns the language server and holds an LSP conversation with
+it over stdio, and `test:extension` drives a real VS Code:
 
 ```powershell
-npm run test:language
+npm test
 ```
+
+### Architecture
+
+The extension is two processes. `src/server/` is a standard LSP server carrying all fourteen
+language providers and the diagnostics derived from the source; `src/activate.js` is the client,
+which keeps everything that is not a question about the text — the preview, the package store, the
+Bridge diagnostics tree and its `dreamshader` collection, the status bar, the commands.
+
+`src/language/` imports neither `vscode` nor the protocol, which is what let the providers move
+without touching it. Where the layer needs to know about the world around it — a setting, the
+workspace folders — it asks `src/host.js`, which each process fills in for itself.
+
+It is deliberately not bundled: `src/bridge/database.js` locates sql.js's WASM through
+`require.resolve`, which a bundler would leave pointing at nothing.
+
+`F5` launches an Extension Development Host. To put breakpoints in the server as well, run the
+**Extension + Server** compound, which attaches a second debugger to port 6018.
 
 Package the extension:
 
