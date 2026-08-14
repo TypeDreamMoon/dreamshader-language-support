@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.8.0
+
+First Marketplace release. The extension now ships with the plugin's own icon.
 
 ### Aligned with the compiler
 
