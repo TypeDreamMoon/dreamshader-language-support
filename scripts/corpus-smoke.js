@@ -151,13 +151,37 @@ function main() {
 
     const codeCount = assertCodesArePublished(CORPUS);
 
+    // Every symbol, at every depth, has a name.
+    //
+    // The client rejects a falsy one with "name must not be falsy", and it converts the tree in one
+    // pass -- so a single nameless node three levels down fails the whole documentSymbol request and
+    // takes the outline, the breadcrumbs and go-to-symbol with it. In-process that throw was
+    // swallowed per-provider and only left the outline blank, which is how a nameless Graph
+    // assignment sat here unnoticed since May. Asserted over the corpus rather than a fixture,
+    // because the shape that broke it is in almost every real file and in none of the fixtures.
+    const nameless = [];
+    let symbolCount = 0;
+    const walkSymbols = (nodes, file, trail) => {
+        for (const node of nodes || []) {
+            symbolCount += 1;
+            if (!node.name) {
+                nameless.push(`${path.relative(CORPUS, file)}: ${[...trail, `<${node.kind}/${node.detail}>`].join(" > ")}`);
+            }
+            walkSymbols(node.children, file, [...trail, node.name || "?"]);
+        }
+    };
+    for (const file of [...good, ...bad]) {
+        walkSymbols(language.getDocumentSymbols(fs.readFileSync(file, "utf8")), file, []);
+    }
+    assert.deepStrictEqual(nameless, [], `${nameless.length} symbols with no name`);
+
     // A name in the list that is no longer in the corpus is a stale expectation, which would
     // otherwise sit there passing forever without checking anything.
     const present = new Set(bad.map((file) => path.basename(file)));
     const stale = [...EXPECTED_REJECTIONS.keys()].filter((name) => !present.has(name));
     assert.deepStrictEqual(stale, [], "expected rejections naming files that are no longer in the corpus");
 
-    console.log(`corpus smoke tests passed (${good.length} accepted, ${EXPECTED_REJECTIONS.size} of ${bad.length} rejected sources owned here, ${codeCount} DSH codes all published)`);
+    console.log(`corpus smoke tests passed (${good.length} accepted, ${EXPECTED_REJECTIONS.size} of ${bad.length} rejected sources owned here, ${codeCount} DSH codes all published, ${symbolCount} symbols all named)`);
 }
 
 main();

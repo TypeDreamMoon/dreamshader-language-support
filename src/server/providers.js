@@ -262,7 +262,12 @@ function documentSymbols(document) {
 
 function symbolSpecToSymbol(document, spec) {
     return {
-        name: spec.name,
+        // Never falsy. The client throws "name must not be falsy" while converting, and because it
+        // converts the whole tree at once, one nameless node three levels down fails the entire
+        // documentSymbol request -- outline, breadcrumbs and go-to-symbol all go with it. In-process
+        // the same throw was swallowed per-provider and merely left the outline blank, which is how
+        // a nameless Graph assignment survived unnoticed. A placeholder degrades one label instead.
+        name: spec.name || "(unnamed)",
         detail: spec.detail || "",
         kind: documentSymbolKind(spec.kind),
         range: rangeFromOffsets(document, spec.startOffset, spec.endOffset),

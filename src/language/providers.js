@@ -132,14 +132,19 @@ function makeSectionSymbol(section) {
                 children: []
             });
         } else if (entry.kind === "assignment") {
+            // Two shapes wear this kind. A Settings assignment (`Domain = "UI";`) carries its
+            // left-hand side as `name`; a Graph statement (`Color = Tint;`) carries it as `target`,
+            // the same field a binding uses. Reading only `name` left every Graph assignment
+            // nameless, which is most of the outline in most real files.
+            const label = String(entry.name || entry.target || "").trim();
             symbol.children.push({
-                name: entry.name,
+                name: label,
                 detail: "setting",
                 kind: "Property",
                 startOffset: entry.startOffset,
                 endOffset: entry.endOffset,
                 selectionStartOffset: entry.startOffset,
-                selectionEndOffset: entry.startOffset + String(entry.name || "").length,
+                selectionEndOffset: entry.startOffset + label.length,
                 children: []
             });
         } else if (entry.kind === "layout") {

@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.8.1
+
+**Fixed: the document outline was failing entirely on most files.** `textDocument/documentSymbol`
+came back as `Error: name must not be falsy`, taking the outline, the breadcrumbs and go-to-symbol
+with it.
+
+A Graph statement (`Color = Tint;`) parses with the same `assignment` kind as a Settings assignment
+(`Domain = "UI";`), but carries its left-hand side in `target` where Settings uses `name` — and the
+symbol builder read only `name`. Every Graph assignment was therefore nameless, which is 41 nodes
+across the 41 files of the compiler's corpus: almost every real file has one.
+
+The bug dates to the original symbol implementation in May, not to 1.8.0. What 1.8.0 changed is how
+loudly it fails. In-process, the editor rejected the nameless symbol inside the provider and quietly
+left the outline blank; over the protocol the client converts the whole tree in one pass, so one
+nameless node three levels down fails the entire request and logs a stack trace each time.
+
+Two fixes, because either alone would have left the other half of the failure standing:
+
+- The symbol builder reads `name` **or** `target`, so Graph assignments are named after their
+  target — the same field a binding already used.
+- The server never emits a falsy name. A future nameless node degrades to one `(unnamed)` label
+  instead of destroying the request.
+
+`test:corpus` now walks every symbol at every depth over the whole corpus and asserts each has a
+name. Verified by reverting the fix: it reports exactly the 41. No fixture had the shape that broke
+this, which is why the existing tests passed a release with the outline broken.
+
 ## 1.8.0
 
 First Marketplace release. The extension now ships with the plugin's own icon.
