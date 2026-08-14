@@ -264,11 +264,19 @@ Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
 npm install
 ```
 
-跑测试。三层，每一层都能抓住下一层抓不到的东西：`test:language` 直接 import 语言层，`test:server`
-拉起语言服务器走 stdio 跟它进行一次真实的 LSP 对话，`test:extension` 驱动一个真的 VS Code：
+跑测试。四层，每一层都能抓住下一层抓不到的东西：`test:language` 直接 import 语言层，`test:server`
+拉起语言服务器走 stdio 跟它进行一次真实的 LSP 对话，`test:corpus` 拿编译器自己的语料校对这一半，
+`test:extension` 驱动一个真的 VS Code：
 
 ```powershell
 npm test
+```
+
+`test:corpus` 需要显式开启,因为插件不在本仓库里。指向一个插件目录,它会双向断言 —— 编译器接受的源
+一条诊断都不许报,编译器因文本可见的原因拒绝的源必须报出对应那条：
+
+```powershell
+$env:DREAMSHADER_CORPUS_DIR = 'I:\...\Plugins\DreamShader'; npm run test:corpus
 ```
 
 ### 架构

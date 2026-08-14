@@ -806,7 +806,7 @@ assert(/    Properties = \{/.test(formatted), "Formatter should indent sections"
 
 // three-or-more levels of nested braces (e.g. nested Group scopes) must not collapse indentation
 // when several closing lines stack up in a row.
-const deepNested = language.formatDocument(`Shader("M") {
+const deepNested = language.formatDocument(`Shader(Name="M") {
 Properties {
 Group("Surface") {
 Group("SS") {
@@ -818,7 +818,9 @@ ScalarParameter Rough = 0.2;
 }`);
 const deepNestedLines = deepNested.split("\n").map((line) => line.replace(/\s+$/, ""));
 assert.deepStrictEqual(deepNestedLines, [
-    "Shader(\"M\") {",
+    // The formatter spaces out the attribute assignment; the compiler's ParseAttributes calls
+    // SkipIgnored around both sides, and the plugin's own corpus carries each spelling.
+    "Shader(Name = \"M\") {",
     "    Properties {",
     "        Group(\"Surface\") {",
     "            Group(\"SS\") {",
@@ -873,7 +875,7 @@ assert(indexed.callables.has("a") && indexed.callables.has("b"), "Document index
 assert(indexed.cycles.length > 0, "Document index should detect function cycles across imports");
 
 // --- DreamShaderLang 1.5 syntax ---------------------------------------------------------
-const v15Source = `Shader("M_V15") {
+const v15Source = `Shader(Name="M_V15") {
     Properties {
         Group("Surface") {
             ScalarParameter Rough = 0.5 [Slider(0, 1)];
@@ -909,7 +911,7 @@ assert(v15Callables.get("luma")[0].outputs.some((output) => output.type === "flo
 assert.strictEqual(language.getDiagnostics(v15Source, "M_V15.dsm").length, 0, "Valid 1.5 syntax should produce no diagnostics");
 
 // nested Group("Outer") { Group("Inner") { ... } } composes into "Outer|Inner"
-const nestedGroupSource = `Shader("M_NestedGroup") {
+const nestedGroupSource = `Shader(Name="M_NestedGroup") {
     Properties {
         Group("Surface") {
             Group("SS") {
@@ -933,7 +935,7 @@ assert.strictEqual(findDecl("Explicit").metadata?.group, "Manual|Literal", "A si
 assert.strictEqual(language.getDiagnostics(nestedGroupSource, "M_NestedGroup.dsm").length, 0, "Nested Group scopes should produce no diagnostics");
 
 // optional '=' on a section keeps its body symbols
-const noEqSource = `Shader("M_NoEq") {
+const noEqSource = `Shader(Name="M_NoEq") {
     Properties { ScalarParameter A = 1.0; }
     Graph { Base.BaseColor = float3(A, A, A); }
 }`;
@@ -941,10 +943,10 @@ const noEqProps = language.parseDocument(noEqSource).blocks[0].sections.find((se
 assert(noEqProps && noEqProps.entries.some((entry) => entry.name === "A"), "Sections without '=' should still be parsed and keep their symbols");
 
 // 1.5 completions: Slider metadata and propgroup declaration sugar
-const metaDoc = `Shader("M") {\n    Properties {\n        ScalarParameter A = 1.0 [];\n    }\n}`;
+const metaDoc = `Shader(Name="M") {\n    Properties {\n        ScalarParameter A = 1.0 [];\n    }\n}`;
 const metaLabels = language.getCompletionSpecs(metaDoc, metaDoc.indexOf("[]") + 1, {}).map((item) => item.label);
 assert(metaLabels.includes("Slider"), "Metadata completion should offer the Slider shorthand");
-const propDoc = `Shader("M") {\n    Properties {\n        \n    }\n}`;
+const propDoc = `Shader(Name="M") {\n    Properties {\n        \n    }\n}`;
 const propLabels = language.getCompletionSpecs(propDoc, propDoc.indexOf("        \n") + 8, {}).map((item) => item.label);
 assert(propLabels.includes("propgroup"), "Properties completion should offer the propgroup scope snippet");
 assert(propLabels.includes("Group"), "Properties completion should offer a 'Group' completion for the Group(\"Name\") { } block, not just the 'propgroup' snippet alias");

@@ -2,7 +2,32 @@
 
 ## Unreleased
 
-The language half is now a language server.
+### Aligned with the compiler
+
+Checked against the DreamShader plugin's own `Tests/Corpus` — the files the C++ parser is tested
+with. Nothing the compiler accepts was being flagged; three things it rejects were not.
+
+- **`Shader(Name="...") is required.`** A Shader block with no name parsed happily here, because the
+  block's `name` falls back to its kind when there is no `Name=` attribute — so a nameless Shader
+  was quietly named "Shader".
+- **`Only one top-level Shader block is currently supported.`**
+- **`A function with a return type cannot use a bare 'return;'. Return a value, e.g. 'return expr;'.`**
+  Ported from the compiler's return-type rewriter, including the two conditions that keep it from
+  over-firing: identifier boundaries on both sides, and brace depth zero.
+
+Each carries the compiler's own wording. An editor that phrased the same refusal differently would
+read as a second, disagreeing opinion.
+
+- **`Shader("Name")` is not valid syntax.** The positional form was never accepted by the compiler —
+  `ParseAttributes` requires `Key = Value` — and appears nowhere in the plugin's corpus or docs. It
+  was only ever in this repo's own smoke-test fixtures, which have been corrected. The new
+  missing-name diagnostic is what surfaced it.
+- **New `npm run test:corpus`**, opt-in via `DREAMSHADER_CORPUS_DIR`, so this comparison keeps
+  running instead of being a one-off. It asserts both directions: no diagnostic on the 35 sources
+  the compiler accepts, and a matching diagnostic on each of the 6 it rejects for a reason visible
+  in the text. A `.bad.` file that fails on something only the engine knows stays the compiler's.
+
+### The language half is now a language server
 
 `src/language/` never imported `vscode` and already answered every provider as a plain object
 carrying offsets, so it moved across untouched; what was rewritten is the 532 lines of converter

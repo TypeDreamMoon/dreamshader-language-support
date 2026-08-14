@@ -60,6 +60,41 @@ function addFileShapeDiagnostics(diagnostics, ast, text, extension) {
     if (extension === ".dsh" && ["Shader", "ShaderFunction", "ShaderLayer", "ShaderLayerBlend"].some((kind) => topLevelKinds.has(kind))) {
         diagnostics.push(makeDiagnostic(0, Math.min(1, text.length), "DreamShader header (.dsh) may only contain import statements, Function blocks, GraphFunction blocks, Namespace blocks, and VirtualFunction declarations.", SEVERITY.Error));
     }
+
+    addShaderBlockDiagnostics(diagnostics, ast);
+}
+
+/**
+ * The two things the compiler asks of a top-level Shader block before it looks inside one.
+ *
+ * Both are refusals, not warnings: `DreamShaderParser.cpp` returns a parse failure for each, so a
+ * file that trips either produces no material at all. The wording is the compiler's own -- an editor
+ * that phrased the same refusal differently would read as a second, disagreeing opinion.
+ */
+function addShaderBlockDiagnostics(diagnostics, ast) {
+    const shaders = (ast.blocks || []).filter((block) => block.kind === "Shader");
+
+    for (const block of shaders.slice(1)) {
+        diagnostics.push(makeDiagnostic(
+            block.kindOffset,
+            block.kindOffset + "Shader".length,
+            "Only one top-level Shader block is currently supported.",
+            SEVERITY.Error));
+    }
+
+    for (const block of shaders) {
+        // Read from the attribute list rather than `block.name`, which falls back to the kind when
+        // there is no `Name=` -- so a nameless Shader is literally named "Shader" here.
+        const named = (block.attributes || []).some((attribute) =>
+            attribute.name === "Name" && String(attribute.value || "").replace(/^"|"$/g, "").length > 0);
+        if (!named) {
+            diagnostics.push(makeDiagnostic(
+                block.kindOffset,
+                block.kindOffset + "Shader".length,
+                "Shader(Name=\"...\") is required.",
+                SEVERITY.Error));
+        }
+    }
 }
 
 function addImportDiagnostics(diagnostics, ast, services) {
@@ -352,12 +387,71 @@ function addFunctionDiagnostics(diagnostics, ast, reachableCallables, substrateB
             diagnostics.push(makeDiagnostic(block.nameOffset, block.nameOffset + (block.nameRangeLength || block.name.length), `${block.kind} '${block.name}' should declare at least one out parameter.`, SEVERITY.Warning));
         }
 
+        addBareReturnDiagnostics(diagnostics, block);
+
         if (block.kind === "Function") {
             addFunctionBodyDiagnostics(diagnostics, block);
         } else {
             addGraphFunctionBodyDiagnostics(diagnostics, ast, block, reachableCallables, substrateBuiltinNames);
         }
     }
+}
+
+/**
+ * `return;` inside a function that declared a return type.
+ *
+ * The compiler lowers a return type into a synthetic `__return` out parameter by rewriting `return`
+ * to `__return =`, which leaves a bare `return;` as `__return =;` -- so it refuses rather than
+ * emitting that. Ported from the rewriter itself (`DreamShaderParser.cpp`), including the two
+ * conditions that keep it from firing on things that only look like one: identifier boundaries on
+ * both sides, so `returned;` is not a match, and brace depth zero, so a `return;` inside a nested
+ * block is left to the HLSL compiler rather than claimed here.
+ */
+function addBareReturnDiagnostics(diagnostics, block) {
+    if (!block.returnType || !block.bodyText) {
+        return;
+    }
+
+    const body = stripCommentsPreserveLayout(block.bodyText);
+    let depth = 0;
+
+    for (let index = 0; index < body.length; index += 1) {
+        const character = body[index];
+        if (character === "{") {
+            depth += 1;
+            continue;
+        }
+        if (character === "}") {
+            depth = Math.max(0, depth - 1);
+            continue;
+        }
+        if (depth !== 0 || character !== "r" || body.slice(index, index + 6) !== "return") {
+            continue;
+        }
+
+        const before = index > 0 ? body[index - 1] : "";
+        const after = body[index + 6] || "";
+        if (isIdentifierCharacter(before) || isIdentifierCharacter(after)) {
+            continue;
+        }
+
+        let probe = index + 6;
+        while (probe < body.length && /\s/.test(body[probe])) {
+            probe += 1;
+        }
+        if (body[probe] === ";") {
+            diagnostics.push(makeDiagnostic(
+                block.bodyOffset + index,
+                block.bodyOffset + probe + 1,
+                "A function with a return type cannot use a bare 'return;'. Return a value, e.g. 'return expr;'.",
+                SEVERITY.Error));
+        }
+        index += 5;
+    }
+}
+
+function isIdentifierCharacter(character) {
+    return /[A-Za-z0-9_]/.test(character || "");
 }
 
 function addFunctionBodyDiagnostics(diagnostics, block) {

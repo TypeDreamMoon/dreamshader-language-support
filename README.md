@@ -265,12 +265,21 @@ Install dependencies:
 npm install
 ```
 
-Run the tests. Three tiers, each catching what the one below it cannot: `test:language` imports the
+Run the tests. Four tiers, each catching what the one below it cannot: `test:language` imports the
 language layer directly, `test:server` spawns the language server and holds an LSP conversation with
-it over stdio, and `test:extension` drives a real VS Code:
+it over stdio, `test:corpus` checks this half against the compiler's own corpus, and
+`test:extension` drives a real VS Code:
 
 ```powershell
 npm test
+```
+
+`test:corpus` is opt-in, because the plugin is not part of this repository. Point it at one and it
+asserts both directions — nothing flagged on a source the compiler accepts, and a matching
+diagnostic on each source it rejects for a reason visible in the text:
+
+```powershell
+$env:DREAMSHADER_CORPUS_DIR = 'I:\...\Plugins\DreamShader'; npm run test:corpus
 ```
 
 ### Architecture

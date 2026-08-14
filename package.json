@@ -386,8 +386,9 @@
   "scripts": {
     "test:language": "node scripts/language-smoke.js",
     "test:server": "node scripts/server-smoke.js",
+    "test:corpus": "node scripts/corpus-smoke.js",
     "test:extension": "node scripts/run-extension-tests.js",
-    "test": "npm run test:language && npm run test:server && npm run test:extension",
+    "test": "npm run test:language && npm run test:server && npm run test:corpus && npm run test:extension",
     "package": "npx @vscode/vsce package"
   },
   "devDependencies": {
