@@ -8,7 +8,18 @@ DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文
 
 DreamShaderLang 是 DreamShader Unreal Engine 插件使用的材质编写语言。这个 VS Code 扩展提供语法高亮、智能提示、符号、折叠、本地诊断、Bridge 诊断、包管理命令和常用模板。
 
-`1.6.0` 版本新增对 DreamShaderLang 1.5 语法的支持——`Group("Name") { ... }` 属性作用域、单输出返回值函数（`Function float Luma(...) { return ...; }`）、区块名与 `{` 之间可选的 `=`、`Slider(min, max)` metadata 简写，以及裸 `"/Game/..."` 资产路径，全部向后兼容现有语法。同时继续提供 Template 块支持、DreamShader bridge 命令、包管理工具，并同步 `Function` 内置函数 metadata、UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出支持。
+语言功能跑在一个 language server 里,它报出的诊断经过编译器自带测试语料的双向校对:编译器接受的源
+这里一条都不报,而属于这一半职责的规则带上编译器的 `DSHnnnn` 码,Problems 里点一下就能跳到对应的文档
+页。只有编译器才能判定的事——这个资产存不存在、类型对不对——留给编译器,经由 bridge 回传,因为同一个
+问题有两个真相来源必然会漂移。
+
+完整支持 DreamShaderLang 1.5 语法:`Group("Name") { ... }` 属性作用域、单输出返回值函数
+(`Function float Luma(...) { return ...; }`)、区块名与 `{` 之间可选的 `=`、`Slider(min, max)`
+metadata 简写,以及裸 `"/Game/..."` 资产路径。Template 块、bridge 命令、包管理工具,以及 `Function`
+内置函数 metadata、UE 5.7 `Substrate.*` 图 helper 和 `Base.FrontMaterial` 输出,都与当前的
+DreamShader 插件保持同步。
+
+每个版本改了什么见[更新日志](./CHANGELOG.md)。
 
 ## 主要能力
 
@@ -299,11 +310,7 @@ $env:DREAMSHADER_CORPUS_DIR = 'I:\...\Plugins\DreamShader'; npm run test:corpus
 npm run package
 ```
 
-生成的 VSIX 文件：
-
-```text
-dreamshaderlang-language-support-1.7.0.vsix
-```
+生成的 VSIX 文件为 `dreamshaderlang-language-support-<version>.vsix`,版本号取自 `package.json`。
 
 ## License
 

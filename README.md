@@ -8,7 +8,20 @@ VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` funct
 
 DreamShaderLang is a material authoring language for the DreamShader Unreal Engine plugin. This extension provides syntax highlighting, completion, symbols, folding, local diagnostics, bridge diagnostics, package tooling, and authoring templates for DreamShader source files.
 
-Version `1.6.0` adds support for the DreamShaderLang 1.5 syntax — `Group("Name") { ... }` property scopes, single-output return-value functions (`Function float Luma(...) { return ...; }`), the optional `=` between a section name and its body, the `Slider(min, max)` metadata shorthand, and bare `"/Game/..."` asset paths — all fully backward compatible with the existing syntax. It also keeps template block support, DreamShader bridge commands, package tooling, Function builtin metadata, UE 5.7 `Substrate.*` graph helpers, and `Base.FrontMaterial` output support synced with the current DreamShader plugin.
+The language features run in a language server, and the diagnostics it reports are checked against
+the compiler's own test corpus: nothing it accepts is flagged here, and the rules this half owns
+carry the compiler's `DSHnnnn` codes so a Problems entry links to the page documenting it. What the
+compiler alone can decide — does this asset exist, does this type check — stays with the compiler
+and arrives through the bridge, because two sources of truth on one question drift.
+
+The full DreamShaderLang 1.5 syntax is supported: `Group("Name") { ... }` property scopes,
+single-output return-value functions (`Function float Luma(...) { return ...; }`), the optional `=`
+between a section name and its body, the `Slider(min, max)` metadata shorthand, and bare
+`"/Game/..."` asset paths. Template blocks, bridge commands, package tooling, Function builtin
+metadata, UE 5.7 `Substrate.*` graph helpers and `Base.FrontMaterial` outputs stay synced with the
+current DreamShader plugin.
+
+See the [changelog](./CHANGELOG.md) for what each release changed.
 
 ## Highlights
 
@@ -305,11 +318,8 @@ Package the extension:
 npm run package
 ```
 
-The packaged VSIX is generated as:
-
-```text
-dreamshaderlang-language-support-1.7.0.vsix
-```
+The packaged VSIX is generated as `dreamshaderlang-language-support-<version>.vsix`, taking the
+version from `package.json`.
 
 ## License
 
