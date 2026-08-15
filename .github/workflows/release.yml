@@ -163,8 +163,17 @@ jobs:
 
           PUBLISHED="$(printf '%s' "$PUBLISHED" | tr -d '[:space:]')"
           if [ "$PUBLISHED" = "$VERSION" ]; then
-            echo "Marketplace already carries $VERSION -- nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
+            # Nothing to publish -- but the credential is still checked rather than returning green
+            # on one nothing has touched. A PAT lasts a year at most and rotating it is easy to
+            # forget; without this, an expired token first shows up on the release that needed it,
+            # which is the one run where a red step costs something.
+            PUBLISHER="$(node -p "require('./package.json').publisher")"
+            if npx @vscode/vsce verify-pat "$PUBLISHER"; then
+              echo "Marketplace already carries $VERSION -- nothing to publish (VSCE_PAT verified)." | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "VSCE_PAT cannot publish for '$PUBLISHER' -- expired, wrong scope, or wrong account. The next version bump would fail to reach the Marketplace." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
           # Checked explicitly rather than left to the shell's -e: the summary line is a claim that
