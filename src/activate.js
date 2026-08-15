@@ -155,6 +155,16 @@ function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {
             new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/diagnostics.json")));
         registerWatcher(vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/bridge.db")));
+        // Deleting a source file is the one edit that changes which bridge diagnostics still apply
+        // without touching a bridge file: the plugin never rewrites the payload for a file it can no
+        // longer compile, so the entry stays until something re-reads it. Closing the document
+        // already triggers that when the file was open in the editor, which is why the stale
+        // diagnostics only survive *sometimes* -- deleted from outside the editor, or never opened,
+        // nothing fires. Watching creates as well so restoring the file brings its diagnostics back.
+        // `**/DShader/**` rather than `DShader/**` because plugins carry source roots of their own.
+        const sources = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(root), "**/DShader/**/*.{dsm,dsf,dsh}"), false, true, false);
+        registerWatcher(sources);
     }
 }
 

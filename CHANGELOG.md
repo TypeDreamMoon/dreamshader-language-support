@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.8.3
+
+**Fixed: deleting a source file left its errors behind.** The count in the status bar stayed red and
+the Bridge view kept a node for the file, which opened `cannot open file:///...` when clicked —
+nothing an edit could clear, because the only thing that would clear it was a recompile of a file
+that no longer existed.
+
+The Bridge payload is a record of the **last compile**, not of what is on disk now. Nothing re-runs
+generation for a deleted file, so its entry survives every later write the plugin makes — confirmed
+on a real project, where two stale entries outlived a write that added a third, live file. The
+extension mirrored the payload entry by entry and never asked whether the file was still there.
+
+Two fixes, because either alone leaves half the failure standing:
+
+- Entries whose file no longer exists on disk are dropped before publishing. The whole file entry
+  goes, so the diagnostic, the tree node and the status-bar count disappear together rather than
+  leaving a count with nothing behind it.
+- Source files are now watched for deletion and creation, per project root, under `**/DShader/**`
+  (plugins carry source roots of their own). This is what made the staleness intermittent: deleting
+  a file that was **open** already triggered a refresh through `onDidCloseTextDocument`, so the
+  errors cleared on their own; deleted from outside the editor, or never opened, nothing fired until
+  an unrelated refresh happened to run. Change events stay ignored — editing a `.dsf` does not
+  change the payload.
+
+The extension test suite now carries a Bridge payload entry for a file that is deliberately never
+written to disk, and asserts it is not published. Verified by reverting the fix: it fails with the
+reported symptom.
+
+Also: the release workflow publishes to the Marketplace itself when a `VSCE_PAT` secret is present,
+instead of that being a manual step after every tag, and its path filter now includes `src/**` and
+`templates.js` — both ship in the VSIX, and a fix touching only those would previously build and
+release nothing.
+
 ## 1.8.2
 
 **Fixed: every import inside a plugin's own `DShader` folder was reported as unresolvable.** A file

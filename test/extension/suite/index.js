@@ -71,6 +71,17 @@ Shader(Name="Materials/M_Test", Root="Game")
                 column: 1,
                 source: "DreamShader"
             }]
+        }, {
+            // Deliberately never written to disk: the payload is a record of the last compile, so an
+            // entry for a since-deleted file outlives it in every later write the plugin makes.
+            path: "DShader/M_Deleted.dsm",
+            diagnostics: [{
+                severity: "error",
+                message: "Bridge diagnostic for a deleted file",
+                line: 1,
+                column: 1,
+                source: "DreamShader"
+            }]
         }]
     }), "utf8");
     return folder;
@@ -122,6 +133,15 @@ async function assertBridgeDiagnosticsRefresh(workspaceRoot, document) {
     await vscode.commands.executeCommand("dreamshader.refreshBridgeDiagnostics");
     const diagnostics = vscode.languages.getDiagnostics(document.uri);
     assert(diagnostics.some((diagnostic) => diagnostic.message === "Bridge smoke diagnostic"), "Bridge diagnostics refresh should publish diagnostics");
+
+    // The deleted file's entry is still in the payload and must not reach the editor: it would be a
+    // diagnostic nobody can navigate to, on a count no edit can clear.
+    const deletedUri = vscode.Uri.file(path.join(workspaceRoot, "DShader", "M_Deleted.dsm"));
+    assert(!fs.existsSync(deletedUri.fsPath), "Test setup expects the deleted file to be absent");
+    assert.deepStrictEqual(
+        vscode.languages.getDiagnostics(deletedUri).map((diagnostic) => diagnostic.message),
+        [],
+        "Bridge diagnostics for a file that no longer exists should not be published");
 
     const requestDirectory = path.join(workspaceRoot, "Saved", "DreamShader", "Bridge", "Requests");
     assert(!fs.existsSync(requestDirectory) || fs.statSync(requestDirectory).isDirectory(), "Bridge request directory state should remain valid");

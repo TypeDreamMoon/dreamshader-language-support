@@ -10,6 +10,8 @@ on:
       - "package.json"
       - "package-lock.json"
       - "extension.js"
+      - "templates.js"
+      - "src/**"
       - "language-configuration.json"
       - "install-vscode-extension.ps1"
       - "README.md"
@@ -117,4 +119,59 @@ jobs:
             gh release upload "$TAG" "$VSIX" --clobber
           else
             gh release create "$TAG" "$VSIX" --title "$TAG" --notes-file release-notes.md
+          fi
+
+      # Publishes the same VSIX that was just attached to the release, so the two channels never
+      # ship different bytes for one version. Requires a VSCE_PAT repository secret -- an Azure
+      # DevOps token with Marketplace > Manage scope, for the publisher that owns the extension.
+      # Without it this step says so and passes, leaving the GitHub release to stand on its own.
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VERSION: ${{ steps.version.outputs.version }}
+          VSIX: ${{ steps.version.outputs.vsix }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "VSCE_PAT is not set -- skipping the Marketplace publish." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # This workflow runs for pushes that bump no version -- a README edit is enough to trigger
+          # it -- and the Marketplace rejects a re-publish of a version it already carries, which
+          # would fail the run for no fault of the push. Ask it what it has before trying.
+          PUBLISHED="$(node <<'NODE'
+          const { publisher, name } = require('./package.json');
+          const body = {
+            filters: [{ criteria: [{ filterType: 7, value: `${publisher}.${name}` }] }],
+            flags: 0x1
+          };
+          fetch('https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json;api-version=7.2-preview.1'
+            },
+            body: JSON.stringify(body)
+          })
+            .then((response) => response.json())
+            // An unreadable answer resolves to empty, which attempts the publish rather than
+            // skipping it: a duplicate fails loudly and visibly, a wrongly-skipped release is silent.
+            .then((payload) => console.log(payload?.results?.[0]?.extensions?.[0]?.versions?.[0]?.version || ''))
+            .catch(() => console.log(''));
+          NODE
+          )"
+
+          PUBLISHED="$(printf '%s' "$PUBLISHED" | tr -d '[:space:]')"
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "Marketplace already carries $VERSION -- nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Checked explicitly rather than left to the shell's -e: the summary line is a claim that
+          # the version is live, and it must not be able to outlive a publish that failed.
+          if npx @vscode/vsce publish --packagePath "$VSIX" --pat "$VSCE_PAT"; then
+            echo "Published $VERSION to the Marketplace." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Marketplace publish of $VERSION FAILED -- the GitHub release still stands." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi

@@ -52,6 +52,15 @@ function refreshBridgeDiagnostics(collection, state, activePath = "") {
         };
         for (const file of parsed.files) {
             const filePath = normalizeFsPath(path.isAbsolute(file.path) ? file.path : path.join(root, file.path || ""));
+            // The payload records the last compile, not what is on disk now: nothing re-runs
+            // generation for a file that has been deleted, so its entry survives every later write
+            // the plugin makes. Publishing it anyway leaves a diagnostic that cannot be navigated to
+            // -- the tree node opens `cannot open file:///...` -- and a red count in the status bar
+            // that no edit can clear, because the only thing that would clear it is a recompile of a
+            // file that no longer exists.
+            if (!fs.existsSync(filePath)) {
+                continue;
+            }
             const fileEntry = {
                 type: "file",
                 label: path.basename(filePath),
