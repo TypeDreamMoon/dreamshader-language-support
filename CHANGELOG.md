@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.8.2
+
+**Fixed: every import inside a plugin's own `DShader` folder was reported as unresolvable.** A file
+under `Plugins/MoonToon/DShader/` writing `import "Shared/ToonFunctions.dsh"` — the form a plugin's
+sources are supposed to use — got `could not be resolved` while the engine compiled it without
+complaint. Go-to-definition and the document link on the specifier were dead for the same reason.
+
+Resolution was still written against a single directory: candidates were built from
+`<Project>/DShader` and then containment-checked against it, so a plugin's file could neither reach
+its own root nor keep a relative path that left `<Project>/DShader`. The compiler stopped working
+that way when it grew **source roots** — the project contributes one root, and so does every plugin
+shipping a `DShader` folder.
+
+That model is now mirrored here, from `Docs/language/import.md`:
+
+- Roots are discovered per project: `<Project>/DShader`, plus `<Plugin>/DShader` for each plugin
+  under `Plugins/` (nested a directory or two deep, as UE allows). Each carries its own `Packages`.
+- An unqualified specifier resolves against the root that **owns** the importing file and never
+  against another's, so adding a plugin cannot change what an existing import means.
+- Root qualifiers are understood: `Project:`, `Plugin.<Name>:`, `Plugins.<Name>:`, `Plugin/<Name>:`,
+  `Plugins/<Name>:`. Text before a `:` that is not one of those shapes is still an ordinary path, so
+  `import "C:/Shared/Common.dsh"` fails the way it always did.
+- Candidate 1 is confined to the longest root directory containing the file rather than always to
+  `<Project>/DShader`, which is what makes `../` behave the same as it does in the build.
+
+Import completion follows the same rule: the owning root's files are offered bare, every other
+root's in the qualified form that actually reaches them. It no longer offers a path that would
+complete straight into an unresolved-import diagnostic.
+
+One editor-side addition with no counterpart in the plugin: the engine asks `IPluginManager` which
+plugins are mounted, and an editor has no such list. A plugin opened on its own with no `.uproject`
+above it, or one living outside `<Project>/Plugins`, therefore contributes no root — so a file under
+none of the discovered roots falls back to its nearest ancestor named `DShader`. Without it those
+files report every import as broken, which is the worse of the two ways to disagree with the
+compiler.
+
+New `npm run test:imports` builds real directory trees and checks the resolution table — the three
+candidates in order, containment, both directions of root isolation, every qualifier spelling, and
+that every specifier offered by completion resolves from the file it was offered for.
+
 ## 1.8.1
 
 **Fixed: the document outline was failing entirely on most files.** `textDocument/documentSymbol`

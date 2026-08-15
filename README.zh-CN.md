@@ -36,7 +36,7 @@ DreamShader 插件保持同步。
 - `Domain`、`MaterialDomain`、`ShadingModel`、`BlendMode`、`RenderType` 的 Settings 值补全。
 - 声明 metadata 补全，例如 `Group`、`SortPriority`、`Description`、`SamplerType`、`GatherMode` 和纹理采样相关属性。
 - 支持 `Layout = { Node(...); Comment(...); }` 和 Graph `#Region` / `#EndRegion` 布局指令。
-- `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转。
+- `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转，按源根解析 —— 工程的 `DShader` 和每个插件各算一个根，也认跨根用的 `Project:` / `Plugin.<名字>:` 限定符。
 - `.dsf` 文件形状诊断，支持 `ShaderFunction`、`Function`、`GraphFunction`、`Namespace` 和 `VirtualFunction`。
 - Go to Definition、Find References、Hover、Signature Help、Inlay Hints、文档格式化、折叠和文档符号。
 - Unreal Bridge 诊断面板。
@@ -275,9 +275,9 @@ Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
 npm install
 ```
 
-跑测试。四层，每一层都能抓住下一层抓不到的东西：`test:language` 直接 import 语言层，`test:server`
-拉起语言服务器走 stdio 跟它进行一次真实的 LSP 对话，`test:corpus` 拿编译器自己的语料校对这一半，
-`test:extension` 驱动一个真的 VS Code：
+跑测试。五层，每一层都能抓住下一层抓不到的东西：`test:language` 直接 import 语言层，`test:imports`
+建出真实目录树来校对 import 解析，`test:server` 拉起语言服务器走 stdio 跟它进行一次真实的 LSP
+对话，`test:corpus` 拿编译器自己的语料校对这一半，`test:extension` 驱动一个真的 VS Code：
 
 ```powershell
 npm test

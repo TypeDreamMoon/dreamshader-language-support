@@ -39,7 +39,7 @@ See the [changelog](./CHANGELOG.md) for what each release changed.
 - Settings value completion for `Domain`, `MaterialDomain`, `ShadingModel`, `BlendMode`, and `RenderType`.
 - Metadata completion for declaration reflection blocks such as `Group`, `SortPriority`, `Description`, `SamplerType`, `GatherMode`, and texture sampling options.
 - Layout authoring support for `Layout = { Node(...); Comment(...); }` and Graph `#Region` / `#EndRegion` directives.
-- Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files.
+- Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files, resolved per source root — the project's `DShader` and each plugin's — including the `Project:` / `Plugin.<Name>:` qualifiers that cross between them.
 - `.dsf` file-shape diagnostics for reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations.
 - Go to Definition, Find References, Hover, Signature Help, Inlay Hints, document formatting, folding, and document symbols.
 - Bridge diagnostics panel for Unreal-side DreamShader compiler diagnostics.
@@ -278,10 +278,11 @@ Install dependencies:
 npm install
 ```
 
-Run the tests. Four tiers, each catching what the one below it cannot: `test:language` imports the
-language layer directly, `test:server` spawns the language server and holds an LSP conversation with
-it over stdio, `test:corpus` checks this half against the compiler's own corpus, and
-`test:extension` drives a real VS Code:
+Run the tests. Five tiers, each catching what the one below it cannot: `test:language` imports the
+language layer directly, `test:imports` builds real directory trees and checks import resolution
+against them, `test:server` spawns the language server and holds an LSP conversation with it over
+stdio, `test:corpus` checks this half against the compiler's own corpus, and `test:extension` drives
+a real VS Code:
 
 ```powershell
 npm test
