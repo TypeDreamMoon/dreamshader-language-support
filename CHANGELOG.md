@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.9.0
+
+**Graph breakpoints — preview any line's value on the mesh.** Set a breakpoint (F9) on a `Graph`
+line in a `.dsm` and the preview shows the value bound at that line on the mesh, instead of the
+finished material. It is the text-source equivalent of the Material Editor's right-click **Start
+Previewing Node**: pick a place in the graph, see what flows there. The previewed line is marked in
+the editor gutter, and the breakpoint disambiguates by picking the topmost enabled one when there
+are several. A breakpoint set on a blank or comment line snaps forward to the next line that binds a
+value; one set before the material has ever compiled attaches as soon as it does. Requires the
+matching DreamShader plugin build (preview protocol `setProbe`/`clearProbe`).
+
+**Faster, smoother streaming.** The live preview now streams **raw RGBA8 frames** straight onto a
+canvas — no PNG encode on the editor side, no PNG decode or Base64 on the client side, and the
+WebSocket is now owned by the preview view itself instead of being relayed frame by frame through the
+extension host. Static previews cost almost nothing: identical frames are dropped and the render
+rate backs off once the picture settles, then snaps back the moment you edit, rotate, or move the
+breakpoint. The default live frame rate is raised from 2 to 12 FPS, and the preview now renders at
+the panel's own size rather than a fixed 512×512 — crisper when enlarged, cheaper when small. It is
+still a *square* frame, letterboxed into whatever shape the panel is: previews render through the
+engine's thumbnail scene, whose projection matrix has its aspect ratio hardcoded to 1:1, so asking
+for a non-square frame would not show more of the scene, it would stretch the sphere into an
+ellipse. The legacy PNG path and the file-bridge fallback are still there for older plugin builds
+and for `dreamshader.previewTransport: "file"`.
+
+**Fixed: completions inserted a literal `$0`.** Accepting `TwoSided`, or any of the other 115
+`Settings` entries, typed `TwoSided = "$0";` into the document instead of leaving the cursor between
+the quotes. The same applied to `Base.<Output>` bindings and to section bodies. Snippet placeholders
+have two spellings — braced (`${1:Surface}`) and bare (`$0`) — and the check that decided whether an
+insert text was a snippet only recognised the braced one, so anything whose only placeholder was a
+bare `$0` was declared plain text and inserted verbatim. The brace is now optional in that check,
+and a server test asserts the invariant over a real `Settings` completion so it cannot regress.
+
+New preview toolbar meshes: **Cylinder** and **Shader Ball**, alongside Sphere / Plane / Cube.
+
 ## 1.8.3
 
 **Fixed: deleting a source file left its errors behind.** The count in the status bar stayed red and

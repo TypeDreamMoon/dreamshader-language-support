@@ -43,6 +43,8 @@ See the [changelog](./CHANGELOG.md) for what each release changed.
 - `.dsf` file-shape diagnostics for reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations.
 - Go to Definition, Find References, Hover, Signature Help, Inlay Hints, document formatting, folding, and document symbols.
 - Bridge diagnostics panel for Unreal-side DreamShader compiler diagnostics.
+- Live material preview that streams from the running Unreal Editor: raw RGBA8 frames painted on a canvas, drag-to-orbit, mesh and frame-rate controls, and per-panel viewport sizing.
+- **Graph breakpoints:** set a breakpoint (F9) on a `Graph` line to preview that line's value on the mesh — the text-source equivalent of the Material Editor's *Start Previewing Node*. The previewed line is marked in the gutter.
 - Package commands for installing, browsing, updating, and removing DreamShader packages.
 
 ## Supported Keywords
@@ -256,13 +258,18 @@ Available commands include:
   ],
   "dreamshader.enableGitHubPackageSearch": true,
   "dreamshader.showStatusBar": true,
-  "dreamshader.enableCodeLens": true
+  "dreamshader.enableCodeLens": true,
+  "dreamshader.previewTransport": "websocket",
+  "dreamshader.previewWebSocketPort": 17864,
+  "dreamshader.previewLiveFrameRate": 12
 }
 ```
 
 `dreamshader.projectRoot` can be left empty in most workspaces. The extension tries to auto-detect the Unreal project root from the active DreamShader file or workspace.
 
 `dreamshader.materialExpressionManifestPath` can point directly at a generated `Saved/DreamShader/Bridge/material-expressions.json`. Leave it empty to use the active project's bridge manifest plus the bundled fallback manifest.
+
+`dreamshader.previewTransport` selects how the live preview reaches the editor: `"websocket"` (the default — raw RGBA8 streaming, drag-to-orbit, and Graph breakpoints) or `"file"` (a one-shot PNG through the bridge request/response files, for setups where the WebSocket server is disabled). `dreamshader.previewLiveFrameRate` (default `12`, `0` pauses streaming) and `dreamshader.previewWebSocketPort` (default `17864`) apply to the WebSocket transport only.
 
 ## Bridge Diagnostics
 
