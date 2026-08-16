@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang .dsm materials, .dsf function files, and .dsh shared headers.",
-  "version": "1.8.3",
+  "version": "1.9.0",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -195,6 +195,11 @@
         "path": "./syntaxes/dreamshader.tmLanguage.json"
       }
     ],
+    "breakpoints": [
+      {
+        "language": "dreamshaderlang"
+      }
+    ],
     "snippets": [
       {
         "language": "dreamshaderlang",
@@ -269,10 +274,10 @@
         },
         "dreamshader.previewLiveFrameRate": {
           "type": "number",
-          "default": 2,
+          "default": 12,
           "minimum": 0,
           "maximum": 60,
-          "description": "Maximum streamed material preview frame rate. Set to 0 to disable continuous live frames."
+          "description": "Maximum streamed material preview frame rate. Raw RGBA frames make higher rates cheap; set to 0 to pause continuous live frames. Only applies to the WebSocket transport."
         }
       }
     },
