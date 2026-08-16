@@ -53,7 +53,12 @@ function completion(document, position, services) {
 
 function completionSpecToItem(document, spec, defaultRange) {
     const insertText = spec.insertText || spec.label;
-    const isSnippet = /\$\{\d/.test(spec.insertText || "");
+    // Snippet placeholders come in both spellings: braced (`${1:Surface}`, `${1|a,b|}`) and bare
+    // (`$0`). Matching only the braced form left every insert text whose sole placeholder was a bare
+    // `$0` — which is all 116 `createSettingItem` entries (`TwoSided = "$0";`), the `Base.<Output>`
+    // bindings, and the section bodies — declared PlainText, so the editor inserted the characters
+    // `$0` literally instead of placing the cursor. The `{` is what must be optional, not required.
+    const isSnippet = /\$\{?\d/.test(spec.insertText || "");
     const range = Array.isArray(spec.range)
         ? rangeFromOffsets(document, spec.range[0], spec.range[1])
         : defaultRange;

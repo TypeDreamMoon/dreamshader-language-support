@@ -129,6 +129,39 @@ async function main() {
     assert(items.length > 0, "There should be completions after `UE.`");
     assert(items.every((item) => item.textEdit), "Every item should carry its own range as a textEdit");
 
+    // A placeholder is a placeholder in both spellings. The converter used to detect only the braced
+    // `${1:…}` form, which left every insert text whose only placeholder was a bare `$0` declared as
+    // PlainText -- so the editor typed the characters `$0` into the document instead of putting the
+    // cursor there. `Settings` entries are the visible case (`TwoSided = "$0";`), and there are 116
+    // of them, so this asserts the invariant over a Settings-section completion rather than over the
+    // `UE.` list above, whose items happen to use the braced form.
+    const settingsUri = URI.file(path.join(WORKSPACE, "DShader", "M_SettingsProbe.dsm")).toString();
+    const settingsText = [
+        'Shader(Name="Materials/M_SettingsProbe", Root="Game")',
+        "{",
+        "    Settings = {",
+        "        ",
+        "    }",
+        "}",
+        ""
+    ].join("\n");
+    await connection.sendNotification("textDocument/didOpen", {
+        textDocument: { uri: settingsUri, languageId: "dreamshaderlang", version: 1, text: settingsText }
+    });
+    const settingsCompletions = await connection.sendRequest("textDocument/completion", {
+        textDocument: { uri: settingsUri },
+        position: { line: 3, character: 8 }
+    });
+    const settingsItems = Array.isArray(settingsCompletions) ? settingsCompletions : settingsCompletions.items;
+    assert(settingsItems.length > 0, "A Settings section should offer setting completions");
+    const placeholderItems = settingsItems.filter((item) => /\$\{?\d/.test(item.textEdit?.newText || ""));
+    assert(placeholderItems.length > 0, "Setting completions insert a `$0` placeholder to land the cursor in");
+    const literalDollarItems = placeholderItems.filter((item) => item.insertTextFormat !== 2);
+    assert.strictEqual(
+        literalDollarItems.length, 0,
+        "Every insert text carrying a placeholder must be declared InsertTextFormat.Snippet, or the "
+        + `editor inserts it literally: ${literalDollarItems.slice(0, 3).map((item) => item.textEdit.newText).join(", ")}`);
+
     const colors = await connection.sendRequest("textDocument/documentColor", textDocument());
     assert.strictEqual(colors.length, 1, "float4(1, 1, 1, 1) is the fixture's one color literal");
     const presentations = await connection.sendRequest("textDocument/colorPresentation", {
