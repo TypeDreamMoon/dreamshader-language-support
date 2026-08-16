@@ -12,6 +12,10 @@ on:
       - "extension.js"
       - "templates.js"
       - "src/**"
+      # The preview webview's runtime script. It ships in the VSIX and is the half of the preview
+      # that actually paints frames, so a change confined to it is a change worth releasing -- and
+      # without this line such a push would package nothing.
+      - "media/**"
       - "language-configuration.json"
       - "install-vscode-extension.ps1"
       - "README.md"
