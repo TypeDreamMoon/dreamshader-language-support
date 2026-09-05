@@ -3,6 +3,7 @@
   "name": "DreamShaderLang",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#preprocessorDirectives" },
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#sectionBlocks" },
@@ -60,6 +61,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#sectionBlocks" },
@@ -70,6 +72,7 @@
         },
         {
           "name": "meta.function.body.dreamshader",
+          "comment": "No `#preprocessorDirectives` here, and that omission is the feature: this body is raw HLSL, its `#` lines address the shader compiler's preprocessor, and DreamShader's preprocessor does not descend into it.",
           "begin": "\\b(Function|GraphFunction)\\b(?:\\s+(SelfContained|Inline))?\\s+(?:([A-Za-z_][A-Za-z0-9_]*)\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
           "beginCaptures": {
             "1": { "name": "keyword.control.dreamshader" },
@@ -113,6 +116,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#graphRegionDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
@@ -136,6 +140,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#graphRegionDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
@@ -160,6 +165,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#materialOutputs" },
@@ -180,6 +186,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#shaderKeywords" },
@@ -203,6 +210,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#shaderKeywords" },
@@ -230,6 +238,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#propertyGroupBlock" },
@@ -252,6 +261,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#layoutCalls" },
@@ -270,6 +280,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#settings" },
@@ -288,6 +299,7 @@
           "end": "\\}",
           "patterns": [
             { "include": "#comments" },
+            { "include": "#preprocessorDirectives" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#settings" },
@@ -338,12 +350,100 @@
       "patterns": [
         {
           "name": "meta.region.graph.dreamshader",
-          "match": "^\\s*(#(?:End)?Region)\\b(?:\\s+(\"[^\"]*\"|[^\\r\\n]+))?",
+          "comment": "The parser matches these two words with ESearchCase::IgnoreCase, so `#region` in lower case is, and always was, legal. Matching them case-sensitively here was a grammar-only bug.",
+          "match": "^\\s*(#(?i:(?:end)?region))\\b(?:\\s+(\"[^\"]*\"|[^\\r\\n]+))?",
           "captures": {
             "1": { "name": "keyword.control.region.dreamshader" },
             "2": { "name": "string.quoted.double.region-name.dreamshader" }
           }
         }
+      ]
+    },
+    "preprocessorDirectives": {
+      "comment": "The eight generation-time directives, line-oriented: the `#` may be preceded only by whitespace, may be followed by whitespace (`#  if FOO` is `#if FOO`), and the keyword is matched LOWERCASE ONLY -- `#IF` is DSH1035, not a directive. This rule is deliberately absent from `meta.function.body.dreamshader`: that body is raw HLSL addressed to the shader compiler's own preprocessor, and painting its `#include` / `#if` as DreamShader directives would be a lie. Every other patterns list gets it, because `#if` can cut any declaration -- a `Settings` line, an `Outputs` block, an `import`. A `#` line that is neither one of the eight keywords nor `#Region` / `#EndRegion` is DSH1035, but it is left unscoped rather than marked invalid: the function-body block ends at the first `}`, so HLSL lines past a nested brace can leak out here, and a false red mark is worse than a missing one.",
+      "patterns": [
+        { "include": "#preprocessorDefine" },
+        { "include": "#preprocessorNameDirectives" },
+        { "include": "#preprocessorConditionals" },
+        { "include": "#preprocessorElseEndif" }
+      ]
+    },
+    "preprocessorDefine": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.define.dreamshader",
+          "comment": "The value runs to end of line and is never tokenized, expanded or evaluated -- so it is left as plain text rather than highlighted as an expression. `#strings` comes before `#comments` to keep the trailing-comment strip quote-aware: `#define PP_URL \"http://x\"` keeps its whole string.",
+          "begin": "^[ \\t]*(#[ \\t]*define)\\b(?:[ \\t]+([A-Za-z_][A-Za-z0-9_]*)\\b)?",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.preprocessor.dreamshader" },
+            "2": { "name": "entity.name.constant.preprocessor.dreamshader" }
+          },
+          "end": "$",
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "preprocessorNameDirectives": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.dreamshader",
+          "comment": "`#ifdef` / `#ifndef` / `#undef` -- one name operand. `#ifdef NAME` is exactly `#if defined(NAME)`.",
+          "begin": "^[ \\t]*(#[ \\t]*(?:ifdef|ifndef|undef))\\b",
+          "beginCaptures": { "1": { "name": "keyword.control.preprocessor.dreamshader" } },
+          "end": "$",
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#preprocessorBuiltinConstants" },
+            { "name": "entity.name.constant.preprocessor.dreamshader", "match": "[A-Za-z_][A-Za-z0-9_]*" }
+          ]
+        }
+      ]
+    },
+    "preprocessorConditionals": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.conditional.dreamshader",
+          "comment": "`#if` / `#elif`. `\\b` after the keyword is what keeps this rule off `#ifdef`. `#comments` is first so a trailing `//` beats the `/` in `#operators`; the hex rule is before `#numbers`, which only knows decimals.",
+          "begin": "^[ \\t]*(#[ \\t]*(?:if|elif))\\b",
+          "beginCaptures": { "1": { "name": "keyword.control.preprocessor.dreamshader" } },
+          "end": "$",
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "name": "keyword.operator.defined.dreamshader", "match": "\\bdefined\\b" },
+            { "include": "#preprocessorBuiltinConstants" },
+            { "name": "constant.numeric.hex.dreamshader", "match": "\\b0[xX][0-9a-fA-F]+\\b" },
+            { "include": "#numbers" },
+            { "include": "#preprocessorOperators" },
+            { "include": "#operators" },
+            { "name": "variable.other.constant.preprocessor.dreamshader", "match": "[A-Za-z_][A-Za-z0-9_]*" }
+          ]
+        }
+      ]
+    },
+    "preprocessorElseEndif": {
+      "patterns": [
+        {
+          "comment": "`#else` / `#endif` take no operand at all. A stray token after one is DSH1042; it is left to the enclosing patterns rather than marked here.",
+          "match": "^[ \\t]*(#[ \\t]*(?:else|endif))\\b",
+          "captures": { "1": { "name": "keyword.control.preprocessor.dreamshader" } }
+        }
+      ]
+    },
+    "preprocessorBuiltinConstants": {
+      "patterns": [
+        { "name": "support.constant.builtin.dreamshader", "match": "\\b(?:DS_ENGINE_MAJOR|DS_ENGINE_MINOR|DS_ENGINE_PATCH|DS_PLATFORM|DS_PLUGIN_VERSION|DS_SUBSTRATE)\\b" }
+      ]
+    },
+    "preprocessorOperators": {
+      "comment": "The operators the conditional grammar has that `#operators` lacks. `!(?!=)` is what stops the logical rule from eating the `!` of a `!=`.",
+      "patterns": [
+        { "name": "keyword.operator.logical.dreamshader", "match": "&&|\\|\\||!(?!=)" },
+        { "name": "keyword.operator.comparison.dreamshader", "match": "==|!=|<=|>=|<|>" },
+        { "name": "keyword.operator.arithmetic.dreamshader", "match": "%" }
       ]
     },
     "layoutCalls": {

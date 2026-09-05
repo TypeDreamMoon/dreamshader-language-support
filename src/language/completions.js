@@ -10,6 +10,9 @@ const {
     GRAPH_TYPE_ITEMS,
     HLSL_TYPE_ITEMS,
     HLSL_KEYWORD_ITEMS,
+    PREPROCESSOR_DIRECTIVE_ITEMS,
+    PREPROCESSOR_DEFINED_ITEM,
+    PREPROCESSOR_BUILTIN_DEFINE_ITEMS,
     SETTINGS_ITEMS,
     VIRTUAL_FUNCTION_OPTION_ITEMS,
     MATERIAL_OUTPUT_ITEMS,
@@ -110,6 +113,32 @@ const LAYOUT_ARGUMENT_ITEMS = [
     ["Color", "Color=float4(${1:0.10}, ${2:0.16}, ${3:0.22}, ${4:0.35})", "Comment color"]
 ];
 
+// The other `#` syntax, offered alongside the eight directives because it is the only other thing
+// that may legally follow a `#` outside a Function body. Without it, typing the `#` that starts a
+// `#Region` would hide the region snippet that `GRAPH_SNIPPET_ITEMS` offers under the label `region`.
+const PREPROCESSOR_REGION_ITEMS = [
+    [
+        "#Region",
+        "#Region \"${1:Main}\"\n$0\n#EndRegion",
+        "Graph directive: group generated nodes into a named layout region",
+        [
+            "**Not a preprocessor directive.** `#Region` is read by the generator, over a stored `Graph`",
+            "body, and names a span of statements which becomes a comment box in the material graph.",
+            "",
+            "It is matched **case-insensitively** -- `#Region`, `#region` and `#REGION` are the same -- where",
+            "the eight preprocessor keywords are lowercase-only. It is also valid only inside `Graph = { ... }`,",
+            "it blanks its line to spaces rather than to an empty line, and it does not count as a directive",
+            "for *Adopt Into Source*."
+        ].join("\n")
+    ],
+    [
+        "#EndRegion",
+        "#EndRegion",
+        "Graph directive: close the innermost #Region",
+        "**Not a preprocessor directive.** Closes the `#Region` above it. Matched case-insensitively."
+    ]
+];
+
 const SWIZZLE_ITEMS = [
     "x", "y", "z", "w", "r", "g", "b", "a",
     "xy", "xyz", "xyzw", "rgb", "rgba"
@@ -147,6 +176,20 @@ function getCompletionSpecs(text, offset, services = {}) {
     const context = analyzeContext(text, offset);
     const specs = [];
     const add = makeAdder(specs);
+
+    // A `#` line is its own completion context, and an exclusive one -- nothing but a directive may
+    // follow the `#` -- so both branches return rather than falling through.
+    const preprocessorDirective = getPreprocessorDirectiveCompletionInfo(context);
+    if (preprocessorDirective) {
+        addPreprocessorDirectives(add, context, preprocessorDirective);
+        return dedupe(specs);
+    }
+
+    const preprocessorOperand = getPreprocessorOperandCompletionInfo(context);
+    if (preprocessorOperand) {
+        addPreprocessorOperands(add, preprocessorOperand);
+        return dedupe(specs);
+    }
 
     const rootPlugin = getRootPluginValueCompletionInfo(text, offset);
     if (rootPlugin) {
@@ -416,6 +459,109 @@ function addHlslIntrinsics(add) {
 function addGraphSnippets(add) {
     for (const [label, insertText, detail] of GRAPH_SNIPPET_ITEMS) {
         add({ label, kind: "Snippet", insertText, detail });
+    }
+}
+
+// ------------------------------------------------------------------ preprocessor
+//
+// Two contexts, split on one question: is the cursor still inside the keyword, or past it?
+//
+//     #i|              -> directive context; offer the eight keywords
+//     #if DS_SUB|      -> operand context;   offer `defined` and the builtin `DS_` constants
+//
+// Neither fires inside a `Function` / `GraphFunction` body. Those bodies are raw HLSL addressed to
+// the shader compiler's own preprocessor, which DreamShader's does not descend into, so a
+// DreamShader `#if` written there would silently never fire -- the completion must not suggest one.
+// Returning null rather than an empty list is what lets HLSL's own completions still answer there.
+
+const PREPROCESSOR_OPAQUE_CONTEXT_KINDS = new Set(["FunctionBody", "GraphFunctionBody"]);
+// Anchored at both ends: only whitespace may precede the `#`, and the keyword being typed must run
+// to the cursor. Anchoring the tail alone would claim `#if FOO#ba` for the directive context.
+/** The `#`, whitespace the language allows after it, and the keyword being typed. */
+const PREPROCESSOR_DIRECTIVE_LINE_PATTERN = /^[ \t]*(#[ \t]*)([A-Za-z_][A-Za-z0-9_]*)?$/;
+/** A complete directive keyword, with the operand region -- if any -- following it. */
+const PREPROCESSOR_OPERAND_LINE_PATTERN = /^[ \t]*#[ \t]*(if|elif|ifdef|ifndef|define|undef|else|endif)\b/;
+const PREPROCESSOR_DIRECTIVES_TAKING_A_CONDITION = new Set(["if", "elif"]);
+const PREPROCESSOR_DIRECTIVES_READING_A_NAME = new Set(["if", "elif", "ifdef", "ifndef"]);
+
+function getPreprocessorDirectiveCompletionInfo(context) {
+    if (PREPROCESSOR_OPAQUE_CONTEXT_KINDS.has(context.kind)) {
+        return null;
+    }
+    const match = PREPROCESSOR_DIRECTIVE_LINE_PATTERN.exec(context.linePrefix);
+    if (!match) {
+        return null;
+    }
+    // The replaced range has to start at the `#`, because the editor's word pattern does not include
+    // one: left to pick its own range the client would replace only the keyword, and inserting
+    // `#if ...` over the `i` of `#i` leaves `##if`.
+    const typed = match[1] + (match[2] || "");
+    return { replaceStartOffset: context.offset - typed.length, replaceEndOffset: context.offset };
+}
+
+function getPreprocessorOperandCompletionInfo(context) {
+    if (PREPROCESSOR_OPAQUE_CONTEXT_KINDS.has(context.kind)) {
+        return null;
+    }
+    const match = PREPROCESSOR_OPERAND_LINE_PATTERN.exec(context.linePrefix);
+    // `>=`, not `>`: with the cursor sitting exactly at the end of the keyword the user is still
+    // typing it -- `#if|` may yet become `#ifdef` -- and that is the directive context's to answer.
+    if (!match || match[0].length >= context.linePrefix.length) {
+        return null;
+    }
+    return { directive: match[1] };
+}
+
+function addPreprocessorDirectives(add, context, info) {
+    const range = [info.replaceStartOffset, info.replaceEndOffset];
+    for (const item of PREPROCESSOR_DIRECTIVE_ITEMS) {
+        add({
+            label: item.name,
+            kind: "Keyword",
+            insertText: item.insertText,
+            detail: item.detail,
+            documentation: item.documentation,
+            range
+        });
+    }
+    if (context.kind === "Graph") {
+        for (const [label, insertText, detail, documentation] of PREPROCESSOR_REGION_ITEMS) {
+            add({ label, kind: "Snippet", insertText, detail, documentation, range, sortText: `zz-${label}` });
+        }
+    }
+}
+
+// The four directives that get nothing here are each a case where an offer would be an offer to
+// write a diagnostic, which is not a completion:
+//
+//   #define / #undef  the `DS_` prefix is reserved, so naming a builtin there is DSH1039
+//   #else / #endif    take no operand at all; a stray token after one is DSH1042
+//
+// Returning an empty list rather than null is the point -- the branch has already claimed the line,
+// so nothing falls through to offer `Shader` or `float3` after a `#endif`.
+function addPreprocessorOperands(add, info) {
+    if (PREPROCESSOR_DIRECTIVES_TAKING_A_CONDITION.has(info.directive)) {
+        add({
+            label: PREPROCESSOR_DEFINED_ITEM.name,
+            kind: "Keyword",
+            insertText: PREPROCESSOR_DEFINED_ITEM.insertText,
+            detail: PREPROCESSOR_DEFINED_ITEM.detail,
+            documentation: PREPROCESSOR_DEFINED_ITEM.documentation
+        });
+    }
+    if (!PREPROCESSOR_DIRECTIVES_READING_A_NAME.has(info.directive)) {
+        return;
+    }
+    for (const item of PREPROCESSOR_BUILTIN_DEFINE_ITEMS) {
+        // `EnumMember` rather than `Constant`: the spec-to-protocol map in `server/providers.js` has
+        // no `Constant` case, and an unmapped kind falls through to `Text`.
+        add({
+            label: item.name,
+            kind: "EnumMember",
+            insertText: item.insertText,
+            detail: item.detail,
+            documentation: item.documentation
+        });
     }
 }
 

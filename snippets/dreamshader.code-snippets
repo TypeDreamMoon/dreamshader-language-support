@@ -410,6 +410,112 @@
       "}"
     ],
     "description": "Material Shader using 1.5 syntax: Group(\"X\") scope, Slider shorthand, and section blocks without '='"
+  },
+  "DreamShader Preprocessor If": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#if",
+      "ppif"
+    ],
+    "body": [
+      "#if ${1:CONDITION}",
+      "$0",
+      "#endif"
+    ],
+    "description": "Generation-time conditional: cut the lines that follow unless the condition is true. Not valid inside a Function body"
+  },
+  "DreamShader Preprocessor If Else": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#ifelse",
+      "ppifelse"
+    ],
+    "body": [
+      "#if ${1:CONDITION}",
+      "$0",
+      "#else",
+      "",
+      "#endif"
+    ],
+    "description": "Generation-time conditional with an else branch"
+  },
+  "DreamShader Preprocessor Ifdef": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#ifdef",
+      "ppifdef"
+    ],
+    "body": [
+      "#ifdef ${1:NAME}",
+      "$0",
+      "#endif"
+    ],
+    "description": "Sugar for #if defined(NAME)"
+  },
+  "DreamShader Preprocessor Ifndef": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#ifndef",
+      "ppifndef"
+    ],
+    "body": [
+      "#ifndef ${1:NAME}",
+      "$0",
+      "#endif"
+    ],
+    "description": "Sugar for #if !defined(NAME)"
+  },
+  "DreamShader Preprocessor Define": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#define",
+      "ppdefine"
+    ],
+    "body": [
+      "#define ${1:NAME} ${2:1}"
+    ],
+    "description": "Name a value for THIS FILE ONLY -- a #define does not reach a file that imports this one. The value is text to end of line, never expanded"
+  },
+  "DreamShader Preprocessor Undef": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#undef",
+      "ppundef"
+    ],
+    "body": [
+      "#undef ${1:NAME}"
+    ],
+    "description": "Remove a name for the rest of this file"
+  },
+  "DreamShader Preprocessor Substrate Outputs Gate": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#ifsubstrate",
+      "ppsubstrate"
+    ],
+    "body": [
+      "#if DS_SUBSTRATE",
+      "Substrate ${1:Surface};",
+      "Base.FrontMaterial = ${1:Surface};",
+      "#else",
+      "vec3 ${2:BaseColor};",
+      "Base.BaseColor = ${2:BaseColor};",
+      "#endif"
+    ],
+    "description": "Substrate / non-Substrate Outputs gate: the two branches declare neither the same names nor the same types, which is the declaration-layer difference no static switch can express"
+  },
+  "DreamShader Preprocessor Engine Version Gate": {
+    "scope": "dreamshaderlang",
+    "prefix": [
+      "#ifengine",
+      "ppengine"
+    ],
+    "body": [
+      "#if DS_ENGINE_MAJOR > ${1:5} || (DS_ENGINE_MAJOR == ${1:5} && DS_ENGINE_MINOR >= ${2:7})",
+      "$0",
+      "#endif"
+    ],
+    "description": "Engine version gate. Both halves are needed, or the condition reads 6.0 as older than 5.7"
   }
 }
 

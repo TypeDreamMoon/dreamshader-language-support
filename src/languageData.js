@@ -201,6 +201,251 @@ const HLSL_KEYWORD_ITEMS = [
     ["struct", "Structure declaration"]
 ];
 
+// ---------------------------------------------------------------- preprocessor
+//
+// The eight generation-time directives, `defined`, and the six read-only `DS_` builtins. Wording is
+// taken from the user documentation -- `Plugins/DreamShader/Docs/language/preprocessor.md` -- so that
+// the editor and the manual say the same thing about the two questions that actually bite: how `#if`
+// differs from a static switch, and that a `#define` is file-local.
+//
+// Every `name` carries its `#`. The completion replaces an explicit range that starts at the `#`,
+// because the editor's word pattern does not: an item labelled `if`, offered on a line reading `#i`,
+// would leave `##if` behind.
+
+const PREPROCESSOR_DIRECTIVE_ITEMS = [
+    {
+        name: "#if",
+        insertText: "#if ${1:CONDITION}\n$0\n#endif",
+        detail: "Preprocessor: keep the lines that follow only when the condition is true",
+        documentation: [
+            "Cuts source text **at generation time**, before `import` extraction and before the declaration",
+            "parser. A branch that is not taken never reaches the parser and never becomes a node.",
+            "",
+            "**`#if` is not a static switch.** A `StaticSwitchParameter` is a node: it lives inside",
+            "`Graph = { ... }`, it selects between two *values*, and a material instance answers it. `#if` is",
+            "text, so it is the only one of the two that can cut the **declaration** layer -- a `Settings`",
+            "line, a whole `Outputs` block, an `import`, an entire `ShaderFunction`. One rule: `#if` is a",
+            "project-wide, build-time decision; a static switch is a per-instance, artist-facing one. Do not",
+            "reach for `#if` to keep a permutation count down -- that trades a permutation for a rebuild and",
+            "takes the choice away from whoever is using the material.",
+            "",
+            "An untaken branch is **not checked at all**: never lexed, never parsed, never type-checked,",
+            "never generated. It may contain anything and the compile stays green, so keep branches short",
+            "and compile every define set you actually ship.",
+            "",
+            "Valid on any line outside a `Function` / `GraphFunction` body, `Graph` included. The keyword is",
+            "matched **lowercase only** -- `#IF` is `DSH1035`, not a line that quietly does nothing.",
+            "",
+            "```c",
+            "#if DS_ENGINE_MAJOR > 5 || (DS_ENGINE_MAJOR == 5 && DS_ENGINE_MINOR >= 7)",
+            "```"
+        ].join("\n")
+    },
+    {
+        name: "#ifdef",
+        insertText: "#ifdef ${1:NAME}\n$0\n#endif",
+        detail: "Preprocessor: exactly `#if defined(NAME)`",
+        documentation: [
+            "Pure sugar. It desugars to `#if defined(NAME)` before anything else happens and behaves",
+            "identically from there, including what it contributes to the build key. It exists because the",
+            "spelling decision was \"match HLSL\", and a HLSL author writes it from muscle memory.",
+            "",
+            "Takes exactly one name; a surplus token is `DSH1042`, and a missing or malformed one `DSH1038`."
+        ].join("\n")
+    },
+    {
+        name: "#ifndef",
+        insertText: "#ifndef ${1:NAME}\n$0\n#endif",
+        detail: "Preprocessor: exactly `#if !defined(NAME)`",
+        documentation: [
+            "Pure sugar. It desugars to `#if !defined(NAME)` before anything else happens and behaves",
+            "identically from there, including what it contributes to the build key.",
+            "",
+            "Takes exactly one name; a surplus token is `DSH1042`, and a missing or malformed one `DSH1038`."
+        ].join("\n")
+    },
+    {
+        name: "#elif",
+        insertText: "#elif ${1:CONDITION}",
+        detail: "Preprocessor: another branch, with its own condition",
+        documentation: [
+            "Same expression grammar as `#if`. Only the first branch of a chain whose condition is true is",
+            "kept; the rest are cut, and their conditions are not evaluated.",
+            "",
+            "`#elif` with no `#if` above it is `DSH1032`, and an `#elif` after an `#else` is `DSH1033` -- the",
+            "`#else` closes the chain."
+        ].join("\n")
+    },
+    {
+        name: "#else",
+        insertText: "#else",
+        detail: "Preprocessor: the branch taken when every condition above failed",
+        documentation: [
+            "Closes the chain: no `#elif` and no second `#else` may follow it (`DSH1033`). An `#else` with no",
+            "`#if` above it is `DSH1032`.",
+            "",
+            "It takes no operand, and that check applies **whether or not the `#else` sits inside a branch",
+            "that was cut** -- it belongs to the chain, not to a branch."
+        ].join("\n")
+    },
+    {
+        name: "#endif",
+        insertText: "#endif",
+        detail: "Preprocessor: close the innermost `#if` chain",
+        documentation: [
+            "Chains nest to 64 levels, counted inside skipped branches too; the 65th is `DSH1037`. Reaching",
+            "end of file with a chain still open is `DSH1030`, and an `#endif` with no matching `#if` is",
+            "`DSH1031`.",
+            "",
+            "It takes no operand -- inside a cut branch as much as outside, because it belongs to the chain",
+            "rather than to a branch. The habit this catches is C's, where a long chain is labelled at the",
+            "bottom:",
+            "",
+            "```c",
+            "#endif MOONTOON_LEGACY     // DSH1042 -- MOONTOON_LEGACY is a stray token",
+            "#endif // MOONTOON_LEGACY  // correct",
+            "```"
+        ].join("\n")
+    },
+    {
+        name: "#define",
+        insertText: "#define ${1:NAME} ${2:1}",
+        detail: "Preprocessor: name a value, for this file only",
+        documentation: [
+            "Defines `NAME` for the remainder of **this file**. The value is everything after the name to the",
+            "end of the line; it is stored as text and **never tokenized, never expanded, never evaluated**.",
+            "There are no macros here -- only named values for a `#if` to test:",
+            "",
+            "```c",
+            "#define PP_SUM  1 + 1      // the five-character string \"1 + 1\", NOT the integer 2",
+            "#define PP_C    5 // five  // the integer 5 -- the trailing comment is stripped first",
+            "#define PP_MARK            // empty: a marker, which reads as the integer 1",
+            "```",
+            "",
+            "**A `#define` is file-local. This is not C.** It is not visible to a file that imports this one,",
+            "and not to a file imported after it. The preprocessor runs *before* imports are extracted, which",
+            "is what lets a `#if` wrap an `import` line; making `#define` behave like C's would mean",
+            "preprocessing the assembled text, and then a `#if` could no longer decide which imports to pull.",
+            "The two cannot both be had, and wrapping `import` won.",
+            "",
+            "**To define a switch centrally, use a channel built for it**: *Preprocessor Defines* in the",
+            "project settings, `RegisterDreamShaderDefine()` from C++, or `-Define=NAME=VALUE` on the",
+            "commandlet. A `#define` in a source file is for a local abbreviation within that file.",
+            "",
+            "It is the only directive with no trailing-token check, since its value runs to end of line:",
+            "`#define A B C` is legal, with the value `B C`. Defining a reserved `DS_` name is `DSH1039`."
+        ].join("\n")
+    },
+    {
+        name: "#undef",
+        insertText: "#undef ${1:NAME}",
+        detail: "Preprocessor: remove a name, for the rest of this file",
+        documentation: [
+            "Undefines `NAME` for the remainder of this file. Like `#define` it is **file-local**: it does not",
+            "reach a file that imports this one, and it cannot remove a define that a *later* file made.",
+            "",
+            "Takes exactly one name -- `#undef A B` is `DSH1042`, which `#define` is excused from but this is",
+            "not. A missing or malformed name is `DSH1038`, and undefining a reserved `DS_` name `DSH1039`."
+        ].join("\n")
+    }
+];
+
+const PREPROCESSOR_DEFINED_ITEM = {
+    name: "defined",
+    insertText: "defined(${1:NAME})",
+    detail: "Preprocessor: 1 when NAME is defined, 0 when it is not",
+    documentation: [
+        "Both `defined(NAME)` and `defined NAME` are accepted. The define's **value is not looked at** --",
+        "only whether the table has the name at all.",
+        "",
+        "A name read through `defined()` is recorded in the build key like any other read, with the",
+        "sentinel `<undef>` when the table had nothing, so defining it later still rebuilds the sources",
+        "that only asked whether it existed."
+    ].join("\n")
+};
+
+const PREPROCESSOR_BUILTIN_NOTE = [
+    "Builtin `DS_` define. This tier is **read-only and never loses**: it outranks the project's",
+    "*Preprocessor Defines*, `RegisterDreamShaderDefine()`, a define provider, and `-Define=` on the",
+    "command line alike.",
+    "",
+    "**The `DS_` prefix is reserved as a prefix, not as a list** -- `#define` or `#undef` of any name",
+    "beginning with `DS_` is `DSH1039`, whether or not DreamShader ships that name today. The test is",
+    "case-sensitive, so `ds_foo` is an ordinary name.",
+    "",
+    "Every builtin is an **invariant of the running process**, and that is a requirement rather than a",
+    "coincidence: a define is evaluated once at generation time and its effect is baked into a saved",
+    "asset, so a value that could change mid-session would make the build unreproducible and the",
+    "asset's recorded build key a lie."
+].join("\n");
+
+function createPreprocessorBuiltinItem(name, valueType, summary, body) {
+    return {
+        name,
+        insertText: name,
+        valueType,
+        detail: `Builtin define (${valueType}) -- ${summary}`,
+        documentation: [...body, "", PREPROCESSOR_BUILTIN_NOTE].join("\n")
+    };
+}
+
+const PREPROCESSOR_BUILTIN_DEFINE_ITEMS = [
+    createPreprocessorBuiltinItem("DS_ENGINE_MAJOR", "integer", "engine major version", [
+        "The engine major version -- `5`. Taken from DreamShader's own `DREAMSHADER_UE_MAJOR`, the same",
+        "macro the plugin's C++ `DREAMSHADER_UE_VERSION_AT_LEAST` guards read, not",
+        "`ENGINE_MAJOR_VERSION`, so a fork that overrides it for compatibility testing gets one answer",
+        "rather than two that disagree.",
+        "",
+        "A version gate needs both halves, or it reads `6.0` as older than `5.7`:",
+        "",
+        "```c",
+        "#if DS_ENGINE_MAJOR > 5 || (DS_ENGINE_MAJOR == 5 && DS_ENGINE_MINOR >= 7)",
+        "```"
+    ]),
+    createPreprocessorBuiltinItem("DS_ENGINE_MINOR", "integer", "engine minor version", [
+        "The engine minor version -- `3` ... `8`, from `DREAMSHADER_UE_MINOR`.",
+        "",
+        "Pair it with `DS_ENGINE_MAJOR`; on its own it reads `6.0` as older than `5.7`:",
+        "",
+        "```c",
+        "#if DS_ENGINE_MAJOR > 5 || (DS_ENGINE_MAJOR == 5 && DS_ENGINE_MINOR >= 7)",
+        "```"
+    ]),
+    createPreprocessorBuiltinItem("DS_ENGINE_PATCH", "integer", "engine hotfix version", [
+        "The engine hotfix version, from `DREAMSHADER_UE_PATCH`."
+    ]),
+    createPreprocessorBuiltinItem("DS_SUBSTRATE", "integer", "1 when Substrate is enabled", [
+        "`1` when Substrate is enabled and `0` otherwise, read from the `r.Substrate` CVar -- which",
+        "qualifies as a process invariant only because it is read-only and fixed at startup.",
+        "",
+        "This is the case the feature exists for. Under Substrate a material may need a different",
+        "`ShadingModel`, a different `import`, and a different set of `Outputs` -- not the same names, and",
+        "not even the same types. A `Substrate` value and a `vec3` are not two inputs of one switch node;",
+        "they are two different materials."
+    ]),
+    createPreprocessorBuiltinItem("DS_PLATFORM", "string", "the ini platform name", [
+        "**A string.** The *ini* platform name, for example `\"Windows\"` -- never `PlatformName()`, which",
+        "folds in editor/server/client and would answer `WindowsEditor` in the editor but `Windows` during",
+        "a cook, so one source would preprocess two different ways on the two sides of a cook.",
+        "",
+        "Compare it with `==` / `!=` and nothing else, and note the comparison is **case-sensitive**:",
+        "`DS_PLATFORM == \"windows\"` is false on Windows. **A string is never coerced to a truth value** --",
+        "`#if DS_PLATFORM` is `DSH1040`, and so are `!DS_PLATFORM`, `DS_PLATFORM && X`, and any comparison",
+        "against a number. Silently treating a string as true is how a platform gate ends up firing",
+        "everywhere, so it is refused instead."
+    ]),
+    createPreprocessorBuiltinItem("DS_PLUGIN_VERSION", "string", "the plugin VersionName", [
+        "**A string.** The plugin descriptor's `VersionName`, for example `\"1.9.0\"`, falling back to",
+        "`\"unknown\"` rather than going undefined -- otherwise `defined(DS_PLUGIN_VERSION)` could flip for",
+        "a reason that has nothing to do with the source, and take a build key with it.",
+        "",
+        "Being a string, `DS_PLUGIN_VERSION >= \"1.9.0\"` is `DSH1040`, not a version test. Compare it with",
+        "`==` / `!=` only; for a version gate use the integer engine defines."
+    ])
+];
+
+const PREPROCESSOR_BUILTIN_DEFINE_NAME_SET = new Set(PREPROCESSOR_BUILTIN_DEFINE_ITEMS.map((item) => item.name));
+
 function createSettingItem(name, detail, insertText) {
     return {
         name,
@@ -925,6 +1170,10 @@ module.exports = {
     GRAPH_TYPE_ITEMS,
     HLSL_TYPE_ITEMS,
     HLSL_KEYWORD_ITEMS,
+    PREPROCESSOR_DIRECTIVE_ITEMS,
+    PREPROCESSOR_DEFINED_ITEM,
+    PREPROCESSOR_BUILTIN_DEFINE_ITEMS,
+    PREPROCESSOR_BUILTIN_DEFINE_NAME_SET,
     SETTINGS_ITEMS,
     VIRTUAL_FUNCTION_OPTION_ITEMS,
     MATERIAL_OUTPUT_ITEMS,
