@@ -17,9 +17,18 @@ const {
 
 function analyzeContext(text, offset) {
     const ast = parseDocument(text);
+
+    // `ast.text` is the document with its preprocessor directive lines blanked -- what the parser
+    // read. The loose fallbacks below re-scan the document themselves instead of reading the tree,
+    // so they need that same view: on the raw text a `#if` line, carrying no `;` to split on, merges
+    // into the statement under the cursor and the half-typed declaration on the next line loses its
+    // type. Offsets are identical in both, the blank being an equal-length run of spaces, so nothing
+    // downstream has to know which one answered. `linePrefix` and `currentWord` stay on the raw text
+    // deliberately: those two describe the characters the author is looking at.
+    const cutText = ast.text;
     let block = findInnermostBlock(ast.blocks, offset);
     let section = block ? findSection(block, offset) : null;
-    const looseContext = section ? null : findLooseSectionContext(text, offset);
+    const looseContext = section ? null : findLooseSectionContext(cutText, offset);
     if (looseContext) {
         block = block ? mergeLooseBlock(block, looseContext.block) : looseContext.block;
         section = findSection(block, offset) || looseContext.section;
@@ -28,18 +37,18 @@ function analyzeContext(text, offset) {
     const linePrefix = getLinePrefix(text, offset);
     let entry = section ? findEntry(section, offset) : null;
     if (!entry && looseContext && section?.name === "Outputs") {
-        entry = findLooseOutputsEntry(text, section, offset);
+        entry = findLooseOutputsEntry(cutText, section, offset);
     }
     let setting = section && (section.name === "Settings" || section.name === "Options")
         ? findAssignmentAtOffset(section, offset)
         : null;
     if (!setting && looseContext && (section?.name === "Settings" || section?.name === "Options")) {
-        setting = findLooseAssignmentAtOffset(text, section, offset);
+        setting = findLooseAssignmentAtOffset(cutText, section, offset);
     }
     const metadata = entry
-        ? getMetadataContext(text, entry, offset)
+        ? getMetadataContext(cutText, entry, offset)
         : section
-            ? getLooseMetadataContext(text, section, offset)
+            ? getLooseMetadataContext(cutText, section, offset)
             : null;
 
     let kind = "TopLevel";

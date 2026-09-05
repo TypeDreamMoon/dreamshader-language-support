@@ -12,6 +12,12 @@ const {
     getPackagesDirectory
 } = require("./projects");
 
+// Resolution only. WHICH specifiers arrive here is decided in `language/parser.js`, and it is the
+// union over every `#if` branch in the file -- an import inside a branch this build would cut is
+// resolved, indexed and watched like any other, matching what the plugin's dependency graph does
+// with the raw text. Nothing here may start filtering on a condition: this side has no define table
+// to evaluate one against, so the only alternatives to the union are a guess or a hole.
+
 // Mirror the plugin's NormalizeImportSpecifier: normalize slashes, strip leading "./", and append
 // ".dsh" when the specifier has no extension, so `import "ColorLib"` resolves to ColorLib.dsh.
 function normalizeImportSpecifier(importPath) {

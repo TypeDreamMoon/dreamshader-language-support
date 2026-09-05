@@ -20,6 +20,7 @@ const path = require("path");
 
 const { resolveImportPath, collectAvailableImports } = require("../src/project/imports");
 const { invalidateProjectRootCache } = require("../src/project/projects");
+const { buildDocumentIndex } = require("../src/language/indexer");
 
 function write(filePath, text = "") {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -167,6 +168,55 @@ for (const specifier of pluginImports) {
 const projectImports = collectAvailableImports(projectMaterial);
 assert(projectImports.includes("Shared/Common.dsh") && projectImports.includes("Plugin.MoonToon:Shared/Toon.dsh"),
     "The project root sees its own files bare and the plugin's qualified");
+
+// ------------------------------------------------------------------------ imports behind a `#if`
+
+// The compiler preprocesses BEFORE it extracts imports -- that ordering is the whole reason a
+// `#define` is file-local over there -- so a `#if` may wrap an `import` line and decide which header
+// a build pulls. This side has no define table, so it cannot know which branch wins, and it does not
+// guess: every branch's specifier is an import, is resolved, and is walked. That is the same answer
+// the compiler's own dependency graph gives, which scans the raw text without evaluating anything so
+// that editing a `.dsh` only a dead branch imports still rebuilds its dependents. Conservative in
+// the one direction that is safe: a header indexed when this build would have cut it costs a little
+// memory, a header missed costs every symbol in it.
+write(path.join(project, "DShader", "Shared", "SubstrateHelpers.dsh"),
+    "Function SubstrateOnly(in float3 C, out float3 R) { R = C; }\n");
+write(path.join(project, "DShader", "Shared", "LegacyHelpers.dsh"),
+    "Function LegacyOnly(in float3 C, out float3 R) { R = C; }\n");
+
+const conditionalMaterial = path.join(project, "DShader", "Materials", "M_Conditional.dsm");
+const conditionalSource = [
+    "#if DS_SUBSTRATE",
+    'import "Shared/SubstrateHelpers.dsh";',
+    "#else",
+    'import "Shared/LegacyHelpers.dsh";',
+    "#endif",
+    "",
+    'Shader(Name="Materials/M_Conditional", Root="Game")',
+    "{",
+    "    Graph = {",
+    "        Color = float3(1, 1, 1);",
+    "    }",
+    "}",
+    ""
+].join("\n");
+write(conditionalMaterial, conditionalSource);
+
+const conditionalIndex = buildDocumentIndex({
+    fileName: conditionalMaterial,
+    text: conditionalSource,
+    // The indexer asks specifier-first; `resolveImportPath` asks importing-file-first.
+    resolveImportPath: (specifier, fromFsPath) => resolveImportPath(fromFsPath, specifier)
+});
+
+assert.deepStrictEqual(
+    conditionalIndex.files.map((file) => path.basename(file.fsPath)).sort(),
+    ["LegacyHelpers.dsh", "M_Conditional.dsm", "SubstrateHelpers.dsh"],
+    "An import inside either branch of a `#if` is a dependency and gets walked");
+assert.deepStrictEqual(
+    conditionalIndex.functionEntries.map((entry) => entry.name).sort(),
+    ["LegacyOnly", "SubstrateOnly"],
+    "...so a Function declared in either header is a symbol this file can resolve and jump to");
 
 fs.rmSync(project, { recursive: true, force: true });
 fs.rmSync(standalone, { recursive: true, force: true });

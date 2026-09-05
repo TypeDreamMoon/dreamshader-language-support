@@ -58,8 +58,15 @@ function parseDocument(text) {
         return cached;
     }
 
-    const tokens = scan(text);
-    const parser = new Parser(text, tokens);
+    // The preprocessor runs before the parser here, as it does in the plugin -- `preprocessor.md`
+    // puts it plainly: "the parser never sees a directive". Doing it once, for the whole document,
+    // is what makes every consumer below safe at once: a directive line carries no `;`, so wherever
+    // it is left in, the statement splitters glue it onto the statement after it and the `Surface`
+    // in `#if DS_SUBSTRATE` + newline + `Surface = ...` stops being a symbol at all.
+    const rawTokens = scan(text);
+    const source = stripPreprocessorDirectivesPreserveLayout(text, rawTokens);
+    const tokens = source === text ? rawTokens : scan(source);
+    const parser = new Parser(source, tokens);
     const ast = parser.parse();
 
     parseCache.set(text, ast);
@@ -114,6 +121,10 @@ class Parser {
         }
 
         return {
+            // The text the parser actually read: the document with its preprocessor directive lines
+            // blanked, equal in length and in every offset to the document itself. Consumers that
+            // re-scan the document for structure want this one; consumers showing the author their
+            // own characters back want the document. `analyzeContext` uses both, and says which.
             text: this.text,
             tokens: this.tokens,
             blocks: this.blocks,
@@ -122,6 +133,14 @@ class Parser {
         };
     }
 
+    // Every `import` in the file, from every branch of every `#if`.
+    //
+    // By the time this runs the directive lines are blanked and the branches are not, so an import
+    // inside a branch this build would cut is collected like any other -- which is exactly what the
+    // plugin's dependency graph does with the raw text, and for the same reason: rebuilding (or here,
+    // indexing) more than strictly necessary costs time, while missing a dependency produces answers
+    // that do not match the source. Whoever next tries to make this "smarter" by evaluating the
+    // condition: there is no define table on this side to evaluate it against.
     parseImport() {
         const start = this.advance();
         const pathToken = this.findNext((token) => token.type === "string", start.end + 512);
@@ -822,10 +841,150 @@ function parseCodeDeclarationEntries(text, baseOffset) {
     return result;
 }
 
+// `#Region` / `#EndRegion` are matched case-insensitively -- the `i` flag, deliberately. The
+// plugin's ExtractGraphRegions reaches them through `IsGraphDirective`, which compares with
+// `ESearchCase::IgnoreCase`, so `#region` and `#REGION` are region directives over there and
+// `Docs/language/layout.md` says so. The two `isRegionDirective` helpers (diagnostics.js,
+// providers.js) already lowercase both sides, so all three sites agree.
+//
+// This is the ONE `#` spelling that stays case-insensitive. The eight preprocessor keywords below
+// are lowercase-only, because a mis-cased `#IF` is DSH1035 in the plugin rather than a line that
+// quietly does nothing.
 function stripGraphRegionDirectivesPreserveLayout(text) {
     const source = String(text || "");
     return source.replace(/^[ \t]*#(?:End)?Region(?:[ \t]+(?:"[^"\r\n]*"|[^\r\n]*))?[ \t]*(?=\r?$)/gim, (match) =>
         match.replace(/[^\r\n]/g, " "));
+}
+
+// The eight preprocessor keywords, and the only spellings that are them.
+//
+// Lowercase, matched case-sensitively, mirroring the plugin's `GDirectiveKeywords` table. The
+// keyword there is read as a maximal run of identifier characters, which settles three rules at
+// once: `#if(A)` is a directive, `#  if FOO` is the same directive as `#if FOO`, and `#iffy` is not
+// `#if` with a suffix -- it is an unknown directive, DSH1035. The lookahead is what reproduces that
+// last one; a `\b` would too, but only by accident of the alternation order.
+//
+// `#include` is deliberately absent. At the declaration level it is DSH1035 (the spelling is
+// `import`), and inside a `Function` body it is the shader compiler's, so neither case wants it
+// blanked.
+const PREPROCESSOR_DIRECTIVE_LINE =
+    /^[ \t]*#[ \t]*(?:ifdef|ifndef|if|elif|else|endif|define|undef)(?![A-Za-z0-9_])[^\r\n]*/gm;
+
+/**
+ * The character ranges that `Function` / `GraphFunction` bodies occupy -- the text the preprocessor
+ * does not descend into.
+ *
+ * A body is raw HLSL, and HLSL has a preprocessor of its own. A `#` line in there addresses THAT
+ * one, with the shader compiler's defines (`MATERIALBLENDING_SOLID`, `PIXELSHADER`), none of which
+ * DreamShader knows. This is not a corner case: across the whole source tree every HLSL `#`
+ * directive in a `.dsm` / `.dsf` / `.dsh` -- nine files, six `#include` and three `#if` chains --
+ * sits inside a body, with no exceptions. MF_MoonToonTranslucencyShadow.dsf is the sharpest of them,
+ * a seven-way blend-mode switch that is a Custom node precisely because the engine exposes blend
+ * mode only as a define.
+ *
+ * Found from the token stream rather than a line scan, so a signature spanning several lines or
+ * carrying `SelfContained` / `Inline` needs no special case: between the keyword and the body brace
+ * only identifiers and one parenthesised parameter list may stand, and anything else -- an `=`, a
+ * `;` -- means this `Function` was never a block header. An unterminated body runs to end of text,
+ * matching `parseFunctionBlock`, so a body being typed stays opaque rather than half-cut.
+ */
+function findOpaqueFunctionBodyRanges(text, tokens) {
+    const ranges = [];
+    for (let index = 0; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        if (token.type !== "identifier" || (token.value !== "Function" && token.value !== "GraphFunction")) {
+            continue;
+        }
+        let cursor = skipTrivia(tokens, index + 1);
+        while (cursor < tokens.length) {
+            const candidate = tokens[cursor];
+            if (candidate.type === "identifier") {
+                cursor = skipTrivia(tokens, cursor + 1);
+                continue;
+            }
+            if (candidate.value === "(") {
+                const closeIndex = findMatchingInTokenList(tokens, cursor, "(", ")");
+                if (closeIndex < 0) {
+                    break;
+                }
+                cursor = skipTrivia(tokens, closeIndex + 1);
+                continue;
+            }
+            if (candidate.value === "{") {
+                const closeIndex = findMatchingInTokenList(tokens, cursor, "{", "}");
+                ranges.push({
+                    // From the KEYWORD, not from the body brace. The plugin's FOpaqueRegionTracker
+                    // answers "opaque" the moment it has seen `Function` -- its SeekingBody state is
+                    // already opaque, before the `{` arrives -- so a `#` line written between a
+                    // multi-line signature and its opening brace is passed through there. Starting
+                    // at the brace instead would blank that one line here while the compiler kept
+                    // it: the editor and the build would disagree about a line neither of them
+                    // should be reading as DreamShaderLang. Widening cannot claim the declaration
+                    // itself, because only lines whose first non-blank character is `#` are ever
+                    // tested against these ranges.
+                    start: token.start,
+                    end: closeIndex >= 0 ? tokens[closeIndex].start : text.length
+                });
+                // Skip the body wholesale: an HLSL body may well contain the word `Function` again,
+                // and it is not a block header in there either.
+                index = closeIndex >= 0 ? closeIndex : tokens.length;
+                break;
+            }
+            break;
+        }
+    }
+    return ranges;
+}
+
+/**
+ * Blanks every preprocessor directive line outside a `Function` / `GraphFunction` body, keeping the
+ * text's length and layout.
+ *
+ * BOTH BRANCHES SURVIVE, ON PURPOSE. The plugin evaluates `#if` against a define table assembled
+ * from C++ registrations, the project settings and `dsc -D`; this side has none of them and never
+ * will, so it cannot know which branch is live. Only the directive LINES go, and the text of every
+ * branch stays -- so a symbol declared in either branch still completes, still resolves, still has a
+ * definition to go to, and an `import` in either branch is still a dependency.
+ *
+ * That is the same rule the plugin's own dependency graph follows, for the same reason
+ * (`preprocessor.md`, "what the dependency graph sees"): it scans the raw file without evaluating
+ * anything, so a `.dsh` that only a dead branch imports still marks its dependents for rebuild --
+ * conservative in the one direction that is safe. Here the asymmetry is just as lopsided: an editor
+ * offering a symbol from a branch this build happens to cut is a small annoyance, while an editor
+ * that hides the symbol on the line you are looking at is a broken editor. Picking a branch would be
+ * worse than either, because it would be a guess made silently.
+ *
+ * The blank is an equal-length run of spaces, NOT the empty line the plugin emits. The plugin
+ * conserves LINES, because its diagnostics and its import line mapping count them. Everything on
+ * this side is keyed on a byte OFFSET instead -- diagnostic ranges, go-to-definition targets, the
+ * completion replace range, semantic token positions -- so this side conserves those, exactly as
+ * `stripGraphRegionDirectivesPreserveLayout` above does. The plugin knows the difference matters,
+ * which is why its VirtualFunction sync refuses a source with directives (DSH9001): line
+ * conservation buys line alignment and nothing more.
+ */
+function stripPreprocessorDirectivesPreserveLayout(text, tokens) {
+    const source = String(text || "");
+    // A source with no directive comes back byte for byte, which is the plugin's invariant too, and
+    // is what lets `parseDocument` reuse its one scan for every file that never used the feature.
+    const matches = source.indexOf("#") < 0 ? [] : [...source.matchAll(PREPROCESSOR_DIRECTIVE_LINE)];
+    if (matches.length === 0) {
+        return source;
+    }
+
+    const opaqueRanges = findOpaqueFunctionBodyRanges(source, tokens || scan(source));
+    let result = "";
+    let cursor = 0;
+    for (const match of matches) {
+        // The hash's own offset, not the line start: `Function F(...) { #if X` opens a body mid-line,
+        // and only the hash answers whether this directive is the shader compiler's.
+        const hashOffset = match.index + match[0].indexOf("#");
+        if (opaqueRanges.some((range) => hashOffset >= range.start && hashOffset < range.end)) {
+            continue;
+        }
+        result += source.slice(cursor, match.index) + match[0].replace(/[^\r\n]/g, " ");
+        cursor = match.index + match[0].length;
+    }
+    return cursor === 0 ? source : result + source.slice(cursor);
 }
 
 function parseDeclaration(text) {
@@ -1022,6 +1181,7 @@ module.exports = {
     parseCodeDeclarationEntries,
     parseCodeStatements,
     stripGraphRegionDirectivesPreserveLayout,
+    stripPreprocessorDirectivesPreserveLayout,
     parseFunctionParams,
     parseDeclaration,
     TOP_LEVEL_BLOCKS,

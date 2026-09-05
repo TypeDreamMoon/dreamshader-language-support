@@ -13,6 +13,10 @@
 //     `.bad.` file qualifies -- most fail on something only the engine knows -- so the ones that do
 //     are listed by name rather than assumed, and the list is the record of what this half owns.
 //
+// `checkPreprocessorDirectives` runs before either of those and needs no corpus: the compiler's
+// conditional compilation is a rule about plain text, which is this file's subject, and its fixtures
+// have to be inline because the corpus has no source carrying a `#if` yet.
+//
 // Opt-in, because the plugin is not part of this repository:
 //
 //   $env:DREAMSHADER_CORPUS_DIR = 'I:\...\Plugins\DreamShader'; npm run test:corpus
@@ -81,6 +85,193 @@ function assertCodesArePublished(corpusRoot) {
     return emitted.size;
 }
 
+/**
+ * Conditional compilation, read by the side that has no define table.
+ *
+ * `#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` / `#endif` / `#define` / `#undef` arrived in the
+ * compiler's 1.9.0. The corpus carries no source with one yet -- every preprocessor test over there
+ * is an inline string in `DreamShaderPreprocessorTests.cpp` -- so the fixtures are inline here too,
+ * and when the corpus does grow one the sweep in `main()` picks it up with no change here.
+ *
+ * The compiler resolves a `#if` against a table injected from C++, the project settings and
+ * `dsc -D`, and cuts the branch that loses. This side has none of those and never will, so it does
+ * the only other correct thing: it blanks the directive LINES and keeps BOTH branches. Every symbol
+ * in the file stays reachable and every `import` stays a dependency -- the same direction the
+ * compiler's own dependency graph errs in, and for the same reason. An editor offering a symbol from
+ * a branch this build happens to cut is a small annoyance; an editor hiding the symbol under the
+ * cursor is not an editor.
+ *
+ * Needs no corpus, so it runs either way.
+ */
+function checkPreprocessorDirectives() {
+    // preprocessor.md's own worked example. The two branches differ in a `Settings` line, in the
+    // NAMES of the outputs and in their TYPES -- which is the whole reason `#if` exists here, since
+    // no arrangement of switch nodes reaches any of those.
+    const conditional = [
+        'Shader(Name="Materials/M_Conditional", Root="Game")',
+        "{",
+        "    Settings = {",
+        '        Domain = "Surface";',
+        "#if !DS_SUBSTRATE",
+        '        ShadingModel = "DefaultLit";',
+        "#endif",
+        "    }",
+        "",
+        "    Properties {",
+        "        vec3 Tint = vec3(0.8, 0.2, 0.1);",
+        "    }",
+        "",
+        "    Outputs = {",
+        "#if DS_SUBSTRATE",
+        "        Substrate Surface;",
+        "        Base.FrontMaterial = Surface;",
+        "#else",
+        "        vec3 BaseColor;",
+        "        Base.BaseColor = BaseColor;",
+        "#endif",
+        "    }",
+        "",
+        "    Graph = {",
+        "#if DS_SUBSTRATE",
+        "        Surface = Substrate.Slab(DiffuseAlbedo = Tint, Roughness = 0.4);",
+        "#else",
+        "        BaseColor = Tint;",
+        "#endif",
+        "    }",
+        "}"
+    ].join("\n");
+
+    const [shader] = language.getDocumentSymbols(conditional);
+    const sectionOf = (name) => (shader.children || []).find((child) => child.name === name);
+    const labelsIn = (name) => (sectionOf(name)?.children || []).map((child) => `${child.name}:${child.detail}`);
+
+    // Both branches, with their declared types intact. The type is the assertion that bites: a
+    // directive line carries no `;`, so a `#if` left in the text is swallowed by the statement after
+    // it and `Substrate Surface;` comes back as a declaration of type `#if DS_SUBSTRATE Substrate`.
+    assert.deepStrictEqual(labelsIn("Settings"), ["Domain:setting", "ShadingModel:setting"],
+        "a Settings line behind a `#if` is still a setting");
+    assert.deepStrictEqual(labelsIn("Outputs"),
+        ["Surface:Substrate", "Base.FrontMaterial:binding", "BaseColor:vec3", "Base.BaseColor:binding"],
+        "both Outputs branches are indexed, with the types they declare");
+    assert.deepStrictEqual(labelsIn("Graph"), ["Surface:setting", "BaseColor:setting"],
+        "both Graph branches are indexed");
+
+    // Offsets do not drift. Directive lines are blanked to an equal-length run of spaces rather than
+    // removed, so every symbol's range still points at the identifier in the text the author sees --
+    // which is what go-to-definition, hover, rename and the completion replace range all ride on.
+    // (The compiler conserves LINES instead, for its diagnostics; the two are not the same promise,
+    // and DSH9001 exists because line conservation alone is not enough to splice bytes with.)
+    for (const [section, name, anchor] of [
+        ["Properties", "Tint", "vec3 Tint"],
+        ["Outputs", "Surface", "Substrate Surface"],
+        ["Outputs", "BaseColor", "vec3 BaseColor"]
+    ]) {
+        const symbol = sectionOf(section).children.find((child) => child.name === name);
+        assert.strictEqual(
+            conditional.slice(symbol.selectionStartOffset, symbol.selectionEndOffset), name,
+            `${section}.${name} selection range should still cover its identifier`);
+        assert.strictEqual(symbol.selectionStartOffset, conditional.indexOf(anchor) + anchor.length - name.length,
+            `${section}.${name} offset drifted`);
+    }
+
+    // No diagnostic may land on a directive line. Asserted as an overlap test rather than a count,
+    // so an unrelated rule firing on the fixture stays this file's business and not this test's.
+    const directiveRanges = [];
+    for (const match of conditional.matchAll(/^[ \t]*#[ \t]*(?:if|ifdef|ifndef|elif|else|endif|define|undef)\b[^\n]*/gm)) {
+        directiveRanges.push([match.index, match.index + match[0].length]);
+    }
+    assert.strictEqual(directiveRanges.length, 8, "the fixture should carry eight directive lines");
+    const onDirective = language.getDiagnostics(conditional, "M_Conditional.dsm", {})
+        .filter((diagnostic) => directiveRanges.some(([start, end]) =>
+            diagnostic.startOffset < end && diagnostic.endOffset > start))
+        .map((diagnostic) => `${diagnostic.severity} ${diagnostic.message}`);
+    assert.deepStrictEqual(onDirective, [], "diagnostics reported on a preprocessor directive line");
+
+    // A `Function` / `GraphFunction` body is the shader compiler's, `#` lines included. Getting this
+    // wrong is silent rather than loud: MoonToon's blend-mode switch would keep compiling and start
+    // returning the wrong value for every blend mode, because the wrong preprocessor answered.
+    const hlsl = [
+        "Function MoonToonBlendModeSwitch(",
+        "\tin float3 Opaque,",
+        "\tin float3 Masked,",
+        "\tout float3 Result)",
+        "{",
+        "#if MATERIALBLENDING_SOLID",
+        "\tResult = Opaque;",
+        "#elif MATERIALBLENDING_MASKED",
+        "\tResult = Masked;",
+        "#else",
+        "\tResult = 0;",
+        "#endif",
+        "}",
+        "",
+        "Function SelfContained Remap01(in float value, out float result) {",
+        '#include "/Engine/Private/Common.ush"',
+        "\tresult = saturate(value * 0.5 + 0.5);",
+        "}",
+        "",
+        "GraphFunction WindPulse(in float2 uv, out float pulse) {",
+        "#if 1",
+        "\tpulse = sin(uv.x);",
+        "#endif",
+        "}"
+    ].join("\n");
+
+    assert.strictEqual(language.stripPreprocessorDirectivesPreserveLayout(hlsl), hlsl,
+        "every directive here is inside a body, so the text comes back byte for byte");
+    const bodies = language.parseDocument(hlsl).blocks;
+    assert.deepStrictEqual(bodies.map((block) => `${block.kind} ${block.name}`),
+        ["Function MoonToonBlendModeSwitch", "Function Remap01", "GraphFunction WindPulse"],
+        "a signature spanning lines, a modifier and a GraphFunction are all bodies");
+    for (const block of bodies) {
+        assert.strictEqual(block.bodyText, hlsl.slice(block.bodyOffset, block.bodyCloseOffset),
+            `${block.name} body text must reach the generated .ush unchanged`);
+    }
+    assert(bodies[0].bodyText.includes("#elif MATERIALBLENDING_MASKED"));
+    assert(bodies[1].bodyText.includes('#include "/Engine/Private/Common.ush"'));
+
+    // The other direction of the same rule: a `#if` around whole Function blocks is DreamShader's,
+    // and both blocks are indexed.
+    const wrapped = language.parseDocument([
+        "#if DS_SUBSTRATE",
+        "Function ApplySubstrate(in float3 C, out float3 R) { R = SubstratePath(C); }",
+        "#else",
+        "Function ApplyLegacy(in float3 C, out float3 R) { R = LegacyPath(C); }",
+        "#endif"
+    ].join("\n"));
+    assert.deepStrictEqual(wrapped.blocks.map((block) => block.name), ["ApplySubstrate", "ApplyLegacy"],
+        "a `#if` outside the bodies selects between them, so both are declarations here");
+
+    // `#Region` is a different thing wearing a similar hat, and the parser has always matched it
+    // case-insensitively (`IsGraphDirective` compares with `ESearchCase::IgnoreCase`). The eight
+    // preprocessor keywords are the opposite: lowercase only, because the compiler answers a
+    // mis-cased `#IF` or a mistyped `#endfi` with DSH1035 rather than letting it quietly do nothing.
+    for (const spelling of ['#Region "Main"', '#region "main"', "#REGION x", "#EndRegion", "#endregion"]) {
+        assert.strictEqual(language.stripPreprocessorDirectivesPreserveLayout(spelling), spelling,
+            `${spelling} is the parser's, not the preprocessor's`);
+    }
+    const lowercaseRegion = language.getDocumentSymbols([
+        'Shader(Name="Materials/M_Region")',
+        "{",
+        "    Graph = {",
+        '#region "surface"',
+        "        Color = 1.0;",
+        "#endregion",
+        "    }",
+        "}"
+    ].join("\n"))[0];
+    assert.deepStrictEqual(
+        lowercaseRegion.children.find((child) => child.name === "Graph").children.map((child) => child.name),
+        ["Color"],
+        "a lowercase #region must fold away like a capitalised one, not glue itself to the statement after it");
+    for (const line of ["#IF FOO", "#Endif", "#ifdefined FOO", "#endfi", '#include "x"']) {
+        assert.strictEqual(language.stripPreprocessorDirectivesPreserveLayout(`${line}\nvec3 A;`), `${line}\nvec3 A;`,
+            `${line} is none of the eight spellings, so it stays for the compiler to reject`);
+    }
+
+    console.log("preprocessor directive checks passed (both branches indexed, offsets held, bodies untouched)");
+}
+
 function collect(root) {
     const good = [];
     const bad = [];
@@ -113,6 +304,8 @@ function collect(root) {
 }
 
 function main() {
+    checkPreprocessorDirectives();
+
     if (!CORPUS) {
         console.log("corpus smoke tests skipped (DREAMSHADER_CORPUS_DIR is not set)");
         return;
@@ -120,6 +313,18 @@ function main() {
 
     const { good, bad } = collect(CORPUS);
     assert(good.length > 0, `no .dsm/.dsf/.dsh files under ${CORPUS}`);
+
+    // "A source with no directives comes back byte for byte" is the compiler's own promise, and this
+    // is the cheapest place to hold this side to it: every `#` in the corpus today is a `#Region` or
+    // an HLSL directive inside a `Function` body, so the preprocessor pass must be a no-op over all
+    // of it. It is also what makes the sweep below a fair test -- a parser fed identical text cannot
+    // have changed its mind about anything.
+    const rewritten = [...good, ...bad].filter((file) => {
+        const text = fs.readFileSync(file, "utf8");
+        return language.stripPreprocessorDirectivesPreserveLayout(text) !== text;
+    }).map((file) => path.relative(CORPUS, file));
+    assert.deepStrictEqual(rewritten, [],
+        `${rewritten.length} sources changed by a preprocessor pass that should have found nothing to cut`);
 
     const falsePositives = [];
     for (const file of good) {
