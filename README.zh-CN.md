@@ -36,6 +36,7 @@ DreamShader 插件保持同步。
 - `Domain`、`MaterialDomain`、`ShadingModel`、`BlendMode`、`RenderType` 的 Settings 值补全。
 - 声明 metadata 补全，例如 `Group`、`SortPriority`、`Description`、`SamplerType`、`GatherMode` 和纹理采样相关属性。
 - 支持 `Layout = { Node(...); Comment(...); }` 和 Graph `#Region` / `#EndRegion` 布局指令。
+- 条件编译：`#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` / `#endif` / `#define` / `#undef` —— 高亮、打一个 `#` 就补全、`defined` 与六个 `DS_` 内置常量的 hover、折叠、十三条 `DSH103x` / `DSH104x` 诊断，以及把本工程 define 切掉的分支灰显。
 - `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转，按源根解析 —— 工程的 `DShader` 和每个插件各算一个根，也认跨根用的 `Project:` / `Plugin.<名字>:` 限定符。
 - `.dsf` 文件形状诊断，支持 `ShaderFunction`、`Function`、`GraphFunction`、`Namespace` 和 `VirtualFunction`。
 - Go to Definition、Find References、Hover、Signature Help、Inlay Hints、文档格式化、折叠和文档符号。
@@ -161,6 +162,68 @@ Shader(Name="Materials/M_Substrate")
 
 扩展会补全 DreamShader 当前支持的 `Substrate.*` wrapper，包括 `Unlit`、`Slab`、`ConvertMaterialAttributes`、`HorizontalMix`、`VerticalLayer`、`Add`、`Weight`、`Select`、`ThinFilm` 和相关 UE 5.7 Substrate helper。
 
+## 条件编译
+
+`#if`、`#ifdef`、`#ifndef`、`#elif`、`#else`、`#endif`、`#define`、`#undef` 这八条指令按行识别，在**生成期**求值，发生在解析之前。没被选中的那一支根本到不了解析器，也就不会变成任何节点 —— 这正是 `#if` 能切到 `StaticSwitchParameter` 够不到的**声明层**的原因：一行 `Settings`、一整块 `Outputs`、一条 `import`，乃至一整个 `Function`。
+
+```dreamshader
+Shader(Name="Materials/M_Foo", Root="Game")
+{
+    Settings = {
+        Domain = "Surface";
+#if !DS_SUBSTRATE
+        ShadingModel = "DefaultLit";
+#endif
+    }
+
+    Outputs = {
+#if DS_SUBSTRATE
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+#else
+        vec3 BaseColor;
+        Base.BaseColor = BaseColor;
+#endif
+    }
+}
+```
+
+扩展这边：八条指令有高亮，打一个 `#` 就弹补全，条件里能读常量的位置会提示 `defined` 和六个只读的 `DS_` 内置常量（`DS_ENGINE_MAJOR`、`DS_ENGINE_MINOR`、`DS_ENGINE_PATCH`、`DS_SUBSTRATE`、`DS_PLATFORM`、`DS_PLUGIN_VERSION`），这七个都有写清规则的 hover，`#if` … `#endif` 能折叠，十三条预处理诊断 `DSH1030` 到 `DSH1042` 全部在本地报出，并带上编译器自己的码。
+
+**所有分支对语言功能一律有效。** 补全、跳转定义、查找引用和 import 索引读的是「只把指令行抹掉」的那份文本，所以本次构建会切掉的那一支里声明的符号照样能解析，里面的 `import` 照样算依赖。插件自己的依赖图就是这么做的，理由也一样：扩展这边没有 define 表可以拿来求值，悄悄替你猜一支比哪种答案都糟。
+
+### 未激活分支
+
+被本工程 define 切掉的分支会**灰显**，免得一份带条件的源码变成脑子里要同时装着的两份文本。指令行本身永远不灰 —— 「这块为什么是灰的」，答案就写在它们身上。
+
+灰显要靠 define 表，由插件导出到 `Saved/DreamShader/Bridge/preprocessor-defines.json`。**manifest 不存在时什么都不灰，也不吭声。** 插件版本旧，或者工程的 bridge 还没写过，都属于正常降级，不是故障。预处理器会拒绝的文件同样一块都不灰 —— `#if` 没闭合、条件写错、大小写错的 `#IF` —— 因为灰错了会把人指到错的分支上，而它跟「没这个功能」看起来还不一样：少灰一块只是少个功能，灰错一块是骗人。
+
+```json
+{
+  "dreamshader.preprocessor.dimInactiveRegions": true,
+  "dreamshader.preprocessor.inactiveOpacity": 0.5
+}
+```
+
+`dreamshader.preprocessor.dimInactiveRegions`（默认 `true`）设成 `false` 就彻底关掉灰显；`dreamshader.preprocessor.inactiveOpacity`（默认 `0.5`）是灰的程度，设成 `1` 等于功能还开着但看不出来。
+
+### `Function` 体里的 `#` 属于着色器编译器
+
+`Function` / `GraphFunction` 体是裸 HLSL，而 HLSL 有自己的预处理器。写在那里的 `#` 行找的是**那一个**，用的是着色器编译器的 define —— `MATERIALBLENDING_SOLID`、`PIXELSHADER`、引擎自己的那套环境 —— 所以扩展一概不碰：不按 DreamShader 指令高亮、不诊断、不灰显。
+
+```dreamshader
+Function BlendModeSwitch(in float3 Opaque, in float3 Masked, out float3 Result)
+{
+#if MATERIALBLENDING_SOLID     // 这是 HLSL 的，编译着色器时才解析
+    Result = Opaque;
+#else
+    Result = 0;
+#endif
+}
+```
+
+想在生成期二选一挑函数体，就把 `#if` 写到 `Function` 块外面 —— 那里 DreamShader 才看得见。
+
 ## Function 内置函数
 
 `Function` 块是 HLSL 风格 helper 代码。扩展会为下面这些内置函数提供补全、Hover、Signature Help、语义高亮和本地诊断白名单。
@@ -253,13 +316,17 @@ Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
   ],
   "dreamshader.enableGitHubPackageSearch": true,
   "dreamshader.showStatusBar": true,
-  "dreamshader.enableCodeLens": true
+  "dreamshader.enableCodeLens": true,
+  "dreamshader.preprocessor.dimInactiveRegions": true,
+  "dreamshader.preprocessor.inactiveOpacity": 0.5
 }
 ```
 
 大多数情况下 `dreamshader.projectRoot` 可以留空，扩展会根据当前 DreamShader 文件或工作区自动寻找 Unreal 项目根目录。
 
 `dreamshader.materialExpressionManifestPath` 可以直接指向生成出来的 `Saved/DreamShader/Bridge/material-expressions.json`。留空时会使用当前项目的 Bridge manifest，并回退到扩展内置 manifest。
+
+两个 `dreamshader.preprocessor.*` 控制被本工程 define 切掉的 `#if` 分支的灰显，见[未激活分支](#未激活分支)。工程的 bridge 没导出 define 表之前，这两项都不会有任何效果。
 
 ## Bridge 诊断
 

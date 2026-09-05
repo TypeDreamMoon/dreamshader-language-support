@@ -39,6 +39,7 @@ See the [changelog](./CHANGELOG.md) for what each release changed.
 - Settings value completion for `Domain`, `MaterialDomain`, `ShadingModel`, `BlendMode`, and `RenderType`.
 - Metadata completion for declaration reflection blocks such as `Group`, `SortPriority`, `Description`, `SamplerType`, `GatherMode`, and texture sampling options.
 - Layout authoring support for `Layout = { Node(...); Comment(...); }` and Graph `#Region` / `#EndRegion` directives.
+- Conditional compilation: `#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` / `#endif` / `#define` / `#undef` — highlighting, completion from a bare `#`, hover for `defined` and the six `DS_` builtins, folding, the thirteen `DSH103x` / `DSH104x` diagnostics, and a fade over the branches the project's defines cut.
 - Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files, resolved per source root — the project's `DShader` and each plugin's — including the `Project:` / `Plugin.<Name>:` qualifiers that cross between them.
 - `.dsf` file-shape diagnostics for reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations.
 - Go to Definition, Find References, Hover, Signature Help, Inlay Hints, document formatting, folding, and document symbols.
@@ -166,6 +167,94 @@ Shader(Name="Materials/M_Substrate")
 
 The extension completes DreamShader's current `Substrate.*` wrappers, including `Unlit`, `Slab`, `ConvertMaterialAttributes`, `HorizontalMix`, `VerticalLayer`, `Add`, `Weight`, `Select`, `ThinFilm`, and related UE 5.7 Substrate helpers.
 
+## Conditional Compilation
+
+`#if`, `#ifdef`, `#ifndef`, `#elif`, `#else`, `#endif`, `#define`, and `#undef` are line-oriented
+directives evaluated at generation time, over the source text, before it is parsed. A branch that is
+not taken never reaches the parser and never becomes a node — which is what lets `#if` cut the
+**declaration** layer a `StaticSwitchParameter` cannot reach: a `Settings` key, a whole `Outputs`
+block, an `import`, an entire `Function`.
+
+```dreamshader
+Shader(Name="Materials/M_Foo", Root="Game")
+{
+    Settings = {
+        Domain = "Surface";
+#if !DS_SUBSTRATE
+        ShadingModel = "DefaultLit";
+#endif
+    }
+
+    Outputs = {
+#if DS_SUBSTRATE
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+#else
+        vec3 BaseColor;
+        Base.BaseColor = BaseColor;
+#endif
+    }
+}
+```
+
+The extension highlights the eight directives, completes them from a bare `#`, offers `defined` and
+the six read-only `DS_` builtins (`DS_ENGINE_MAJOR`, `DS_ENGINE_MINOR`, `DS_ENGINE_PATCH`,
+`DS_SUBSTRATE`, `DS_PLATFORM`, `DS_PLUGIN_VERSION`) where a condition may read one, hovers all seven
+with the rules that govern them, folds `#if` … `#endif`, and reports all thirteen preprocessor
+diagnostics — `DSH1030` through `DSH1042` — under the compiler's own codes.
+
+**Every branch stays live for the language features.** Completion, Go to Definition, Find References
+and the import index read the source with only the directive lines removed, so a symbol declared in a
+branch this build cuts still resolves, and an `import` inside one is still a dependency. That is what
+the plugin's own dependency graph does with the raw file, and for the same reason: this side has no
+define table to evaluate a condition against, and picking a branch silently would be worse than
+either answer.
+
+### Inactive branches
+
+The branches the project's defines cut are **faded**, so a conditional source stops being two texts a
+reader has to hold in their head. The directive lines themselves never fade — they are the answer to
+"why is this grey".
+
+The fade needs the define table, which the plugin exports to
+`Saved/DreamShader/Bridge/preprocessor-defines.json`. **With no manifest nothing is faded, silently.**
+An older plugin, or a project whose bridge has never been written, is a normal degradation and not a
+fault. Nothing is faded in a file the preprocessor would refuse either — an unclosed `#if`, a
+malformed condition, a mis-cased `#IF` — because a wrong grey points an author at the wrong branch,
+and unlike a missing grey it does not look like a missing feature.
+
+```json
+{
+  "dreamshader.preprocessor.dimInactiveRegions": true,
+  "dreamshader.preprocessor.inactiveOpacity": 0.5
+}
+```
+
+`dreamshader.preprocessor.dimInactiveRegions` (default `true`) turns the fade off;
+`dreamshader.preprocessor.inactiveOpacity` (default `0.5`) is how strong it is, where `1` disables
+the fade without turning the feature off.
+
+### `Function` bodies are the shader compiler's
+
+A `Function` or `GraphFunction` body is raw HLSL, and HLSL has a preprocessor of its own. A `#` line
+written there addresses **that** one, with the shader compiler's defines — `MATERIALBLENDING_SOLID`,
+`PIXELSHADER`, the engine's own environment — so the extension does not touch it: not highlighted as
+a DreamShader directive, not diagnosed, not faded.
+
+```dreamshader
+Function BlendModeSwitch(in float3 Opaque, in float3 Masked, out float3 Result)
+{
+#if MATERIALBLENDING_SOLID     // HLSL's own, resolved when the shader is compiled
+    Result = Opaque;
+#else
+    Result = 0;
+#endif
+}
+```
+
+To choose between two function bodies at generation time, put the `#if` around the `Function` blocks
+themselves, where DreamShader can see it.
+
 ## Function Builtins
 
 `Function` blocks are HLSL-style helper code. The extension provides completion, hover, signature help, semantic highlighting, and local diagnostic allow-list coverage for these builtins.
@@ -261,7 +350,9 @@ Available commands include:
   "dreamshader.enableCodeLens": true,
   "dreamshader.previewTransport": "websocket",
   "dreamshader.previewWebSocketPort": 17864,
-  "dreamshader.previewLiveFrameRate": 12
+  "dreamshader.previewLiveFrameRate": 12,
+  "dreamshader.preprocessor.dimInactiveRegions": true,
+  "dreamshader.preprocessor.inactiveOpacity": 0.5
 }
 ```
 
@@ -270,6 +361,8 @@ Available commands include:
 `dreamshader.materialExpressionManifestPath` can point directly at a generated `Saved/DreamShader/Bridge/material-expressions.json`. Leave it empty to use the active project's bridge manifest plus the bundled fallback manifest.
 
 `dreamshader.previewTransport` selects how the live preview reaches the editor: `"websocket"` (the default — raw RGBA8 streaming, drag-to-orbit, and Graph breakpoints) or `"file"` (a one-shot PNG through the bridge request/response files, for setups where the WebSocket server is disabled). `dreamshader.previewLiveFrameRate` (default `12`, `0` pauses streaming) and `dreamshader.previewWebSocketPort` (default `17864`) apply to the WebSocket transport only.
+
+The two `dreamshader.preprocessor.*` settings control the fade over the `#if` branches the project's defines cut — see [Inactive branches](#inactive-branches). Neither has any effect until the project's bridge has exported its define table.
 
 ## Bridge Diagnostics
 
