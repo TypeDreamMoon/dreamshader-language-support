@@ -1043,4 +1043,229 @@ assert.strictEqual(language.formatColorPresentation("float4", 4, { red: 0.8, gre
 assert.strictEqual(language.formatColorPresentation("vec3", 3, { red: 1, green: 0, blue: 0, alpha: 0.5 }), "vec3(1.0, 0.0, 0.0)", "A 3-component constructor's presentation should drop the alpha component entirely");
 assert.strictEqual(language.formatColorPresentation("float4", 4, { red: 1 / 3, green: 0, blue: 0, alpha: 1 }), "float4(0.333, 0.0, 0.0, 1.0)", "Component values should round to 3 decimal places");
 
+// --- 1.9.x: preprocessor directives (#if / #ifdef / #ifndef / #elif / #else / #endif / #define /
+//     #undef) -----------------------------------------------------------------------------------
+//
+// One example per DSHnnnn, the two codes this side deliberately does not emit, and -- first,
+// because it is the one that would do real damage -- the gate that keeps a `Function` body opaque.
+const preprocessorDiagnosticsFor = (src, fileName = "M_Preprocessor.dsm") =>
+    language.getDiagnostics(src, fileName, {}).filter((diagnostic) => /^DSH10(3\d|4[0-2])$/.test(diagnostic.code || ""));
+const preprocessorCodesFor = (src, fileName) => preprocessorDiagnosticsFor(src, fileName).map((diagnostic) => diagnostic.code);
+const preprocessorMessagesFor = (src, fileName) => preprocessorDiagnosticsFor(src, fileName).map((diagnostic) => diagnostic.message);
+
+// THE REGRESSION GATE. `MF_MoonToonTranslucencyShadow.dsf`'s real shape, the `#include` form six
+// more files in the tree use, and a `GraphFunction` body for the third. These directives address
+// HLSL's preprocessor, with the shader compiler's defines, and DreamShader never sees them -- so a
+// pass that descended into a body would put a red squiggle on nine shipped files every day.
+const opaqueHlslBodySource = `Function MoonToonBlendModeSwitch(
+	in float3 Opaque,
+	in float3 Masked,
+	in float3 Translucent,
+	out float3 Result)
+{
+#if MATERIALBLENDING_SOLID
+	Result = Opaque;
+#elif MATERIALBLENDING_MASKED
+	Result = Masked;
+#elif MATERIALBLENDING_TRANSLUCENT
+	Result = Translucent;
+#else
+	Result = 0;
+#endif
+}
+
+Function DreamWindSample(in float3 P, out float3 W)
+{
+	#include "/Plugin/DreamDynamicWorld/Shared/DreamWindShared.h"
+	W = P;
+}
+
+GraphFunction ToonEyeHighlight(in float2 UV, out float3 Highlight)
+{
+#if PIXELSHADER
+	Highlight = float3(UV, 0);
+#else
+	Highlight = float3(0, 0, 0);
+#endif
+}`;
+assert.deepStrictEqual(preprocessorCodesFor(opaqueHlslBodySource, "MF_Opaque.dsf"), [], "HLSL directives inside a Function / GraphFunction body must produce no preprocessor diagnostic at all");
+assert.deepStrictEqual(preprocessorCodesFor(`Function F(out float B)
+{
+#if PIXELSHADER
+	B = 1;
+}`, "MF_Unbalanced.dsf"), [], "An unpaired HLSL #if inside a body is not recognized, not paired and not counted -- so it cannot leave a chain open");
+assert.deepStrictEqual(preprocessorCodesFor(`#if DS_SUBSTRATE
+Function ApplyShading(in float3 C, out float3 R) { R = C; }
+#else
+Function ApplyShading(in float3 C, out float3 R) { R = C * 0.5; }
+#endif`, "MF_Wrapped.dsf"), [], "A #if wrapping whole Function blocks sits outside every body, so it is a directive and must pair cleanly");
+
+// `#Region` / `#EndRegion` are the parser's, matched case-insensitively -- so lowercase `#region`
+// is legal today and must not become DSH1035.
+assert.deepStrictEqual(preprocessorCodesFor(`Shader(Name="Materials/M_Region")
+{
+    Outputs = {
+        float3 Color;
+        Base.BaseColor = Color;
+    }
+    Graph = {
+        #Region "upper"
+        Color = float3(1, 1, 1);
+        #EndRegion
+        #region "lower"
+        Color = Color * 0.5;
+        #endregion
+    }
+}`), [], "#Region / #EndRegion pass through in any case, lowercase included");
+
+// The documented Substrate example: the reason the feature exists, and well-formed throughout.
+assert.deepStrictEqual(preprocessorCodesFor(`Shader(Name="Materials/M_Foo", Root="Game")
+{
+    Settings = {
+        Domain = "Surface";
+#if !DS_SUBSTRATE
+        ShadingModel = "DefaultLit";
+#endif
+    }
+
+    Outputs = {
+#if DS_SUBSTRATE
+        Substrate Surface;
+        Base.FrontMaterial = Surface;
+#else
+        vec3 BaseColor;
+        Base.BaseColor = BaseColor;
+#endif
+    }
+}`), [], "The documented Substrate example must produce no preprocessor diagnostics");
+
+// Chain shape: DSH1030 - DSH1033.
+assert.deepStrictEqual(preprocessorCodesFor("#if DS_SUBSTRATE\n"), ["DSH1030"], "DSH1030: the file ends with a #if still open");
+assert(/2 conditional block\(s\) still open/.test(preprocessorMessagesFor("#if 1\n#if 2\n")[0]), "DSH1030 points at the innermost #if and says how many are open");
+assert.deepStrictEqual(preprocessorCodesFor("#endif\n"), ["DSH1031"], "DSH1031: #endif with no matching #if");
+assert.deepStrictEqual(preprocessorCodesFor("#else\n"), ["DSH1032"], "DSH1032: #else with no matching #if");
+assert.deepStrictEqual(preprocessorCodesFor("#elif 1\n"), ["DSH1032"], "DSH1032: #elif with no matching #if");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1\n#else\n#elif 2\n#endif\n"), ["DSH1033"], "DSH1033: #elif after the #else that closed the chain");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1\n#else\n#else\n#endif\n"), ["DSH1033"], "DSH1033: a second #else");
+assert(/after the '#else' on line 2/.test(preprocessorMessagesFor("#if 1\n#else\n#else\n#endif\n")[0]), "DSH1033 names the line of the #else that closed the chain");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1\n#if 2\n#else\n#endif\n#elif 3\n#else\n#endif\n"), [], "Nested chains pair independently");
+
+// DSH1034 against DSH1042: did the expression finish? The two tables below are the plugin's own
+// worked examples, and they are the whole of the rule.
+for (const [text, why] of [
+    ["#if (1", "the parenthesis never closes"],
+    ["#if 1 &&", "&& has no right operand"],
+    ["#if &&1", "&& is not a valid operand"],
+    ["#if 1 &&)", ") is not a valid operand, so the expression stops unfinished there"],
+    ["#if 0xZZ", "a malformed literal arrives whole and fails as one bad literal"],
+    ["#if A & B", "a lone & is not in the grammar -- there are no bitwise operators"],
+    ["#if \"unterminated", "an unterminated string literal"],
+    ["#if defined(", "'defined' with no name"]
+]) {
+    assert.deepStrictEqual(preprocessorCodesFor(`${text}\n#endif\n`), ["DSH1034"], `DSH1034: ${why}`);
+}
+for (const [text, why] of [
+    ["#if 1 2\n#endif\n", "1 is already a complete expression"],
+    ["#if 1)\n#endif\n", "the ) is surplus"],
+    ["#if (1))\n#endif\n", "likewise, one level in"],
+    ["#ifdef A B\n#endif\n", "A is a valid name; B is surplus"],
+    ["#undef A B\n", "same, and #undef has no value to hide behind"],
+    ["#if 1\n#else junk\n#endif\n", "#else takes no operand at all"],
+    ["#if 1\n#endif MOONTOON_LEGACY\n", "labelling a long chain is C's habit, not this language's"]
+]) {
+    assert.deepStrictEqual(preprocessorCodesFor(text), ["DSH1042"], `DSH1042: ${why}`);
+}
+assert(/expected '\)' but found the end of the condition/.test(preprocessorMessagesFor("#if (1\n#endif\n")[0]), "DSH1034 describes the end of the condition rather than an empty token");
+assert(/is already complete before 'B'/.test(preprocessorMessagesFor("#ifdef A B\n#endif\n")[0]), "DSH1042 names the surplus token");
+
+// DSH1035, and the three suggestions it picks between.
+assert.deepStrictEqual(preprocessorCodesFor(`#include "Shared/Common.dsh"\n`), ["DSH1035"], "DSH1035: #include at the declaration level");
+assert(/use import "\.\.\." instead/.test(preprocessorMessagesFor(`#include "Shared/Common.dsh"\n`)[0]), "DSH1035 answers #include with the DreamShaderLang spelling, not a near-miss keyword");
+assert.deepStrictEqual(preprocessorCodesFor("#IF FOO\n"), ["DSH1035"], "DSH1035: a mis-cased directive is reported, not quietly ignored");
+assert(/Preprocessor directives are lowercase: write '#if'/.test(preprocessorMessagesFor("#IF FOO\n")[0]), "A distance-zero match is a case diagnosis, not a 'did you mean'");
+assert(/Did you mean '#endif'\?/.test(preprocessorMessagesFor("#if 1\n#endfi\n")[0]), "A near miss gets the nearest keyword");
+assert(/A '#' line must be #if/.test(preprocessorMessagesFor("#zzz\n")[0]), "Something resembling nothing gets the general rule");
+assert.deepStrictEqual(preprocessorCodesFor("#if FOO\n#endfi\n"), ["DSH1035", "DSH1030"], "A typo'd #endfi is an unknown directive AND leaves the chain open -- both are true, and the second is the damage the first would have done silently");
+
+// DSH1036 and DSH1038 split on missing-operand against unusable-name.
+assert.deepStrictEqual(preprocessorCodesFor("#if\n#endif\n"), ["DSH1036"], "DSH1036: #if with no expression");
+assert.deepStrictEqual(preprocessorCodesFor("#if // nothing but a comment\n#endif\n"), ["DSH1036"], "The trailing comment is stripped before the condition is read");
+assert.deepStrictEqual(preprocessorCodesFor("#ifdef\n#endif\n"), ["DSH1036"], "DSH1036: #ifdef with no name");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1\n#elif\n#endif\n"), ["DSH1036"], "DSH1036: #elif with no expression");
+assert.deepStrictEqual(preprocessorCodesFor("#define 1BAD 1\n"), ["DSH1038"], "DSH1038: a name may not start with a digit");
+assert.deepStrictEqual(preprocessorCodesFor("#define\n"), ["DSH1038"], "DSH1038 covers a missing #define name too -- DSH1036 is reserved for the #if family");
+assert.deepStrictEqual(preprocessorCodesFor("#undef\n"), ["DSH1038"], "DSH1038: #undef with no name");
+assert.deepStrictEqual(preprocessorCodesFor("#define FOO(x) x\n"), ["DSH1038"], "There are no function-like macros, so FOO(x) fails as a name rather than defining FOO");
+assert.deepStrictEqual(preprocessorCodesFor("#ifdef 9LIVES\n#endif\n"), ["DSH1038"], "DSH1038: an #ifdef name is validated like any other");
+
+// DSH1037: sixty-four levels are legal, the sixty-fifth is not, and it complains once.
+assert.deepStrictEqual(preprocessorCodesFor(`${"#if 1\n".repeat(64)}${"#endif\n".repeat(64)}`), [], "64 levels of nesting are legal");
+assert.deepStrictEqual(preprocessorCodesFor(`${"#if 1\n".repeat(65)}${"#endif\n".repeat(65)}`), ["DSH1037"], "DSH1037: the 65th #if is the one that fails, and it fails exactly once");
+
+// DSH1039: the DS_ prefix is reserved, as a prefix, case-sensitively -- and only against writes.
+assert.deepStrictEqual(preprocessorCodesFor("#define DS_FOO 1\n"), ["DSH1039"], "DSH1039: defining a reserved name");
+assert.deepStrictEqual(preprocessorCodesFor("#undef DS_SUBSTRATE\n"), ["DSH1039"], "DSH1039: undefining one is refused for the same reason");
+assert.deepStrictEqual(preprocessorCodesFor("#define ds_foo 1\n"), [], "The prefix test is case-sensitive: ds_foo cannot collide with a builtin, so it is an ordinary name");
+assert.deepStrictEqual(preprocessorCodesFor("#ifdef DS_SUBSTRATE\n#endif\n"), [], "Reading a reserved name is fine -- only defining or undefining one is refused");
+
+// Shapes that are legal and easy to break.
+assert.deepStrictEqual(preprocessorCodesFor("#define PP_SUM 1 + 1\n#define PP_NOTE two words\n#define PP_MARK\n"), [], "#define takes its value to the end of the line, so `B C` is a value and never a trailing token");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1\n#endif // MOONTOON_LEGACY\n"), [], "A trailing // comment is allowed after any directive");
+assert.deepStrictEqual(preprocessorCodesFor(`#if DS_HOST == "http://build"\n#endif\n`), [], "The comment strip is quote-aware, so a // inside a string literal does not end the directive early");
+assert.deepStrictEqual(preprocessorCodesFor("#  if defined(FOO)\n#  endif\n"), [], "Whitespace after the # is allowed");
+assert.deepStrictEqual(preprocessorCodesFor("#if(FOO)\n#endif\n"), [], "#if(A) is a directive: the keyword run ends where an identifier character stops");
+assert.deepStrictEqual(preprocessorCodesFor("// #if FOO\n"), [], "A line starting with // is an ordinary comment, so commenting a directive out works exactly as it looks");
+assert.deepStrictEqual(preprocessorCodesFor("#if defined(FOO) || defined BAR\n#endif\n"), [], "Both spellings of defined parse");
+assert.deepStrictEqual(preprocessorCodesFor("#if !!FOO\n#endif\n"), [], "Repeated unary prefixes are accepted, as they are in the plugin");
+assert.deepStrictEqual(preprocessorCodesFor("#if DS_ENGINE_MAJOR > 5 || (DS_ENGINE_MAJOR == 5 && DS_ENGINE_MINOR >= 7)\n#endif\n"), [], "The documented engine-version gate parses");
+
+// DSH1040 (a string where a number was required) and DSH1041 (division or modulo by zero) are the
+// two codes this side does not and cannot emit: both need the expression EVALUATED against a define
+// table that exists only inside the running editor. The three lines below are the plugin's own
+// examples for them, and they must stay silent here. If one ever starts reporting, someone has
+// added an evaluator without a table to evaluate against, and it is guessing.
+assert.deepStrictEqual(preprocessorCodesFor("#if DS_PLATFORM\n#endif\n"), [], "DSH1040 is the plugin's alone: a bare string condition needs the define table to notice");
+assert.deepStrictEqual(preprocessorCodesFor(`#if "x" == 1\n#endif\n`), [], "DSH1040 is the plugin's alone: a string against a number is well-FORMED, and only evaluation says otherwise");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1 / 0\n#endif\n"), [], "DSH1041 is the plugin's alone: division by zero is a value question, not a syntax one");
+
+// And the reason staying silent about those two is not enough on its own. The condition check runs
+// the shared parser with evaluation TURNED OFF (`checkConditionSyntax`), rather than evaluating
+// against an empty table and discarding whatever DSH1040 / DSH1041 comes back. The difference is
+// only visible when a value complaint sits in FRONT of a real syntax error: an evaluating parse
+// stops at the first one it meets, so the syntax error below it is never reached and never
+// reported. `DS_PLATFORM == "Windows"` is the documented string idiom and every identifier reads as
+// 0 without a table, so both shapes below are one plausible typo away from an author.
+assert.deepStrictEqual(preprocessorCodesFor(`#if DS_PLATFORM == "Windows" || (\n#endif\n`), ["DSH1034"],
+    "A string comparison in front of a broken parenthesis must not swallow the DSH1034");
+assert.deepStrictEqual(preprocessorCodesFor("#if 1 / 0 2\n#endif\n"), ["DSH1042"],
+    "A literal division by zero in front of a surplus token must not swallow the DSH1042");
+
+// Both arms of a #if are parsed and indexed here (there is no define table to choose between them),
+// so the duplicate-declaration rules have to ask whether the preprocessor could ever emit two
+// declarations TOGETHER. One `Function` per branch is what `preprocessor.md` documents as the only
+// way to pick between two HLSL bodies at generation time, so calling it an error would make the
+// feature unusable in exactly the case it was built for.
+const duplicateMessagesFor = (src, fileName = "M_Preprocessor.dsm") =>
+    language.getDiagnostics(src, fileName, {})
+        .filter((diagnostic) => /declared more than once|Only one top-level Shader block/.test(diagnostic.message))
+        .map((diagnostic) => diagnostic.message);
+assert.deepStrictEqual(duplicateMessagesFor(`#if DS_SUBSTRATE
+Function ApplyShading(in float3 C, out float3 R) { R = C; }
+#else
+Function ApplyShading(in float3 C, out float3 R) { R = C * 0.5; }
+#endif`, "MF_Branches.dsf"), [], "Two declarations in different branches of one chain are never both emitted, so they are not duplicates");
+assert.strictEqual(duplicateMessagesFor(`Function ApplyShading(in float3 C, out float3 R) { R = C; }
+Function ApplyShading(in float3 C, out float3 R) { R = C * 0.5; }`, "MF_Duplicate.dsf").length, 2, "Two unconditional declarations are still duplicates -- the branch test must not swallow the real rule");
+assert.strictEqual(duplicateMessagesFor(`#if DS_SUBSTRATE
+Function ApplyShading(in float3 C, out float3 R) { R = C; }
+Function ApplyShading(in float3 C, out float3 R) { R = C * 0.5; }
+#endif`, "MF_SameBranch.dsf").length, 2, "Two declarations in the SAME branch are emitted together, so they are duplicates");
+assert.deepStrictEqual(duplicateMessagesFor(`#if DS_SUBSTRATE
+Shader(Name="Materials/M_A") { Outputs = { vec3 C; Base.BaseColor = C; } Graph = { C = vec3(1, 1, 1); } }
+#else
+Shader(Name="Materials/M_A") { Outputs = { vec3 C; Base.BaseColor = C; } Graph = { C = vec3(0, 0, 0); } }
+#endif`), [], "Two Shader blocks in different branches are not two top-level Shader blocks");
+assert.strictEqual(duplicateMessagesFor(`Shader(Name="Materials/M_A") { Outputs = { vec3 C; Base.BaseColor = C; } Graph = { C = vec3(1, 1, 1); } }
+Shader(Name="Materials/M_B") { Outputs = { vec3 D; Base.BaseColor = D; } Graph = { D = vec3(0, 0, 0); } }`).length, 1, "Two unconditional Shader blocks are still DSH3030");
+
 console.log("language smoke tests passed");
