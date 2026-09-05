@@ -19,6 +19,7 @@ const { createDebouncedDisposable } = require("./common/debounce");
 const { createEmptyBridgeDiagnosticsState, refreshBridgeDiagnostics } = require("./bridge/diagnostics");
 const { initializeBridgeDatabaseSupport } = require("./bridge/database");
 const { createBridgeDiagnosticsTreeProvider } = require("./vscode/views/bridgeDiagnostics");
+const { registerInactiveRegionDecorations } = require("./vscode/inactiveRegions");
 const { updateStatusBar } = require("./vscode/statusBar");
 const { registerCommands } = require("./vscode/commands");
 const { installVscodeHost } = require("./vscode/host");
@@ -64,6 +65,11 @@ function activate(context) {
     );
 
     registerCommands(context, { refreshBridge });
+
+    // Greys out the `#if` branches this project's define table cuts. It owns its own watchers and
+    // debounce because it answers to a different clock from the bridge diagnostics above: the
+    // diagnostics change when a compile finishes, this changes on every keystroke in the editor.
+    registerInactiveRegionDecorations(context);
 
     context.subscriptions.push(
         vscode.workspace.onDidOpenTextDocument(() => {

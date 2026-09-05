@@ -43,6 +43,14 @@ function getSubstrateBuiltinsManifestPath(projectRoot) {
     return normalizeFsPath(path.join(getBridgeDirectory(projectRoot), "substrate-builtins.json"));
 }
 
+// The resolved preprocessor define table (DreamShader.PreprocessorDefines), written by plugin
+// versions that ship conditional compilation. Older plugins never write it, and the editor's
+// inactive-branch dimming degrades to "dim nothing" rather than guessing at a table -- see
+// readPreprocessorDefinesManifest in manifests.js.
+function getPreprocessorDefinesManifestPath(projectRoot) {
+    return normalizeFsPath(path.join(getBridgeDirectory(projectRoot), "preprocessor-defines.json"));
+}
+
 module.exports = {
     getBridgeDirectory,
     getRequestDirectory,
@@ -52,5 +60,6 @@ module.exports = {
     getMaterialExpressionManifestPath,
     getSettingsManifestPath,
     getSubstrateBuiltinsManifestPath,
+    getPreprocessorDefinesManifestPath,
     getBridgeDatabasePath
 };

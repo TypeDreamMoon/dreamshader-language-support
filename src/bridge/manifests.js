@@ -17,6 +17,7 @@ const {
     getMaterialExpressionManifestPath,
     getSettingsManifestPath,
     getSubstrateBuiltinsManifestPath,
+    getPreprocessorDefinesManifestPath,
     getBridgeDatabasePath
 } = require("./paths");
 const {
@@ -192,6 +193,79 @@ const getSubstrateBuiltinItems = memoizeByFileVersion(
     }
 );
 
+// -------------------------------------------------------------------------------------------------
+// DreamShader.PreprocessorDefines
+//
+// The resolved `#if` define table, which the editor needs to know which branch of a conditional
+// source is the live one. Unlike every other manifest here there is no bundled fallback and no
+// built-in default, and that is deliberate: the table describes the process that will do the
+// compiling -- its engine version, whether Substrate is on, what the project settings and any C++
+// registrations added -- so a guessed table would grey out the wrong branch, which is strictly worse
+// than greying out nothing. A plugin too old to export it, or a project that has never run a
+// compile, therefore yields `available: false`, and the caller dims nothing, silently.
+//
+// Shape (schema "DreamShader.PreprocessorDefines", version 1):
+//   { revision, defines: [{ name, value, source, readOnly }], fixtureDefines: [...],
+//     conformance: [{ expr, value } | { expr, error }] }
+//
+// `fixtureDefines` and `conformance` exist only for scripts/preprocessor-smoke.js, which replays the
+// plugin's own evaluator vectors through the JavaScript mirror in src/language/preprocessor.js.
+// -------------------------------------------------------------------------------------------------
+
+function toDefineMap(entries) {
+    const map = new Map();
+    for (const entry of Array.isArray(entries) ? entries : []) {
+        const name = typeof entry?.name === "string" ? entry.name.trim() : "";
+        if (!name) {
+            continue;
+        }
+        // Case-SENSITIVE keys, matching FDreamShaderDefineMap: `Foo` and `FOO` are two defines, and
+        // folding them would let `ds_substrate` answer for `DS_SUBSTRATE`.
+        map.set(name, entry.value === undefined || entry.value === null ? "" : String(entry.value));
+    }
+    return map;
+}
+
+const readPreprocessorDefinesManifest = memoizeByFileVersion(
+    (activePath) => collectKnownProjectRoots(activePath)
+        // The root itself is in the key, not just its file tags: two projects that both lack the
+        // manifest tag as "0|0", and without the path a lookup for one would be answered from the
+        // other's cache entry. That is harmless while both are absent and wrong the moment one
+        // appears, which is the kind of bug that only shows up on someone else's machine.
+        .map((root) => `${root}|${getFileVersionTag(getBridgeDatabasePath(root))}|${getFileVersionTag(getPreprocessorDefinesManifestPath(root))}`)
+        .join(","),
+    (activePath) => {
+        // Read through the same database-then-JSON path as the other manifests, but without
+        // requiring bridge.db to have a table for it: the query function is looked up by name so
+        // that adding `queryPreprocessorDefinesFromDatabase` to database.js later starts feeding
+        // this reader with no change here, and its absence today costs nothing.
+        const queryDatabase = require("./database").queryPreprocessorDefinesFromDatabase;
+
+        for (const root of collectKnownProjectRoots(activePath)) {
+            const manifest = typeof queryDatabase === "function"
+                ? readBridgeManifest(root, queryDatabase, getPreprocessorDefinesManifestPath(root), null)
+                : readJsonFile(getPreprocessorDefinesManifestPath(root), null);
+
+            if (!manifest || !Array.isArray(manifest.defines)) {
+                // Missing, unreadable, or written by a plugin whose schema predates this field. All
+                // three are "this project cannot tell us", and none of them is worth a log line: the
+                // overwhelmingly common case is simply a project that has no conditionals.
+                continue;
+            }
+
+            return {
+                available: true,
+                revision: Number.isFinite(Number(manifest.revision)) ? Number(manifest.revision) : 0,
+                defines: toDefineMap(manifest.defines),
+                fixtureDefines: toDefineMap(manifest.fixtureDefines),
+                conformance: Array.isArray(manifest.conformance) ? manifest.conformance : []
+            };
+        }
+
+        return { available: false, revision: 0, defines: new Map(), fixtureDefines: new Map(), conformance: [] };
+    }
+);
+
 function normalizeSubstrateBuiltinManifestEntry(entry) {
     const name = String(entry?.name || "").trim();
     if (!name) {
@@ -282,6 +356,7 @@ module.exports = {
     getUEBuiltinItems,
     getSubstrateBuiltinItems,
     collectDreamShaderSettingMappings,
+    readPreprocessorDefinesManifest,
     MATERIAL_EXPRESSION_MANIFEST_NAME,
     SETTINGS_MANIFEST_NAME
 };
