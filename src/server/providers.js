@@ -86,6 +86,7 @@ function completionSpecToItem(document, spec, defaultRange) {
 function completionItemKind(kind) {
     switch (kind) {
         case "Class": return CompletionItemKind.Class;
+        case "Constant": return CompletionItemKind.Constant;
         case "Field": return CompletionItemKind.Field;
         case "File": return CompletionItemKind.File;
         case "Function": return CompletionItemKind.Function;

@@ -5,7 +5,14 @@ const { collectCallables, flatten } = require("./symbols");
 const { findMatchingDelimiter, parseCallExpressionText } = require("./calls");
 const { findFunctionBuiltin } = require("./functionBuiltins");
 const { normalizeSymbolKey, stripCommentsPreserveLayout } = require("./utils");
-const { SUBSTRATE_BUILTIN_ITEMS, UE_BUILTINS, getBundledMaterialExpressionBuiltinItems } = require("../languageData");
+const {
+    PREPROCESSOR_BUILTIN_DEFINE_ITEMS,
+    PREPROCESSOR_BUILTIN_DEFINE_NAME_SET,
+    PREPROCESSOR_DEFINED_ITEM,
+    SUBSTRATE_BUILTIN_ITEMS,
+    UE_BUILTINS,
+    getBundledMaterialExpressionBuiltinItems
+} = require("../languageData");
 
 function getCodeLensTargets(text) {
     const ast = parseDocument(text);
@@ -59,14 +66,30 @@ function getInlayHintSpecs(text, services = {}) {
     return hints;
 }
 
+/**
+ * Every call expression in the document, scanned over the text the PARSER sees.
+ *
+ * `parseDocument(text).text` is the document with its preprocessor directive lines blanked, equal in
+ * length and in every offset to the document itself -- so every offset produced here still points at
+ * the author's own characters, and the two callers below need no correction. What it removes is the
+ * one thing a call scan must not see: `defined(FOO)` in a `#if` is preprocessor syntax, not a call,
+ * and reading it as one put a phantom `defined` call into both callers -- inlay hints, which then
+ * labelled its operand with some unrelated signature's first parameter name, and hover, which
+ * answered for whatever callable happened to share the name. (Signature help never came through
+ * here; `getActiveCallContext` in the server's providers scans for itself.)
+ *
+ * Re-parsing here is not a second parse: `parseDocument` is cached on the document text, and every
+ * caller of this has already been through it.
+ */
 function findCallExpressions(text) {
     const calls = [];
-    const clean = stripCommentsPreserveLayout(text);
+    const source = parseDocument(text).text;
+    const clean = stripCommentsPreserveLayout(source);
     const pattern = /(?<![_\p{L}\p{N}])([_\p{L}][_\p{L}\p{N}]*(?:(?:::|\.)[_\p{L}][_\p{L}\p{N}]*)*)\s*\(/gu;
     for (const match of clean.matchAll(pattern)) {
         const callee = match[1];
         const calleeOffset = match.index + match[0].indexOf(callee);
-        if (isOffsetInString(text, calleeOffset)) {
+        if (isOffsetInString(source, calleeOffset)) {
             continue;
         }
         const openOffset = match.index + match[0].lastIndexOf("(");
@@ -75,7 +98,7 @@ function findCallExpressions(text) {
             continue;
         }
         const callExpression = parseCallExpressionText(clean.slice(calleeOffset, closeOffset + 1), calleeOffset);
-        if (callExpression && !isDeclarationCall(text, callExpression)) {
+        if (callExpression && !isDeclarationCall(source, callExpression)) {
             calls.push(callExpression);
         }
     }
@@ -199,6 +222,11 @@ function getHoverSpecForName(name, text, services) {
         return callableToHoverSpec(signatures[0], name);
     }
 
+    const preprocessorSpec = findPreprocessorHoverSpec(name);
+    if (preprocessorSpec) {
+        return preprocessorSpec;
+    }
+
     const functionBuiltin = findFunctionBuiltin(name);
     if (functionBuiltin) {
         return builtinToHoverSpec(functionBuiltin, name, "FunctionBuiltin");
@@ -211,6 +239,54 @@ function getHoverSpecForName(name, text, services) {
 
     const ueBuiltin = findBuiltinItem(getUEBuiltins(services), normalized, shortName, "ue");
     return ueBuiltin ? builtinToHoverSpec(ueBuiltin, name, "UE") : null;
+}
+
+/**
+ * The preprocessor's own vocabulary: the six read-only `DS_` builtins, and `defined`.
+ *
+ * Neither is a callable and neither is a material expression, so nothing else in the chain above can
+ * answer for them. Until this they had a hover only when the hover provider's completion fallback
+ * happened to offer an item with the same label, which is to say when the cursor sat somewhere the
+ * `#if` operand list was already being offered -- and never on the `#if` line the author wrote
+ * yesterday.
+ *
+ * Matched case-SENSITIVELY, exactly as the plugin matches define names (`preprocessor.md`, "Where
+ * defines come from"). The reserved-prefix test there is case-sensitive too, so `ds_substrate` and
+ * `Ds_Substrate` are ordinary names a project may define for itself; answering one of them with this
+ * documentation -- which promises a read-only tier that outranks every other -- would be a lie.
+ *
+ * It sits after the callable lookup for the same reason every builtin does: what the project
+ * declares wins. That only ever matters for `defined`, which is a legal DreamShaderLang identifier.
+ */
+function findPreprocessorHoverSpec(name) {
+    const exactName = String(name || "");
+    if (exactName === PREPROCESSOR_DEFINED_ITEM.name) {
+        return preprocessorItemToHoverSpec(PREPROCESSOR_DEFINED_ITEM, "Preprocessor operator");
+    }
+    if (!PREPROCESSOR_BUILTIN_DEFINE_NAME_SET.has(exactName)) {
+        return null;
+    }
+    const item = PREPROCESSOR_BUILTIN_DEFINE_ITEMS.find((candidate) => candidate.name === exactName);
+    return item ? preprocessorItemToHoverSpec(item, "Preprocessor define") : null;
+}
+
+function preprocessorItemToHoverSpec(item, kind) {
+    return {
+        name: item.name,
+        kind,
+        detail: item.detail || "",
+        // A define is a value, not a call: no parameters, and no return type either. The value's kind
+        // -- integer or string, which is the one thing that decides whether a comparison against it
+        // is DSH1040 -- is already the first thing `detail` says.
+        parameters: [],
+        returnType: "",
+        outputs: [],
+        // The insert text doubles as the shortest usage line there is, once its snippet placeholders
+        // are stripped: `defined(NAME)`. A builtin's is its own name again, which shows nothing, so
+        // the example is only worth carrying when it differs.
+        example: item.insertText && item.insertText !== item.name ? stripSnippetPlaceholders(item.insertText) : "",
+        documentation: item.documentation || ""
+    };
 }
 
 function findCallableEntries(callables, normalized, shortName) {

@@ -56,10 +56,34 @@
       "\""
     ]
   ],
+  // Two syntaxes, one pair of markers, because one pair is all marker folding has. `#Region` names
+  // a span of Graph statements; `#if` cuts a span of declarations. Both read as a block and both
+  // want to fold, so they share the alternation.
+  //
+  // The two halves are spelled with different case rules because the language gives them different
+  // ones, and that is what forces the per-letter classes. `#Region` / `#EndRegion` is matched
+  // case-INSENSITIVELY -- the plugin's IsGraphDirective is, and the parser's region strip carries
+  // the `i` flag to match -- while the eight preprocessor keywords are LOWERCASE ONLY: `#IF` is
+  // DSH1035, not a directive, and folding it would be the editor quietly disagreeing with the
+  // compiler about what the line is. A marker may be given as `{ "pattern": ..., "flags": "i" }`,
+  // but a flag applies to the whole pattern and would drag the keywords in with it, so the
+  // insensitivity is written into the region half alone. `#[ \t]*if(?:n?def)?` covers `#ifdef` and
+  // `#ifndef` and the whitespace the language allows after the `#`, while stopping short of
+  // `#iffy`, which is DSH1035 too.
+  //
+  // KNOWN LIMITATION: `#else` and `#elif` are not fold boundaries. A marker pair has a start and an
+  // end and no notion of a midpoint, so a `#if` / `#else` / `#endif` chain folds as one range from
+  // the `#if` to the `#endif` rather than as one range per branch. Splitting it needs a folding
+  // range provider, not a marker; nothing here can be spelled to do it.
+  //
+  // Marker folding is also a pure line scan, so an HLSL `#if` inside a `Function` body folds like
+  // any other. That one is deliberate: the chain nests identically, and folding it is what a C
+  // editor does with the same lines. Folding is the only feature that treats those bodies as
+  // ordinary -- highlighting, diagnostics and the inactive-branch fade all know they are opaque.
   "folding": {
     "markers": {
-      "start": "^\\s*(?://\\s*)?#?[Rr]egion\\b",
-      "end": "^\\s*(?://\\s*)?#?[Ee]nd[Rr]egion\\b"
+      "start": "^\\s*(?://\\s*)?(?:#?[Rr][Ee][Gg][Ii][Oo][Nn]\\b|#[ \\t]*if(?:n?def)?\\b)",
+      "end": "^\\s*(?://\\s*)?(?:#?[Ee][Nn][Dd][Rr][Ee][Gg][Ii][Oo][Nn]\\b|#[ \\t]*endif\\b)"
     }
   },
   "wordPattern": "(-?\\d*\\.\\d\\w*)|([_\\p{L}][_\\p{L}\\p{N}]*)|([_\\p{L}][_\\p{L}\\p{N}]*\\.[_\\p{L}][_\\p{L}\\p{N}]*)"

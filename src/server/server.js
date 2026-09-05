@@ -37,8 +37,14 @@ const DIAGNOSTIC_DEBOUNCE_MS = 150;
  * The alphabet is in here because a member completion has to keep offering as the author types the
  * member name, and DreamShaderLang has no character that reliably starts one. It is the reason the
  * parse cache in `language/parser.js` exists: this fires on every keystroke.
+ *
+ * `#` is here for the preprocessor. A bare `#` is already a complete context -- completion answers
+ * it with the eight directives, each carrying a replace range that starts at the `#` so the item
+ * cannot double it -- but without the trigger nothing would ask: the alphabet fires only once a
+ * letter follows, and a list of spellings offered after the spelling has been typed is a list that
+ * arrived too late to be one.
  */
-const COMPLETION_TRIGGERS = [".", "\"", "/", ...Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")];
+const COMPLETION_TRIGGERS = ["#", ".", "\"", "/", ...Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")];
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
