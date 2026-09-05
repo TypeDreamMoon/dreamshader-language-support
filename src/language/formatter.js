@@ -35,11 +35,29 @@ function formatDocument(text, options = {}) {
     if (/\n$/.test(text) && !/\n$/.test(result)) {
         result += "\n";
     }
-    return result;
+    // Give the document back the line ending it arrived with. The pass above works in LF because
+    // every rule here is single-line, but the caller replaces the WHOLE document with this string
+    // (providers.js formatting()), so returning LF unconditionally rewrites every line ending in a
+    // CRLF file -- a whole-file change disguised as a format, on a repository whose working tree is
+    // CRLF throughout.
+    return usesCrlf(text) ? result.replace(/\n/g, "\r\n") : result;
+}
+
+// True when the text is predominantly CRLF. Counting rather than sampling the first terminator:
+// a file that is already mixed should end up consistent afterwards, and consistent with its
+// majority rather than with whichever line happened to be first.
+function usesCrlf(text) {
+    const source = String(text || "");
+    const crlf = (source.match(/\r\n/g) || []).length;
+    const total = (source.match(/\n/g) || []).length;
+    return crlf * 2 > total;
 }
 
 function formatLine(line) {
     if (isCommentOnly(line)) {
+        return line;
+    }
+    if (isDirectiveLine(line)) {
         return line;
     }
     let result = line;
@@ -100,6 +118,22 @@ function countLeadingClosers(line) {
 
 function isCommentOnly(line) {
     return /^\/\//.test(line) || /^\/\*/.test(line) || /^\*/.test(line);
+}
+
+// Any line whose first non-blank character is '#', passed through byte for byte.
+//
+// Deliberately every '#' line and not just the eight preprocessor keywords: a graph #Region, an
+// HLSL #include inside a Function body and a #define all have the same thing in common here --
+// their text is data, not DreamShaderLang, and none of the rewrites below have any business
+// touching it. Widening the test also means this cannot go stale when the keyword set moves.
+//
+// It is not cosmetic. formatLine normalizes ", " and strips space before ';', and a #define's
+// value is literal text that is folded into the generated asset's build key: formatting
+// `#define A B,C` once would silently change both the value and the hash. `#if X == "a,b"`
+// rewrites the string a condition compares against, and `#Region "A,B"` renames a region -- that
+// last one has been true since long before conditionals existed.
+function isDirectiveLine(line) {
+    return /^[ \t]*#/.test(line);
 }
 
 module.exports = {
