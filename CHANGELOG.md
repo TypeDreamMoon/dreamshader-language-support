@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.10.0
+
+**Conditional compilation.** DreamShader 1.9.0 adds `#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` /
+`#endif` plus `#define` / `#undef`, evaluated when the material is generated rather than in the shader,
+so a condition can select a `Domain`, a `ShadingModel`, an entire `Outputs` block or an `import` — the
+places a StaticSwitch node cannot reach, because they describe what the material *is* rather than what
+it computes. This release teaches the editor the whole of it: highlighting for the directives, their
+conditions and the six read-only `DS_` builtins; completion from a bare `#`, with `defined` and the
+builtins offered inside a condition; hover on both; folding of `#if`…`#endif` alongside `#Region`; and
+the thirteen `DSH1030`–`DSH1042` diagnostics reported as you type.
+
+**Inactive branches are dimmed.** The branch the build will not take fades, so a condition is something
+you can see rather than something you infer. It reads the define table the plugin exports; without that
+file — an older plugin build, or one that has not exported yet — nothing is dimmed and nothing is
+logged, which is a normal downgrade rather than a fault. Directive lines stay at full strength, and
+every branch remains live for completion, navigation and symbols even while faded: the extension has no
+way to know which arm you are about to edit.
+
+**`Function` bodies belong to the shader compiler.** A `#` line inside a `Function` or `GraphFunction`
+body is HLSL, addressed to Unreal's own preprocessor, and the extension leaves it alone — not
+highlighted as a directive, not diagnosed, not dimmed. Every such directive in a real DreamShader tree
+lives there, and reading them as DreamShaderLang would grey out the arm that actually ships.
+
+**Fixes.** Formatting no longer rewrites `#` lines: the pass that normalizes `", "` was changing a
+`#define`'s value — text the compiler folds into the generated asset's build key — and the string a
+condition compares against, and the name of a `#Region`. Formatting also no longer converts a CRLF file
+to LF wholesale. `defined(...)` in a condition is no longer offered to inlay hints as a function call,
+and `#Region` is now matched case-insensitively everywhere, as the compiler has always matched it.
+
 ## 1.9.0
 
 **Graph breakpoints — preview any line's value on the mesh.** Set a breakpoint (F9) on a `Graph`
