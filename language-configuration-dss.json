@@ -1,0 +1,41 @@
+{
+  "comments": {
+    "lineComment": "//",
+    "blockComment": ["/*", "*/"]
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] },
+    { "open": "/*", "close": " */", "notIn": ["string"] }
+  ],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["\"", "\""]
+  ],
+  // `#pragma region "Title"` ... `#pragma endregion` is the 2.0 spelling of a comment box, and `#if` ... `#endif`
+  // cuts declarations the way it does in a 1.x source; both read as a block, so both fold. All of them are
+  // lowercase only, as the compiler reads them.
+  "folding": {
+    "markers": {
+      "start": "^\\s*#[ \\t]*(?:pragma[ \\t]+region\\b|if(?:n?def)?\\b)",
+      "end": "^\\s*#[ \\t]*(?:pragma[ \\t]+endregion\\b|endif\\b)"
+    }
+  },
+  // A `///` line continues as a `///` line: a doc block is written several lines at a time.
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*///.*$",
+      "action": { "indent": "none", "appendText": "/// " }
+    }
+  ],
+  "wordPattern": "(-?\\d*\\.\\d\\w*)|([_\\p{L}][_\\p{L}\\p{N}]*)"
+}

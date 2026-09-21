@@ -1,8 +1,8 @@
 {
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
-  "description": "Language support for DreamShaderLang .dsm materials, .dsf function files, and .dsh shared headers.",
-  "version": "1.10.0",
+  "description": "Language support for DreamShaderLang: 2.0 .dss sources and .dsi material instances, and the 1.x .dsm materials, .dsf function files and .dsh shared headers.",
+  "version": "2.0.0",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",
@@ -32,7 +32,9 @@
     "material",
     "dsm",
     "dsf",
-    "dsh"
+    "dsh",
+    "dss",
+    "dsi"
   ],
   "activationEvents": [
     "onLanguage:dreamshaderlang",
@@ -57,7 +59,9 @@
     "onCommand:dreamshader.createFunctionFile",
     "onCommand:dreamshader.createHeader",
     "onCommand:dreamshader.createTextureSample",
-    "onCommand:dreamshader.createNoiseMaterial"
+    "onCommand:dreamshader.createNoiseMaterial",
+    "onLanguage:dreamshader-dss",
+    "onCommand:dreamshader.revealInMaterialEditor"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -91,6 +95,11 @@
         "command": "dreamshader.showMaterialDetails",
         "title": "DreamShaderLang: Show Details",
         "icon": "$(checklist)"
+      },
+      {
+        "command": "dreamshader.revealInMaterialEditor",
+        "title": "DreamShaderLang: Reveal in Material Editor",
+        "icon": "$(target)"
       },
       {
         "command": "dreamshader.refreshBridgeDiagnostics",
@@ -186,6 +195,20 @@
           ".dsh"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "dreamshader-dss",
+        "aliases": [
+          "DreamShader 2.0",
+          "DreamShaderLang 2.0",
+          "dss",
+          "dsi"
+        ],
+        "extensions": [
+          ".dss",
+          ".dsi"
+        ],
+        "configuration": "./language-configuration-dss.json"
       }
     ],
     "grammars": [
@@ -193,17 +216,29 @@
         "language": "dreamshaderlang",
         "scopeName": "source.dreamshaderlang",
         "path": "./syntaxes/dreamshader.tmLanguage.json"
+      },
+      {
+        "language": "dreamshader-dss",
+        "scopeName": "source.dreamshader.dss",
+        "path": "./syntaxes/dreamshader-dss.tmLanguage.json"
       }
     ],
     "breakpoints": [
       {
         "language": "dreamshaderlang"
+      },
+      {
+        "language": "dreamshader-dss"
       }
     ],
     "snippets": [
       {
         "language": "dreamshaderlang",
         "path": "./snippets/dreamshader.code-snippets"
+      },
+      {
+        "language": "dreamshader-dss",
+        "path": "./snippets/dreamshader-dss.code-snippets"
       }
     ],
     "configuration": {
@@ -314,7 +349,7 @@
       "editor/title": [
         {
           "command": "dreamshader.recompileCurrent",
-          "when": "resourceLangId == dreamshaderlang",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
           "group": "navigation@1"
         },
         {
@@ -324,7 +359,7 @@
         },
         {
           "command": "dreamshader.showMaterialPreview",
-          "when": "resourceLangId == dreamshaderlang && resourceExtname == .dsm",
+          "when": "(resourceLangId == dreamshaderlang && resourceExtname == .dsm) || resourceExtname == .dss",
           "group": "navigation@3"
         },
         {
@@ -334,24 +369,29 @@
         },
         {
           "command": "dreamshader.cleanGeneratedShaders",
-          "when": "resourceLangId == dreamshaderlang",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
           "group": "navigation@5"
         },
         {
           "command": "dreamshader.showBridgeDiagnostics",
-          "when": "resourceLangId == dreamshaderlang",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
           "group": "navigation@6"
+        },
+        {
+          "command": "dreamshader.revealInMaterialEditor",
+          "when": "resourceExtname == .dss",
+          "group": "navigation@7"
         }
       ],
       "editor/context": [
         {
           "command": "dreamshader.recompileCurrent",
-          "when": "resourceLangId == dreamshaderlang",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
           "group": "navigation@1"
         },
         {
           "command": "dreamshader.showMaterialPreview",
-          "when": "resourceLangId == dreamshaderlang && resourceExtname == .dsm",
+          "when": "(resourceLangId == dreamshaderlang && resourceExtname == .dsm) || resourceExtname == .dss",
           "group": "navigation@2"
         },
         {
@@ -361,8 +401,13 @@
         },
         {
           "command": "dreamshader.cleanGeneratedShaders",
-          "when": "resourceLangId == dreamshaderlang",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
           "group": "navigation@4"
+        },
+        {
+          "command": "dreamshader.revealInMaterialEditor",
+          "when": "resourceExtname == .dss",
+          "group": "navigation@5"
         }
       ],
       "view/title": [
@@ -408,8 +453,9 @@
     "test:server": "node scripts/server-smoke.js",
     "test:corpus": "node scripts/corpus-smoke.js",
     "test:extension": "node scripts/run-extension-tests.js",
-    "test": "npm run test:language && npm run test:imports && npm run test:preprocessor && npm run test:server && npm run test:corpus && npm run test:extension",
-    "package": "npx @vscode/vsce package"
+    "test": "npm run test:language && npm run test:imports && npm run test:preprocessor && npm run test:server && npm run test:corpus && npm run test:dss && npm run test:extension",
+    "package": "npx @vscode/vsce package",
+    "test:dss": "node scripts/dss-smoke.js"
   },
   "devDependencies": {
     "@vscode/test-electron": "^2.5.2",

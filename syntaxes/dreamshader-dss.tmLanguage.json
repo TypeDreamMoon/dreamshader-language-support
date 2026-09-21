@@ -1,0 +1,252 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "DreamShader 2.0",
+  "scopeName": "source.dreamshader.dss",
+  "fileTypes": ["dss", "dsi"],
+  "patterns": [
+    { "include": "#doc-comment" },
+    { "include": "#comments" },
+    { "include": "#pragma" },
+    { "include": "#include" },
+    { "include": "#preprocessor" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#namespace-call" },
+    { "include": "#storage" },
+    { "include": "#control" },
+    { "include": "#constants" },
+    { "include": "#types" },
+    { "include": "#intrinsics" },
+    { "include": "#function-declaration" },
+    { "include": "#function-call" },
+    { "include": "#member" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "doc-comment": {
+      "comment": "A `///` line: free text is documentation, `@word` is a directive the binder reads.",
+      "name": "comment.line.documentation.dreamshader",
+      "begin": "///",
+      "beginCaptures": { "0": { "name": "punctuation.definition.comment.dreamshader" } },
+      "end": "$",
+      "patterns": [
+        {
+          "match": "(@)(param)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.definition.directive.dreamshader" },
+            "2": { "name": "storage.type.annotation.dreamshader" },
+            "3": { "name": "variable.parameter.dreamshader" }
+          }
+        },
+        {
+          "match": "(@)(asset|default|name|library)\\s+(\\S+)",
+          "captures": {
+            "1": { "name": "punctuation.definition.directive.dreamshader" },
+            "2": { "name": "storage.type.annotation.dreamshader" },
+            "3": { "name": "string.unquoted.path.dreamshader" }
+          }
+        },
+        {
+          "match": "(@)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.definition.directive.dreamshader" },
+            "2": { "name": "storage.type.annotation.dreamshader" }
+          }
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.dreamshader",
+          "begin": "//",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.dreamshader" } },
+          "end": "$"
+        },
+        {
+          "name": "comment.block.dreamshader",
+          "begin": "/\\*",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.dreamshader" } },
+          "end": "\\*/",
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.dreamshader" } }
+        }
+      ]
+    },
+    "pragma": {
+      "comment": "`#pragma material(Key = Value, ...)`, `#pragma instance(...)`, `#pragma region \"Title\"`, `#pragma layout(...)`.",
+      "begin": "^\\s*(#)\\s*(pragma)\\s+(material|instance|region|endregion|layout)\\b",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.directive.dreamshader" },
+        "2": { "name": "keyword.control.directive.pragma.dreamshader" },
+        "3": { "name": "entity.name.function.preprocessor.dreamshader" }
+      },
+      "end": "$",
+      "name": "meta.preprocessor.pragma.dreamshader",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#constants" },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_.]*)\\s*(=)(?!=)",
+          "captures": {
+            "1": { "name": "variable.other.property.dreamshader" },
+            "2": { "name": "keyword.operator.assignment.dreamshader" }
+          }
+        },
+        {
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b",
+          "name": "constant.other.enumerator.dreamshader"
+        },
+        { "include": "#punctuation" }
+      ]
+    },
+    "include": {
+      "match": "^\\s*(#)\\s*(include)\\s+(\"[^\"]*\"|<[^>]*>)",
+      "captures": {
+        "1": { "name": "punctuation.definition.directive.dreamshader" },
+        "2": { "name": "keyword.control.directive.include.dreamshader" },
+        "3": { "name": "string.quoted.other.include.dreamshader" }
+      }
+    },
+    "preprocessor": {
+      "comment": "The conditional-compilation directives, and any other `#` line (HLSL's own inside a custom body).",
+      "begin": "^\\s*(#)\\s*(if|ifdef|ifndef|elif|else|endif|define|undef|error|warning|pragma|line)\\b",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.directive.dreamshader" },
+        "2": { "name": "keyword.control.directive.dreamshader" }
+      },
+      "end": "$",
+      "name": "meta.preprocessor.dreamshader",
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "match": "\\bdefined\\b", "name": "keyword.operator.word.dreamshader" },
+        { "match": "\\bDS_[A-Z0-9_]+\\b", "name": "support.constant.builtin.dreamshader" },
+        { "include": "#operators" }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.dreamshader",
+      "begin": "\"",
+      "end": "\"|$",
+      "patterns": [
+        { "match": "\\\\.", "name": "constant.character.escape.dreamshader" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b0[xX][0-9a-fA-F]+[uU]?\\b",
+          "name": "constant.numeric.hex.dreamshader"
+        },
+        {
+          "match": "(?<![A-Za-z_])(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:[eE][+-]?\\d+)?[fFhHuU]?\\b",
+          "name": "constant.numeric.dreamshader"
+        }
+      ]
+    },
+    "namespace-call": {
+      "comment": "`UE.TexCoord(...)`, `Substrate.Slab(...)`: the two namespaces of reflected engine nodes.",
+      "match": "\\b(UE|Substrate)\\s*(\\.)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "support.class.namespace.dreamshader" },
+        "2": { "name": "punctuation.accessor.dreamshader" },
+        "3": { "name": "support.function.node.dreamshader" }
+      }
+    },
+    "storage": {
+      "patterns": [
+        {
+          "match": "\\b(uniform|static|const|export|extern|struct|in|out|inout)\\b",
+          "name": "storage.modifier.dreamshader"
+        }
+      ]
+    },
+    "control": {
+      "match": "\\b(if|else|for|while|do|return|break|continue|discard|switch|case|default)\\b",
+      "name": "keyword.control.dreamshader"
+    },
+    "constants": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.dreamshader"
+    },
+    "types": {
+      "patterns": [
+        {
+          "match": "\\b(void|bool|int|uint|float|half|double)\\b",
+          "name": "storage.type.scalar.dreamshader"
+        },
+        {
+          "match": "\\b(bool|int|uint|float|half|double)[2-4](?:x[2-4])?\\b",
+          "name": "storage.type.vector.dreamshader"
+        },
+        {
+          "match": "\\b(Texture2D|Texture2DArray|TextureCube|TextureCubeArray|Texture3D|VolumeTexture|SamplerState)\\b",
+          "name": "storage.type.object.dreamshader"
+        },
+        {
+          "match": "\\b(material|Substrate)\\b(?!\\s*\\.)",
+          "name": "storage.type.graph.dreamshader"
+        }
+      ]
+    },
+    "intrinsics": {
+      "match": "\\b(abs|acos|all|any|asin|atan|atan2|ceil|clamp|cos|cross|ddx|ddy|degrees|distance|dot|exp|exp2|floor|fmod|frac|fwidth|length|lerp|log|log10|log2|max|min|mul|normalize|pow|radians|reflect|refract|round|rsqrt|saturate|sign|sin|smoothstep|sqrt|step|tan|transpose|trunc)\\b(?=\\s*\\()",
+      "name": "support.function.intrinsic.dreamshader"
+    },
+    "function-declaration": {
+      "comment": "`<type> Name(` at the start of a line, modifiers allowed in front.",
+      "match": "^\\s*(?:(?:export|extern|static)\\s+)*(?:[A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "entity.name.function.dreamshader" }
+      }
+    },
+    "function-call": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "entity.name.function.call.dreamshader" }
+      }
+    },
+    "member": {
+      "patterns": [
+        {
+          "comment": "A swizzle: up to four of xyzw or rgba.",
+          "match": "(\\.)([xyzw]{1,4}|[rgba]{1,4})\\b",
+          "captures": {
+            "1": { "name": "punctuation.accessor.dreamshader" },
+            "2": { "name": "variable.other.member.swizzle.dreamshader" }
+          }
+        },
+        {
+          "match": "(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.dreamshader" },
+            "2": { "name": "variable.other.member.dreamshader" }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        { "match": "(\\+\\+|--)", "name": "keyword.operator.increment.dreamshader" },
+        { "match": "(==|!=|<=|>=|<|>)", "name": "keyword.operator.comparison.dreamshader" },
+        { "match": "(&&|\\|\\||!)", "name": "keyword.operator.logical.dreamshader" },
+        { "match": "(\\+=|-=|\\*=|/=|%=|=)", "name": "keyword.operator.assignment.dreamshader" },
+        { "match": "(\\+|-|\\*|/|%)", "name": "keyword.operator.arithmetic.dreamshader" },
+        { "match": "(\\?|:)", "name": "keyword.operator.ternary.dreamshader" }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        { "match": ";", "name": "punctuation.terminator.statement.dreamshader" },
+        { "match": ",", "name": "punctuation.separator.comma.dreamshader" },
+        { "match": "[{}]", "name": "punctuation.section.block.dreamshader" },
+        { "match": "[()]", "name": "punctuation.section.parens.dreamshader" },
+        { "match": "[\\[\\]]", "name": "punctuation.section.brackets.dreamshader" }
+      ]
+    }
+  }
+}
