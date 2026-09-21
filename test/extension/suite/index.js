@@ -31,6 +31,8 @@ async function run() {
     await assertInlayHintProvider(document);
     await assertBridgeDiagnosticsRefresh(workspaceRoot, document);
 
+    await assertDssLanguageFeatures(workspaceRoot);
+
     console.log("extension smoke tests passed");
 }
 
@@ -145,6 +147,71 @@ async function assertBridgeDiagnosticsRefresh(workspaceRoot, document) {
 
     const requestDirectory = path.join(workspaceRoot, "Saved", "DreamShader", "Bridge", "Requests");
     assert(!fs.existsSync(requestDirectory) || fs.statSync(requestDirectory).isDirectory(), "Bridge request directory state should remain valid");
+}
+
+// DreamShader 2.0: a `.dss` answers from the symbol index the plugin wrote for it, not from the text. The index below is
+// that file to the letter (scripts/dss-smoke.js checks the queries; this checks that the providers are registered for
+// the language and reach the index through a real workspace).
+async function assertDssLanguageFeatures(workspaceRoot) {
+    const norm = (value) => value.replace(/\\/g, "/");
+    const sourcePath = norm(path.join(workspaceRoot, "DShader", "M_Glow.dss"));
+    const sourceText = [
+        "/// @desc The tint",                                   // 1
+        "uniform float3 Tint = float3(1, 0.5, 0.25);",          // 2
+        "",                                                     // 3
+        "export void M_Glow(inout material m)",                 // 4
+        "{",                                                    // 5
+        "    m.EmissiveColor = Tint;",                          // 6
+        "}"                                                     // 7
+    ].join("\n");
+    fs.writeFileSync(sourcePath, sourceText, "utf8");
+
+    const span = (line, column, length) => ({ file: sourcePath, line, column, offset: 0, length });
+    const indexPath = path.join(workspaceRoot, "Saved", "DreamShader", "Index", "Project", "M_Glow.dss.index.json");
+    fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+    fs.writeFileSync(indexPath, JSON.stringify({
+        schema: "dreamshader-symbol-index",
+        version: 1,
+        file: sourcePath,
+        declarations: [
+            { kind: "uniform", name: "Tint", signature: "uniform float3 Tint", type: "float3", doc: "The tint", ...span(2, 16, 4) },
+            { kind: "function", name: "M_Glow", role: "Entry", signature: "export void M_Glow(inout material m)", type: "void", doc: "", ...span(4, 13, 6) },
+            { kind: "parameter", name: "m", container: "M_Glow", type: "material", doc: "", ...span(4, 35, 1) }
+        ],
+        references: [
+            { name: "Tint", spans: [span(6, 23, 4)] },
+            { name: "m", spans: [span(6, 5, 1)] }
+        ],
+        includes: [],
+        parameters: []
+    }), "utf8");
+
+    const document = await vscode.workspace.openTextDocument(sourcePath);
+    await vscode.window.showTextDocument(document);
+    assert.strictEqual(document.languageId, "dreamshader-dss", "A .dss file should open as DreamShader 2.0");
+
+    const usage = new vscode.Position(5, sourceText.split("\n")[5].indexOf("Tint") + 1);
+    const definitions = await vscode.commands.executeCommand("vscode.executeDefinitionProvider", document.uri, usage);
+    const target = (definitions || []).map((entry) => entry.targetRange || entry.range)[0];
+    assert(target, "Definition provider should answer for a uniform of a .dss from its index");
+    assert.strictEqual(target.start.line, 1, "...with the line the index names");
+
+    const symbols = await vscode.commands.executeCommand("vscode.executeDocumentSymbolProvider", document.uri);
+    const names = (symbols || []).map((entry) => entry.name);
+    assert(names.includes("Tint") && names.includes("M_Glow"), `Outline should list the declarations of the index (got ${names.join(", ")})`);
+
+    const hovers = await vscode.commands.executeCommand("vscode.executeHoverProvider", document.uri, usage);
+    const hoverText = (hovers || [])
+        .flatMap((hover) => hover.contents || [])
+        .map((content) => typeof content === "string" ? content : content.value || "")
+        .join("\n");
+    assert(/uniform float3 Tint/.test(hoverText), "Hover should show the declaration's signature");
+    assert(/The tint/.test(hoverText), "...and its doc comment");
+
+    // Unlike the 1.x fixtures above, these are not kept: an index names its sources by absolute path, which is this
+    // machine's, and a checked-in one would be wrong everywhere else.
+    fs.rmSync(path.join(workspaceRoot, "Saved", "DreamShader", "Index"), { recursive: true, force: true });
+    fs.rmSync(sourcePath, { force: true });
 }
 
 module.exports = {
