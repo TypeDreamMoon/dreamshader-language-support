@@ -1,6 +1,6 @@
 # DreamShaderLang Language Support
 
-VS Code language support for DreamShaderLang `.dsm` material files, `.dsf` function files, and `.dsh` shared headers.
+VS Code language support for DreamShaderLang: the 2.0 `.dss` sources and `.dsi` material instances, and the 1.x `.dsm` material files, `.dsf` function files, and `.dsh` shared headers.
 
 > 中文文档: [README.zh-CN.md](./README.zh-CN.md)
 
@@ -47,6 +47,38 @@ See the [changelog](./CHANGELOG.md) for what each release changed.
 - Live material preview that streams from the running Unreal Editor: raw RGBA8 frames painted on a canvas, drag-to-orbit, mesh and frame-rate controls, and per-panel viewport sizing.
 - **Graph breakpoints:** set a breakpoint (F9) on a `Graph` line to preview that line's value on the mesh — the text-source equivalent of the Material Editor's *Start Previewing Node*. The previewed line is marked in the gutter.
 - Package commands for installing, browsing, updating, and removing DreamShader packages.
+
+## DreamShader 2.0 — `.dss` and `.dsi`
+
+DreamShader 2.0 adds an HLSL-shaped language beside the 1.x one: a `.dss` file is a compilation unit —
+`uniform` parameters, `///` doc blocks with `@directives`, `#pragma material(...)`, one exported
+`void M_Name(inout material m)` for a material and one asset per other `export` — and a `.dsi` file is a
+material instance. Both open as the language **DreamShader 2.0**, with their own grammar and snippets.
+
+The extension does not read 2.0 text for meaning, and that is on purpose. 2.0 has overloads, implicit
+conversions and a binder that knows the engine's node classes; a second implementation of that in
+JavaScript would be wrong in exactly the places that matter. So the editor asks the compiler:
+
+| Feature | Answered from |
+| :-- | :-- |
+| Go to Definition, Find References, Hover, Outline, Signature Help, Rename | the **symbol index** the plugin writes after every compile, and on `dsc index`: `Saved/DreamShader/Index/<root>/<file>.index.json` |
+| Completion and hover for `UE.` and `Substrate.` — node names, their pins and properties, the Substrate sugar arguments (`BaseColor`, `Metallic`, `Haziness`, ...) | the **builtin catalog** the plugin exports once the editor has loaded, and on `dsc export-catalog`: `Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json` |
+| Diagnostics | the bridge, as for 1.x — the compiler's own, with their `DSHnnnn` codes |
+| `/// @` directives, `#pragma` forms, keywords and types | the extension's own word lists |
+
+Answers are therefore as fresh as the last compile — and the plugin compiles on save. A position the
+text no longer matches is dropped from an answer rather than shown, and a rename refuses outright and
+asks for a compile. Two limits follow from what the index holds: it lists what a file declares at file
+scope, not the locals of a body, so a local has no definition to go to; and it records mentions by name,
+so only a name that is unique at file scope — a uniform, a constant, a struct, a function — is renamed.
+
+**Reveal in Material Editor** (editor title bar and context menu of a `.dss`) asks the running Unreal
+editor to find the node the current line became, open the material editor of the asset that owns it and
+select it. The other direction is in the plugin: a generated node's context menu has *DreamShader ▸ Open
+Source Line*. It needs the project open in an editor, and assets compiled by 2.0.
+
+Recompile, the bridge diagnostics panel, the live preview and graph breakpoints (F9) work on a `.dss`
+as they do on a `.dsm`. Formatting a 2.0 source is the compiler's printer: `dsc fmt`.
 
 ## Supported Keywords
 
@@ -324,6 +356,7 @@ Available commands include:
 - `DreamShaderLang: Clean Generated Shaders`
 - `DreamShaderLang: Show Bridge Panel`
 - `DreamShaderLang: Refresh Bridge Diagnostics`
+- `DreamShaderLang: Reveal in Material Editor` — a `.dss` line to the node it became
 - `DreamShaderLang: Install Package from GitHub`
 - `DreamShaderLang: Browse Package Store`
 - `DreamShaderLang: Update Installed Packages`

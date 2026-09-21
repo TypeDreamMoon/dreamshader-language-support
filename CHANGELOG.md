@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.0
+
+**DreamShader 2.0: `.dss` and `.dsi`.** The plugin's 2.0 line adds an HLSL-shaped language — `uniform`
+parameters, `///` doc blocks with `@directives`, `#pragma material(...)`, one asset per `export` — and
+material instances as text. Both file kinds now open as **DreamShader 2.0**, with a grammar of their own
+(doc directives, the four `#pragma` forms, the `UE.` and `Substrate.` namespaces, swizzles), snippets
+for the shapes a file is made of, folding on `#pragma region` and `#if`, and `///` that continues on Enter.
+
+**Navigation comes from the compiler, not from a second parser.** Go to Definition, Find References,
+Hover, the Outline, Signature Help and Rename read the symbol index the plugin now writes after every
+compile (`Saved/DreamShader/Index`), and completion of `UE.` / `Substrate.` — node names, pins,
+properties, and the Substrate sugar arguments a slab takes — reads the builtin catalog the plugin exports
+once the editor has loaded. What the editor offers is therefore what the compiler accepts, on this engine,
+with these plugins. A position the text no longer matches is dropped rather than shown, and a rename
+refuses and asks for a compile; locals are not in the index, and only a name unique at file scope is
+renamed. Needs DreamShader 2.0.0 for the two files; without them the grammar, the snippets and the
+bridge features still work.
+
+**Reveal in Material Editor.** From a line of a `.dss` to the node it became: the command asks the
+running Unreal editor to open the owning asset's material editor and select the node, and offers a
+recompile when nothing from that source is loaded.
+
+**The bridge features take 2.0 sources.** Recompile, the diagnostics panel, the live preview and graph
+breakpoints work on a `.dss` as they do on a `.dsm`.
+
 ## 1.10.0
 
 **Conditional compilation.** DreamShader 1.9.0 adds `#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` /

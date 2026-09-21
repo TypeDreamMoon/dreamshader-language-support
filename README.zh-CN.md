@@ -43,6 +43,32 @@ DreamShader 插件保持同步。
 - Unreal Bridge 诊断面板。
 - DreamShader Package 的安装、浏览、更新和移除命令。
 
+## DreamShader 2.0 —— `.dss` 与 `.dsi`
+
+DreamShader 2.0 在 1.x 语言旁边加了一门 HLSL 形状的语言:`.dss` 是一个编译单元——`uniform` 参数、
+带 `@指令` 的 `///` 文档块、`#pragma material(...)`,一个导出的 `void M_Name(inout material m)` 就是一个材质,
+其余每个 `export` 各出一个资产;`.dsi` 是材质实例。两者都以语言 **DreamShader 2.0** 打开,有自己的语法高亮与代码片段。
+
+扩展**不**自己去理解 2.0 的文本,这是有意的。2.0 有重载、隐式转换,还有一个认识引擎节点类的绑定器;
+用 JavaScript 再实现一遍,恰恰会在要紧的地方出错。所以编辑器去问编译器:
+
+| 功能 | 答案来自 |
+| :-- | :-- |
+| 转到定义、查找引用、悬停、大纲、签名帮助、重命名 | 插件每次编译后(以及 `dsc index`)写出的**符号索引**:`Saved/DreamShader/Index/<根>/<文件>.index.json` |
+| `UE.` 与 `Substrate.` 的补全和悬停——节点名、引脚与属性、Substrate 语法糖实参(`BaseColor`、`Metallic`、`Haziness`……) | 编辑器加载完成后(以及 `dsc export-catalog`)导出的**内建目录**:`Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json` |
+| 诊断 | 与 1.x 相同,走 bridge——编译器自己的诊断,带 `DSHnnnn` 码 |
+| `/// @` 指令、`#pragma` 形式、关键字与类型 | 扩展自带的词表 |
+
+因此答案的新鲜度等于上一次编译——而插件在保存时就会编译。文本已经对不上的位置会从结果里丢掉而不是照样显示;
+重命名则直接拒绝,并提示先编译。索引的内容带来两条限制:它只列文件作用域的声明,不列函数体里的局部变量,
+所以局部变量没有定义可跳;它按名字记录提及,所以只有在文件作用域里唯一的名字——uniform、常量、struct、函数——才能重命名。
+
+**Reveal in Material Editor**(`.dss` 的编辑器标题栏与右键菜单)让正在运行的 Unreal 编辑器找到当前行生成的节点,
+打开所属资产的材质编辑器并选中它。反方向在插件里:生成节点的右键菜单有 *DreamShader ▸ Open Source Line*。
+需要工程已在编辑器中打开,且资产由 2.0 编译。
+
+重新编译、bridge 诊断面板、实时预览与 Graph 断点(F9)对 `.dss` 与对 `.dsm` 一样可用。2.0 源码的格式化用编译器自己的打印器:`dsc fmt`。
+
 ## 支持的关键字
 
 当前有效顶层关键字：
@@ -293,6 +319,7 @@ Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
 - `DreamShaderLang: Clean Generated Shaders`
 - `DreamShaderLang: Show Bridge Panel`
 - `DreamShaderLang: Refresh Bridge Diagnostics`
+- `DreamShaderLang: Reveal in Material Editor`——从 `.dss` 的一行跳到它生成的节点
 - `DreamShaderLang: Install Package from GitHub`
 - `DreamShaderLang: Browse Package Store`
 - `DreamShaderLang: Update Installed Packages`
