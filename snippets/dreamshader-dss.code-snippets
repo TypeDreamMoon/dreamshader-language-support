@@ -1,0 +1,125 @@
+{
+  "Material entry": {
+    "prefix": ["material", "entry"],
+    "description": "A material: one exported function that fills in an `inout material`.",
+    "body": [
+      "#pragma material(ShadingModel = ${1|DefaultLit,Unlit,Subsurface,ClearCoat,TwoSidedFoliage|}, BlendMode = ${2|Opaque,Masked,Translucent,Additive|})",
+      "",
+      "/// @group ${3:Surface} @desc ${4:Base colour}",
+      "uniform float3 ${5:Tint} = float3(1, 1, 1);",
+      "",
+      "export void ${TM_FILENAME_BASE}(inout material m)",
+      "{",
+      "    m.BaseColor = ${5:Tint};",
+      "    $0",
+      "}"
+    ]
+  },
+  "Material function": {
+    "prefix": ["function", "export"],
+    "description": "A material function asset: one per `export`.",
+    "body": [
+      "/// @library ${1:Project|Utility}",
+      "/// @desc ${2:What it does.}",
+      "/// @param ${4:Value} ${5:What goes in.}",
+      "export ${3|float,float2,float3,float4|} ${TM_FILENAME_BASE}(${3} ${4:Value})",
+      "{",
+      "    return ${4:Value};$0",
+      "}"
+    ]
+  },
+  "Helper function": {
+    "prefix": "helper",
+    "description": "A function that is inlined into the graph of whoever calls it.",
+    "body": [
+      "${1|float,float2,float3,float4|} ${2:Name}(${3:float x})",
+      "{",
+      "    return ${4:x};$0",
+      "}"
+    ]
+  },
+  "Custom node function": {
+    "prefix": "custom",
+    "description": "A function whose body is HLSL for a Custom node.",
+    "body": [
+      "/// @custom",
+      "${1|float,float2,float3,float4|} ${2:Name}(${3:float2 uv})",
+      "{",
+      "    ${0:return 0;}",
+      "}"
+    ]
+  },
+  "Extern material function": {
+    "prefix": "extern",
+    "description": "Declares an existing material function asset so that it can be called.",
+    "body": [
+      "/// @asset ${1:/Game/Functions/MF_Existing}",
+      "extern ${2|float,float2,float3,float4|} ${3:MF_Existing}(${4:float3 Input});"
+    ]
+  },
+  "Scalar parameter": {
+    "prefix": ["uniform", "param"],
+    "description": "A material parameter with its group, description and slider.",
+    "body": [
+      "/// @group ${1:Surface} @desc ${2:What it controls}",
+      "/// @slider ${3:0} ${4:1}",
+      "uniform float ${5:Name} = ${6:0.5};"
+    ]
+  },
+  "Texture parameter": {
+    "prefix": ["texture", "uniform texture"],
+    "description": "A texture parameter with its default asset and sampler type.",
+    "body": [
+      "/// @group ${1:Textures} @default ${2:/Engine/EngineResources/DefaultTexture}",
+      "/// @sampler ${3|Color,Normal,Masks,LinearColor,Grayscale|}",
+      "uniform Texture2D ${4:Albedo};"
+    ]
+  },
+  "Static switch": {
+    "prefix": ["static", "switch"],
+    "description": "A static switch parameter: branches on it are compiled out, not selected.",
+    "body": [
+      "/// @static @group ${1:Features}",
+      "uniform bool ${2:bUseDetail} = ${3|false,true|};"
+    ]
+  },
+  "Texture sample": {
+    "prefix": "sample",
+    "description": "Sample a texture parameter at the first UV channel.",
+    "body": "float4 ${1:Texel} = ${2:Albedo}.Sample(UE.TexCoord(Index = ${3:0}));"
+  },
+  "Region": {
+    "prefix": "region",
+    "description": "A comment box around the nodes of the statements inside.",
+    "body": [
+      "#pragma region \"${1:Title}\"",
+      "$0",
+      "#pragma endregion"
+    ]
+  },
+  "Substrate slab": {
+    "prefix": ["slab", "substrate"],
+    "description": "A Substrate slab from the legacy parameters; the compiler adds the conversion node.",
+    "body": "Substrate ${1:Surface} = Substrate.Slab(BaseColor = ${2:Albedo}, Metallic = ${3:0.0}, Roughness = ${4:0.5});"
+  },
+  "Substrate builder": {
+    "prefix": "slab builder",
+    "description": "A Substrate value built member by member; the first use of it makes the node.",
+    "body": [
+      "Substrate ${1:Surface} = Substrate.Slab();",
+      "${1:Surface}.BaseColor = ${2:Albedo};",
+      "${1:Surface}.Roughness = ${3:0.5};",
+      "$0"
+    ]
+  },
+  "Material instance": {
+    "prefix": "instance",
+    "description": "A `.dsi` file: a material instance of a parent, with the parameters it overrides.",
+    "body": [
+      "#pragma instance(Parent = \"${1:/Game/Materials/M_Parent}\")",
+      "",
+      "uniform float ${2:Roughness} = ${3:0.25};",
+      "$0"
+    ]
+  }
+}
