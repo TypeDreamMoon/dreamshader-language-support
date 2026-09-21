@@ -414,7 +414,9 @@ async function getTargetDocument(targetUri) {
 }
 
 function isPreviewDocument(document) {
-    return Boolean(document && isDreamShaderDocument(document) && path.extname(document.fileName).toLowerCase() === ".dsm");
+    // A material source of either language: the plugin previews whatever the source builds.
+    const extension = document ? path.extname(document.fileName).toLowerCase() : "";
+    return Boolean(document && ((isDreamShaderDocument(document) && extension === ".dsm") || extension === ".dss"));
 }
 
 function readPreviewResult(projectRoot, sourceFile) {

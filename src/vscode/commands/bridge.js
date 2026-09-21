@@ -2,7 +2,7 @@
 
 const path = require("path");
 const vscode = require("vscode");
-const { findProjectRoot, isDreamShaderDocument } = require("../../project/projects");
+const { findProjectRoot, isAnyDreamShaderDocument } = require("../../project/projects");
 const { writeRecompileRequest, writeCleanGeneratedShadersRequest } = require("../../bridge/requests");
 
 function registerBridgeCommands(context, refreshBridge) {
@@ -31,8 +31,8 @@ function registerBridgeCommands(context, refreshBridge) {
 
 async function recompileCurrent(targetUri) {
     const document = await getTargetDocument(targetUri);
-    if (!document || !isDreamShaderDocument(document)) {
-        vscode.window.showWarningMessage("DreamShader recompile needs an active .dsm, .dsf, or .dsh document.");
+    if (!document || !isAnyDreamShaderDocument(document)) {
+        vscode.window.showWarningMessage("DreamShader recompile needs an active DreamShader source: .dss, .dsi, .dsm, .dsf or .dsh.");
         return;
     }
     if (document.isDirty) {

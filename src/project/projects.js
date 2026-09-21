@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { DREAMSHADER_EXTENSIONS } = require("../languageData");
+const { DSS_EXTENSIONS } = require("../dss/languageData");
 const { normalizeFsPath, isSameOrSubPath } = require("../common/path");
 const { host } = require("../host");
 
@@ -328,6 +329,16 @@ function isDreamShaderDocument(document) {
         && DREAMSHADER_EXTENSIONS.has(path.extname(document.fileName).toLowerCase()));
 }
 
+/** A 2.0 source: `.dss` or `.dsi`. Its language features come from the compiler's index, not from the server. */
+function isDreamShaderDssDocument(document) {
+    return Boolean(document && DSS_EXTENSIONS.has(path.extname(document.fileName).toLowerCase()));
+}
+
+/** Anything the plugin compiles or reads: what the bridge commands -- recompile, diagnostics -- apply to. */
+function isAnyDreamShaderDocument(document) {
+    return isDreamShaderDocument(document) || isDreamShaderDssDocument(document);
+}
+
 function containsUproject(directory) {
     return fs.readdirSync(directory, { withFileTypes: true }).some((entry) =>
         entry.isFile() && entry.name.toLowerCase().endsWith(".uproject"));
@@ -365,5 +376,7 @@ module.exports = {
     collectSourceRoots,
     findSourceRootForFile,
     findAncestorSourceRoot,
-    isDreamShaderDocument
+    isDreamShaderDocument,
+    isDreamShaderDssDocument,
+    isAnyDreamShaderDocument
 };
