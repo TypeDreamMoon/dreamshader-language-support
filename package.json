@@ -265,6 +265,10 @@
       {
         "language": "dreamshader-dss",
         "path": "./snippets/dreamshader-dss.code-snippets"
+      },
+      {
+        "language": "dreamshader-dsp",
+        "path": "./snippets/dreamshader-dsp.code-snippets"
       }
     ],
     "configuration": {
