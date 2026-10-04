@@ -379,7 +379,7 @@
       "editor/title": [
         {
           "command": "dreamshader.recompileCurrent",
-          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss || resourceLangId == dreamshader-dsp)",
           "group": "navigation@1"
         },
         {
@@ -399,12 +399,12 @@
         },
         {
           "command": "dreamshader.cleanGeneratedShaders",
-          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss || resourceLangId == dreamshader-dsp)",
           "group": "navigation@5"
         },
         {
           "command": "dreamshader.showBridgeDiagnostics",
-          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss || resourceLangId == dreamshader-dsp)",
           "group": "navigation@6"
         },
         {
@@ -416,7 +416,7 @@
       "editor/context": [
         {
           "command": "dreamshader.recompileCurrent",
-          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss || resourceLangId == dreamshader-dsp)",
           "group": "navigation@1"
         },
         {
@@ -431,7 +431,7 @@
         },
         {
           "command": "dreamshader.cleanGeneratedShaders",
-          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss)",
+          "when": "(resourceLangId == dreamshaderlang || resourceLangId == dreamshader-dss || resourceLangId == dreamshader-dsp)",
           "group": "navigation@4"
         },
         {

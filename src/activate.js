@@ -180,7 +180,7 @@ function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {
         // nothing fires. Watching creates as well so restoring the file brings its diagnostics back.
         // `**/DShader/**` rather than `DShader/**` because plugins carry source roots of their own.
         const sources = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.Uri.file(root), "**/DShader/**/*.{dsm,dsf,dsh,dss,dsi}"), false, true, false);
+            new vscode.RelativePattern(vscode.Uri.file(root), "**/DShader/**/*.{dsm,dsf,dsh,dss,dsi,dsp}"), false, true, false);
         registerWatcher(sources);
     }
 }

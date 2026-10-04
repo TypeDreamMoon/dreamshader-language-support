@@ -9,6 +9,19 @@ const { collectKnownProjectRoots } = require("../project/projects");
 const { getDiagnosticsFilePath, getBridgeDatabasePath } = require("./paths");
 const { queryDiagnosticsFromDatabase } = require("./database");
 
+// A DSHnnnn code has a section of its own on the plugin's diagnostics pages -- the link the language server already gives
+// the diagnostics it reports. Only the structured `code` field is read, never the message, which an editor running in
+// another language has translated. A code that is not a DSH code (`generate-error`, `material-compile`) stays text.
+const DIAGNOSTIC_DOCS_BASE = "https://github.com/TypeDreamMoon/DreamShader/blob/main/Docs/diagnostics";
+
+function diagnosticCode(code) {
+    const value = String(code || "");
+    if (!/^DSH\d{4}$/.test(value)) {
+        return value || undefined;
+    }
+    return { value, target: vscode.Uri.parse(`${DIAGNOSTIC_DOCS_BASE}/${value.slice(0, 4)}xxx.md#${value.toLowerCase()}`) };
+}
+
 function createEmptyBridgeDiagnosticsState() {
     return {
         updatedAtUtc: "",
@@ -114,7 +127,7 @@ function toVsCodeDiagnostic(entry) {
         entry.message,
         toVsCodeSeverity(entry.severity));
     diagnostic.source = entry.source;
-    diagnostic.code = entry.code || undefined;
+    diagnostic.code = diagnosticCode(entry.code);
     return diagnostic;
 }
 

@@ -32,7 +32,7 @@ function registerBridgeCommands(context, refreshBridge) {
 async function recompileCurrent(targetUri) {
     const document = await getTargetDocument(targetUri);
     if (!document || !isAnyDreamShaderDocument(document)) {
-        vscode.window.showWarningMessage("DreamShader recompile needs an active DreamShader source: .dss, .dsi, .dsm, .dsf or .dsh.");
+        vscode.window.showWarningMessage("DreamShader recompile needs an active DreamShader source: .dss, .dsi, .dsp, .dsm, .dsf or .dsh.");
         return;
     }
     if (document.isDirty) {
