@@ -1,0 +1,118 @@
+>// A `UE.` call in a `/// @custom` body is a graph node wired to an input of the Custom node
+#^^ source.dreamshader.dss comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss comment.line.double-slash.dreamshader
+>// (`_ds_<Fn>_UE0`, `_UE1`), lowered at every call site with the parameters holding that call's arguments. The two
+#^^ source.dreamshader.dss comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss comment.line.double-slash.dreamshader
+>// calls differ in `Gain`, so their UE1 inputs differ; the Time node behind UE0 is one node for both.
+#^^ source.dreamshader.dss comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss comment.line.double-slash.dreamshader
+>
+>/// @custom
+#^^^ source.dreamshader.dss comment.line.documentation.dreamshader punctuation.definition.comment.dreamshader
+#   ^ source.dreamshader.dss comment.line.documentation.dreamshader
+#    ^ source.dreamshader.dss comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#     ^^^^^^ source.dreamshader.dss comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+>float Pulse(float2 UV, float Gain)
+#^^^^^ source.dreamshader.dss storage.type.scalar.dreamshader
+#     ^ source.dreamshader.dss
+#      ^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#           ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#            ^^^^^^ source.dreamshader.dss storage.type.vector.dreamshader
+#                  ^^^ source.dreamshader.dss
+#                     ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                      ^ source.dreamshader.dss
+#                       ^^^^^ source.dreamshader.dss storage.type.scalar.dreamshader
+#                            ^^^^^ source.dreamshader.dss
+#                                 ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+>{
+#^ source.dreamshader.dss punctuation.section.block.begin.dreamshader
+>    float T = UE.Time();
+#^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#    ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl storage.type.basic.hlsl
+#         ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#              ^^ source.dreamshader.dss meta.embedded.block.hlsl support.class.namespace.dreamshader
+#                ^ source.dreamshader.dss meta.embedded.block.hlsl punctuation.accessor.dreamshader
+#                 ^^^^ source.dreamshader.dss meta.embedded.block.hlsl support.function.node.dreamshader
+#                     ^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+>    float Mixed = UE.LinearInterpolate(A = 0.0, B = Gain, Alpha = 0.5);
+#^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#    ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl storage.type.basic.hlsl
+#         ^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                  ^^ source.dreamshader.dss meta.embedded.block.hlsl support.class.namespace.dreamshader
+#                    ^ source.dreamshader.dss meta.embedded.block.hlsl punctuation.accessor.dreamshader
+#                     ^^^^^^^^^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl support.function.node.dreamshader
+#                                      ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                                           ^^^ source.dreamshader.dss meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                                              ^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                                                                  ^^^ source.dreamshader.dss meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                                                                     ^^^ source.dreamshader.dss meta.embedded.block.hlsl
+>    return sin(UV.x * 8.0 + T) * Mixed;
+#^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#    ^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl keyword.control.hlsl
+#          ^ source.dreamshader.dss meta.embedded.block.hlsl
+#           ^^^ source.dreamshader.dss meta.embedded.block.hlsl support.function.hlsl
+#              ^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                      ^^^ source.dreamshader.dss meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                         ^^^^^^^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+>}
+#^ source.dreamshader.dss punctuation.section.block.end.dreamshader
+>
+>export void M_CuLiftedCalls(inout material m)
+#^^^^^^ source.dreamshader.dss storage.modifier.dreamshader
+#      ^ source.dreamshader.dss
+#       ^^^^ source.dreamshader.dss storage.type.scalar.dreamshader
+#           ^ source.dreamshader.dss
+#            ^^^^^^^^^^^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#                           ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                            ^^^^^ source.dreamshader.dss storage.modifier.dreamshader
+#                                 ^ source.dreamshader.dss
+#                                  ^^^^^^^^ source.dreamshader.dss storage.type.graph.dreamshader
+#                                          ^^ source.dreamshader.dss
+#                                            ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+>{
+#^ source.dreamshader.dss punctuation.section.block.dreamshader
+>    float2 UV = UE.TextureCoordinate(CoordinateIndex = 0);
+#^^^^ source.dreamshader.dss
+#    ^^^^^^ source.dreamshader.dss storage.type.vector.dreamshader
+#          ^^^^ source.dreamshader.dss
+#              ^ source.dreamshader.dss keyword.operator.assignment.dreamshader
+#               ^ source.dreamshader.dss
+#                ^^ source.dreamshader.dss support.class.namespace.dreamshader
+#                  ^ source.dreamshader.dss punctuation.accessor.dreamshader
+#                   ^^^^^^^^^^^^^^^^^ source.dreamshader.dss support.function.node.dreamshader
+#                                    ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                     ^^^^^^^^^^^^^^^^ source.dreamshader.dss
+#                                                     ^ source.dreamshader.dss keyword.operator.assignment.dreamshader
+#                                                      ^ source.dreamshader.dss
+#                                                       ^ source.dreamshader.dss constant.numeric.dreamshader
+#                                                        ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                                         ^ source.dreamshader.dss punctuation.terminator.statement.dreamshader
+>    m.Opacity = Pulse(UV, 2.0) * Pulse(UV, 4.0);
+#^^^^^ source.dreamshader.dss
+#     ^ source.dreamshader.dss punctuation.accessor.dreamshader
+#      ^^^^^^^ source.dreamshader.dss variable.other.member.dreamshader
+#             ^ source.dreamshader.dss
+#              ^ source.dreamshader.dss keyword.operator.assignment.dreamshader
+#               ^ source.dreamshader.dss
+#                ^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#                     ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                      ^^ source.dreamshader.dss
+#                        ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                         ^ source.dreamshader.dss
+#                          ^^^ source.dreamshader.dss constant.numeric.dreamshader
+#                             ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                              ^ source.dreamshader.dss
+#                               ^ source.dreamshader.dss keyword.operator.arithmetic.dreamshader
+#                                ^ source.dreamshader.dss
+#                                 ^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#                                      ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                       ^^ source.dreamshader.dss
+#                                         ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                                          ^ source.dreamshader.dss
+#                                           ^^^ source.dreamshader.dss constant.numeric.dreamshader
+#                                              ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                               ^ source.dreamshader.dss punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dss punctuation.section.block.dreamshader
+>

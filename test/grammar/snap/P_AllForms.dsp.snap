@@ -1,0 +1,658 @@
+>// Every form of the pipeline grammar once: keyed pragma values with dots and bars, uniforms and a constant, buffer
+#^^ source.dreamshader.dsp comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dsp comment.line.double-slash.dreamshader
+>// argument lists (empty, expressions, words), every pass kind, every statement kind, `.Previous` and string values.
+#^^ source.dreamshader.dsp comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dsp comment.line.double-slash.dreamshader
+>#pragma pipeline(Order = -5, Injection = PostProcess.AfterDOF, Views = Game | SceneCapture, Requires = PostProcess | SceneResolve, Enabled = On)
+#^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.definition.directive.dreamshader
+# ^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.control.directive.pragma.dreamshader
+#       ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#        ^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader entity.name.function.preprocessor.dreamshader
+#                ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.section.parens.dreamshader
+#                 ^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader variable.other.property.dreamshader
+#                      ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                       ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.assignment.dreamshader
+#                        ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                         ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.arithmetic.dreamshader
+#                          ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.numeric.dreamshader
+#                           ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.separator.comma.dreamshader
+#                            ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                             ^^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader variable.other.property.dreamshader
+#                                      ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                       ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.assignment.dreamshader
+#                                        ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                         ^^^^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                    ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.accessor.dreamshader
+#                                                     ^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                             ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.separator.comma.dreamshader
+#                                                              ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                               ^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader variable.other.property.dreamshader
+#                                                                    ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                     ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.assignment.dreamshader
+#                                                                      ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                       ^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                                           ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                            ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.bitwise.dreamshader
+#                                                                             ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                              ^^^^^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                                                          ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.separator.comma.dreamshader
+#                                                                                           ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                            ^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader variable.other.property.dreamshader
+#                                                                                                    ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                     ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.assignment.dreamshader
+#                                                                                                      ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                       ^^^^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                                                                                  ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                                   ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.bitwise.dreamshader
+#                                                                                                                    ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                                     ^^^^^^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                                                                                                 ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.separator.comma.dreamshader
+#                                                                                                                                  ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                                                   ^^^^^^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader variable.other.property.dreamshader
+#                                                                                                                                          ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                                                           ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader keyword.operator.assignment.dreamshader
+#                                                                                                                                            ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader
+#                                                                                                                                             ^^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader constant.other.enumerator.dreamshader
+#                                                                                                                                               ^ source.dreamshader.dsp meta.preprocessor.pragma.dreamshader punctuation.section.parens.dreamshader
+>
+>uniform bool On = true;
+#^^^^^^^ source.dreamshader.dsp storage.modifier.dreamshader
+#       ^ source.dreamshader.dsp
+#        ^^^^ source.dreamshader.dsp storage.type.dreamshader
+#            ^ source.dreamshader.dsp
+#             ^^ source.dreamshader.dsp entity.name.variable.uniform.dreamshader
+#               ^ source.dreamshader.dsp
+#                ^ source.dreamshader.dsp keyword.operator.assignment.dreamshader
+#                 ^ source.dreamshader.dsp
+#                  ^^^^ source.dreamshader.dsp constant.language.boolean.dreamshader
+#                      ^ source.dreamshader.dsp punctuation.terminator.statement.dreamshader
+>/// @group Look   @slider 0 4   @sort 2
+#^^^ source.dreamshader.dsp comment.line.documentation.dreamshader punctuation.definition.comment.dreamshader
+#   ^ source.dreamshader.dsp comment.line.documentation.dreamshader
+#    ^ source.dreamshader.dsp comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#     ^^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+#          ^^^^^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader
+#                  ^ source.dreamshader.dsp comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#                   ^^^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+#                         ^^^^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader
+#                                ^ source.dreamshader.dsp comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#                                 ^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+#                                     ^^ source.dreamshader.dsp comment.line.documentation.dreamshader
+>/// @desc How strong the effect is.
+#^^^ source.dreamshader.dsp comment.line.documentation.dreamshader punctuation.definition.comment.dreamshader
+#   ^ source.dreamshader.dsp comment.line.documentation.dreamshader
+#    ^ source.dreamshader.dsp comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#     ^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+#         ^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dsp comment.line.documentation.dreamshader
+>uniform float Strength = 1.5;
+#^^^^^^^ source.dreamshader.dsp storage.modifier.dreamshader
+#       ^ source.dreamshader.dsp
+#        ^^^^^ source.dreamshader.dsp storage.type.dreamshader
+#             ^ source.dreamshader.dsp
+#              ^^^^^^^^ source.dreamshader.dsp entity.name.variable.uniform.dreamshader
+#                      ^ source.dreamshader.dsp
+#                       ^ source.dreamshader.dsp keyword.operator.assignment.dreamshader
+#                        ^ source.dreamshader.dsp
+#                         ^^^ source.dreamshader.dsp constant.numeric.dreamshader
+#                            ^ source.dreamshader.dsp punctuation.terminator.statement.dreamshader
+>uniform float3 Tint = float3(1.0, 0.5, 0.25);
+#^^^^^^^ source.dreamshader.dsp storage.modifier.dreamshader
+#       ^ source.dreamshader.dsp
+#        ^^^^^^ source.dreamshader.dsp storage.type.dreamshader
+#              ^ source.dreamshader.dsp
+#               ^^^^ source.dreamshader.dsp entity.name.variable.uniform.dreamshader
+#                   ^ source.dreamshader.dsp
+#                    ^ source.dreamshader.dsp keyword.operator.assignment.dreamshader
+#                     ^ source.dreamshader.dsp
+#                      ^^^^^^ source.dreamshader.dsp storage.type.vector.dreamshader
+#                            ^ source.dreamshader.dsp punctuation.section.parens.dreamshader
+#                             ^^^ source.dreamshader.dsp constant.numeric.dreamshader
+#                                ^ source.dreamshader.dsp punctuation.separator.comma.dreamshader
+#                                 ^ source.dreamshader.dsp
+#                                  ^^^ source.dreamshader.dsp constant.numeric.dreamshader
+#                                     ^ source.dreamshader.dsp punctuation.separator.comma.dreamshader
+#                                      ^ source.dreamshader.dsp
+#                                       ^^^^ source.dreamshader.dsp constant.numeric.dreamshader
+#                                           ^ source.dreamshader.dsp punctuation.section.parens.dreamshader
+#                                            ^ source.dreamshader.dsp punctuation.terminator.statement.dreamshader
+>uniform Texture2D Noise;
+#^^^^^^^ source.dreamshader.dsp storage.modifier.dreamshader
+#       ^ source.dreamshader.dsp
+#        ^^^^^^^^^ source.dreamshader.dsp storage.type.dreamshader
+#                 ^ source.dreamshader.dsp
+#                  ^^^^^ source.dreamshader.dsp entity.name.variable.uniform.dreamshader
+#                       ^ source.dreamshader.dsp punctuation.terminator.statement.dreamshader
+>static const float Half = 0.5;
+#^^^^^^ source.dreamshader.dsp storage.modifier.dreamshader
+#      ^ source.dreamshader.dsp
+#       ^^^^^ source.dreamshader.dsp storage.modifier.dreamshader
+#            ^ source.dreamshader.dsp
+#             ^^^^^ source.dreamshader.dsp storage.type.dreamshader
+#                  ^ source.dreamshader.dsp
+#                   ^^^^ source.dreamshader.dsp variable.other.constant.dreamshader
+#                       ^ source.dreamshader.dsp
+#                        ^ source.dreamshader.dsp keyword.operator.assignment.dreamshader
+#                         ^ source.dreamshader.dsp
+#                          ^^^ source.dreamshader.dsp constant.numeric.dreamshader
+#                             ^ source.dreamshader.dsp punctuation.terminator.statement.dreamshader
+>
+>buffer ObjDepth : Depth32;
+#^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader storage.type.buffer.dreamshader
+#      ^ source.dreamshader.dsp meta.buffer.dreamshader
+#       ^^^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader entity.name.variable.buffer.dreamshader
+#               ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.colon.dreamshader
+#                 ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                  ^^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader support.type.format.dreamshader
+#                         ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.terminator.statement.dreamshader
+>buffer Mask : R8();
+#^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader storage.type.buffer.dreamshader
+#      ^ source.dreamshader.dsp meta.buffer.dreamshader
+#       ^^^^ source.dreamshader.dsp meta.buffer.dreamshader entity.name.variable.buffer.dreamshader
+#           ^ source.dreamshader.dsp meta.buffer.dreamshader
+#            ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.colon.dreamshader
+#             ^ source.dreamshader.dsp meta.buffer.dreamshader
+#              ^^ source.dreamshader.dsp meta.buffer.dreamshader support.type.format.dreamshader
+#                ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                 ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                  ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.terminator.statement.dreamshader
+>buffer Field : RG16F(Size = int2(64, 32), History = true, Clear = None);
+#^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader storage.type.buffer.dreamshader
+#      ^ source.dreamshader.dsp meta.buffer.dreamshader
+#       ^^^^^ source.dreamshader.dsp meta.buffer.dreamshader entity.name.variable.buffer.dreamshader
+#            ^ source.dreamshader.dsp meta.buffer.dreamshader
+#             ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.colon.dreamshader
+#              ^ source.dreamshader.dsp meta.buffer.dreamshader
+#               ^^^^^ source.dreamshader.dsp meta.buffer.dreamshader support.type.format.dreamshader
+#                    ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                     ^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                         ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                          ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                           ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                            ^^^^ source.dreamshader.dsp meta.buffer.dreamshader storage.type.vector.dreamshader
+#                                ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                                 ^^ source.dreamshader.dsp meta.buffer.dreamshader constant.numeric.dreamshader
+#                                   ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.comma.dreamshader
+#                                    ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                     ^^ source.dreamshader.dsp meta.buffer.dreamshader constant.numeric.dreamshader
+#                                       ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                                        ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.comma.dreamshader
+#                                         ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                          ^^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                                                 ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                  ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                                                   ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                    ^^^^ source.dreamshader.dsp meta.buffer.dreamshader constant.language.boolean.dreamshader
+#                                                        ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.comma.dreamshader
+#                                                         ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                          ^^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                                                               ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                                                                 ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                  ^^^^ source.dreamshader.dsp meta.buffer.dreamshader constant.other.enumerator.dreamshader
+#                                                                      ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                                                                       ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.terminator.statement.dreamshader
+>buffer Blurred : RGBA16F(Scale = Half * 0.5, Resolution = Output, Mips = 2, Export = true);
+#^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader storage.type.buffer.dreamshader
+#      ^ source.dreamshader.dsp meta.buffer.dreamshader
+#       ^^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader entity.name.variable.buffer.dreamshader
+#              ^ source.dreamshader.dsp meta.buffer.dreamshader
+#               ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.colon.dreamshader
+#                ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                 ^^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader support.type.format.dreamshader
+#                        ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                         ^^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                              ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                               ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                                ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                 ^^^^ source.dreamshader.dsp meta.buffer.dreamshader constant.other.enumerator.dreamshader
+#                                     ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                      ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.arithmetic.dreamshader
+#                                       ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                        ^^^ source.dreamshader.dsp meta.buffer.dreamshader constant.numeric.dreamshader
+#                                           ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.comma.dreamshader
+#                                            ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                             ^^^^^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                                                       ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                        ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                                                         ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                          ^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader constant.other.enumerator.dreamshader
+#                                                                ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.comma.dreamshader
+#                                                                 ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                  ^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                                                                      ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                       ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                                                                        ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                         ^ source.dreamshader.dsp meta.buffer.dreamshader constant.numeric.dreamshader
+#                                                                          ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.comma.dreamshader
+#                                                                           ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                            ^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader variable.other.property.dreamshader
+#                                                                                  ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                                   ^ source.dreamshader.dsp meta.buffer.dreamshader keyword.operator.assignment.dreamshader
+#                                                                                    ^ source.dreamshader.dsp meta.buffer.dreamshader
+#                                                                                     ^^^^ source.dreamshader.dsp meta.buffer.dreamshader constant.language.boolean.dreamshader
+#                                                                                         ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.section.parens.dreamshader
+#                                                                                          ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.terminator.statement.dreamshader
+>
+>pass Draw : mesh
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.pass.dreamshader
+#    ^ source.dreamshader.dsp meta.pass.dreamshader
+#     ^^^^ source.dreamshader.dsp meta.pass.dreamshader entity.name.function.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.colon.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^ source.dreamshader.dsp meta.pass.dreamshader support.type.pass-kind.dreamshader
+>{
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.begin.dreamshader
+>    Filter = (Layer(Highlight | "Other Layer") | List(Enemies)) & Stencil(4, 0x0F);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#              ^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.function.dreamshader
+#                   ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                    ^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                             ^ source.dreamshader.dsp meta.pass.dreamshader
+#                              ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.bitwise.dreamshader
+#                               ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                                 ^^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                                            ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                                             ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                              ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                               ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.bitwise.dreamshader
+#                                                ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                                 ^^^^ source.dreamshader.dsp meta.pass.dreamshader support.function.dreamshader
+#                                                     ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                                      ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                                                             ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                                              ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                                               ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                                                ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.bitwise.dreamshader
+#                                                                 ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                                                  ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.function.dreamshader
+#                                                                         ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                                                          ^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                                                           ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                                                                            ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                                                             ^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.hex.dreamshader
+#                                                                                 ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                                                                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Material = "M_Mask";
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                      ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Mode = OwnOrOverride;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader
+#           ^^^^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Depth = Own(ObjDepth);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^ source.dreamshader.dsp meta.pass.dreamshader support.function.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                         ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Cull = None;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader
+#           ^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Blend = Max;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Usage = StaticMesh | SplineMesh;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                      ^ source.dreamshader.dsp meta.pass.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.bitwise.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader
+#                         ^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                                   ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Nanite = AssignStencil(200);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^^^^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.function.dreamshader
+#                          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                           ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                              ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                               ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    NaniteValue = float4(1.0, 0.0, 0.0, 1.0);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader
+#                  ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.vector.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                         ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                            ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                             ^ source.dreamshader.dsp meta.pass.dreamshader
+#                              ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                 ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                                  ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                   ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                      ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                                       ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                        ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                           ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                            ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    write Output0 = Mask;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader
+#                  ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                   ^ source.dreamshader.dsp meta.pass.dreamshader
+#                    ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.end.dreamshader
+>
+>pass Advance : compute
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.pass.dreamshader
+#    ^ source.dreamshader.dsp meta.pass.dreamshader
+#     ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader entity.name.function.pass.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.colon.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader
+#               ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.type.pass-kind.dreamshader
+>{
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.begin.dreamshader
+>    Injection = BeginView;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader
+#                ^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                         ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Enabled = On;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader
+#              ^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Shader = "/Project/Passes/Field.usf";
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#              ^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                                       ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Entry = "AdvanceCS";
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#             ^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                      ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Threads = uint3(8, 4, 2);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader
+#              ^^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.vector.dreamshader
+#                   ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                    ^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                     ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                      ^ source.dreamshader.dsp meta.pass.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                         ^ source.dreamshader.dsp meta.pass.dreamshader
+#                          ^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                           ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                            ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Dispatch = Field / 2;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader
+#               ^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                    ^ source.dreamshader.dsp meta.pass.dreamshader
+#                     ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.arithmetic.dreamshader
+#                      ^ source.dreamshader.dsp meta.pass.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    read Previous = Field.Previous;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader
+#         ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader
+#                  ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                   ^ source.dreamshader.dsp meta.pass.dreamshader
+#                    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                         ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.accessor.dreamshader
+#                          ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.language.previous.dreamshader
+#                                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    write Result = Field;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                  ^ source.dreamshader.dsp meta.pass.dreamshader
+#                   ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    param Gain = Strength * 2.0 - 1.0;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                ^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#                          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.arithmetic.dreamshader
+#                           ^ source.dreamshader.dsp meta.pass.dreamshader
+#                            ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                               ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.arithmetic.dreamshader
+#                                 ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                  ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                     ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    param Weight = DreamPassWeight;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                  ^^^^^^^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#                                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    param Flip = -Strength;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.arithmetic.dreamshader
+#                  ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#                          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    param Fixed = float2(Half, 1.0);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader
+#                  ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.vector.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                         ^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#                             ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                              ^ source.dreamshader.dsp meta.pass.dreamshader
+#                               ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                   ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.end.dreamshader
+>
+>pass Fill : clear
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.pass.dreamshader
+#    ^ source.dreamshader.dsp meta.pass.dreamshader
+#     ^^^^ source.dreamshader.dsp meta.pass.dreamshader entity.name.function.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.colon.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.type.pass-kind.dreamshader
+>{
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.begin.dreamshader
+>    Value = float4(0.25, 0.5, 0.75, 1.0);
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.vector.dreamshader
+#                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                   ^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                        ^ source.dreamshader.dsp meta.pass.dreamshader
+#                         ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                            ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                             ^ source.dreamshader.dsp meta.pass.dreamshader
+#                              ^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.comma.dreamshader
+#                                   ^ source.dreamshader.dsp meta.pass.dreamshader
+#                                    ^^^ source.dreamshader.dsp meta.pass.dreamshader constant.numeric.dreamshader
+#                                       ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.parens.dreamshader
+#                                        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    write Blurred;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.end.dreamshader
+>
+>pass Grab : copy
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.pass.dreamshader
+#    ^ source.dreamshader.dsp meta.pass.dreamshader
+#     ^^^^ source.dreamshader.dsp meta.pass.dreamshader entity.name.function.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.colon.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^ source.dreamshader.dsp meta.pass.dreamshader support.type.pass-kind.dreamshader
+>{
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.begin.dreamshader
+>    read SceneColor;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader
+#         ^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                   ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    write Blurred;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.end.dreamshader
+>
+>pass Show : fullscreen
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.pass.dreamshader
+#    ^ source.dreamshader.dsp meta.pass.dreamshader
+#     ^^^^ source.dreamshader.dsp meta.pass.dreamshader entity.name.function.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.colon.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.type.pass-kind.dreamshader
+>{
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.begin.dreamshader
+>    Shader = "Show.usf";
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#            ^ source.dreamshader.dsp meta.pass.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#              ^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                      ^ source.dreamshader.dsp meta.pass.dreamshader string.quoted.double.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    Entry = ShowPS;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.property.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader constant.other.enumerator.dreamshader
+#                  ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    read Mask;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader
+#         ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#             ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    read Blurred;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader
+#         ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    write SceneColor;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                    ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    param Tint = Tint;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#              ^ source.dreamshader.dsp meta.pass.dreamshader
+#               ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                ^^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#                     ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.end.dreamshader
+>

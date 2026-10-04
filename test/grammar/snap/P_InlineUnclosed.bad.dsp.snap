@@ -1,0 +1,28 @@
+>// A block whose `}` is missing runs to the end of the file: DSH2150, naming the line it opened on.
+#^^ source.dreamshader.dsp comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dsp comment.line.double-slash.dreamshader
+>hlsl
+#^^^^ source.dreamshader.dsp keyword.other.hlsl-block.dreamshader
+>{
+#^ source.dreamshader.dsp punctuation.section.block.begin.dreamshader
+>    float Halve(float X)
+#^^^^ source.dreamshader.dsp meta.embedded.block.hlsl
+#    ^^^^^ source.dreamshader.dsp meta.embedded.block.hlsl storage.type.basic.hlsl
+#         ^ source.dreamshader.dsp meta.embedded.block.hlsl
+#          ^^^^^ source.dreamshader.dsp meta.embedded.block.hlsl support.function.hlsl
+#               ^ source.dreamshader.dsp meta.embedded.block.hlsl
+#                ^^^^^ source.dreamshader.dsp meta.embedded.block.hlsl storage.type.basic.hlsl
+#                     ^^^^ source.dreamshader.dsp meta.embedded.block.hlsl
+>    {
+#^^^^ source.dreamshader.dsp meta.embedded.block.hlsl
+#    ^ source.dreamshader.dsp meta.embedded.block.hlsl punctuation.section.block.begin.hlsl
+>        return X * 0.5;
+#^^^^^^^^ source.dreamshader.dsp meta.embedded.block.hlsl
+#        ^^^^^^ source.dreamshader.dsp meta.embedded.block.hlsl keyword.control.hlsl
+#              ^^^^^ source.dreamshader.dsp meta.embedded.block.hlsl
+#                   ^^^ source.dreamshader.dsp meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                      ^^ source.dreamshader.dsp meta.embedded.block.hlsl
+>    }
+#^^^^ source.dreamshader.dsp meta.embedded.block.hlsl
+#    ^ source.dreamshader.dsp meta.embedded.block.hlsl punctuation.section.block.end.hlsl
+>

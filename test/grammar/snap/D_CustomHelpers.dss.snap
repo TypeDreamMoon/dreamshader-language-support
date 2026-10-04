@@ -1,0 +1,115 @@
+>// One @custom calling another: the callee travels inside the caller's code as a wrapper struct member, and comes
+#^^ source.dreamshader.dss comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss comment.line.double-slash.dreamshader
+>// back as a function of its own.
+#^^ source.dreamshader.dss comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss comment.line.double-slash.dreamshader
+>/// @custom
+#^^^ source.dreamshader.dss comment.line.documentation.dreamshader punctuation.definition.comment.dreamshader
+#   ^ source.dreamshader.dss comment.line.documentation.dreamshader
+#    ^ source.dreamshader.dss comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#     ^^^^^^ source.dreamshader.dss comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+>float Luma(float3 Colour)
+#^^^^^ source.dreamshader.dss storage.type.scalar.dreamshader
+#     ^ source.dreamshader.dss
+#      ^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#          ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#           ^^^^^^ source.dreamshader.dss storage.type.vector.dreamshader
+#                 ^^^^^^^ source.dreamshader.dss
+#                        ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+>{
+#^ source.dreamshader.dss punctuation.section.block.begin.dreamshader
+>    return dot(Colour, float3(0.299, 0.587, 0.114));
+#^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#    ^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl keyword.control.hlsl
+#          ^ source.dreamshader.dss meta.embedded.block.hlsl
+#           ^^^ source.dreamshader.dss meta.embedded.block.hlsl support.function.hlsl
+#              ^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                       ^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl storage.type.basic.hlsl
+#                             ^ source.dreamshader.dss meta.embedded.block.hlsl
+#                              ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                                   ^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                                     ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                                          ^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                                            ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl constant.numeric.decimal.hlsl
+#                                                 ^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+>}
+#^ source.dreamshader.dss punctuation.section.block.end.dreamshader
+>
+>/// @custom
+#^^^ source.dreamshader.dss comment.line.documentation.dreamshader punctuation.definition.comment.dreamshader
+#   ^ source.dreamshader.dss comment.line.documentation.dreamshader
+#    ^ source.dreamshader.dss comment.line.documentation.dreamshader punctuation.definition.directive.dreamshader
+#     ^^^^^^ source.dreamshader.dss comment.line.documentation.dreamshader storage.type.annotation.dreamshader
+>float3 Desaturate(float3 Colour, float Amount)
+#^^^^^^ source.dreamshader.dss storage.type.vector.dreamshader
+#      ^ source.dreamshader.dss
+#       ^^^^^^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#                 ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                  ^^^^^^ source.dreamshader.dss storage.type.vector.dreamshader
+#                        ^^^^^^^ source.dreamshader.dss
+#                               ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                                ^ source.dreamshader.dss
+#                                 ^^^^^ source.dreamshader.dss storage.type.scalar.dreamshader
+#                                      ^^^^^^^ source.dreamshader.dss
+#                                             ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+>{
+#^ source.dreamshader.dss punctuation.section.block.begin.dreamshader
+>    float L = Luma(Colour);
+#^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#    ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl storage.type.basic.hlsl
+#         ^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#              ^^^^ source.dreamshader.dss meta.embedded.block.hlsl support.function.hlsl
+#                  ^^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+>    return lerp(Colour, float3(L, L, L), Amount);
+#^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#    ^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl keyword.control.hlsl
+#          ^ source.dreamshader.dss meta.embedded.block.hlsl
+#           ^^^^ source.dreamshader.dss meta.embedded.block.hlsl support.function.hlsl
+#               ^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+#                        ^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl storage.type.basic.hlsl
+#                              ^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dss meta.embedded.block.hlsl
+>}
+#^ source.dreamshader.dss punctuation.section.block.end.dreamshader
+>
+>export void M_DCustomHelpers(inout material m)
+#^^^^^^ source.dreamshader.dss storage.modifier.dreamshader
+#      ^ source.dreamshader.dss
+#       ^^^^ source.dreamshader.dss storage.type.scalar.dreamshader
+#           ^ source.dreamshader.dss
+#            ^^^^^^^^^^^^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#                            ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                             ^^^^^ source.dreamshader.dss storage.modifier.dreamshader
+#                                  ^ source.dreamshader.dss
+#                                   ^^^^^^^^ source.dreamshader.dss storage.type.graph.dreamshader
+#                                           ^^ source.dreamshader.dss
+#                                             ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+>{
+#^ source.dreamshader.dss punctuation.section.block.dreamshader
+>    m.EmissiveColor = Desaturate(float3(1, 0.5, 0.25), 0.5);
+#^^^^^ source.dreamshader.dss
+#     ^ source.dreamshader.dss punctuation.accessor.dreamshader
+#      ^^^^^^^^^^^^^ source.dreamshader.dss variable.other.member.dreamshader
+#                   ^ source.dreamshader.dss
+#                    ^ source.dreamshader.dss keyword.operator.assignment.dreamshader
+#                     ^ source.dreamshader.dss
+#                      ^^^^^^^^^^ source.dreamshader.dss entity.name.function.call.dreamshader
+#                                ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                 ^^^^^^ source.dreamshader.dss storage.type.vector.dreamshader
+#                                       ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                        ^ source.dreamshader.dss constant.numeric.dreamshader
+#                                         ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                                          ^ source.dreamshader.dss
+#                                           ^^^ source.dreamshader.dss constant.numeric.dreamshader
+#                                              ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                                               ^ source.dreamshader.dss
+#                                                ^^^^ source.dreamshader.dss constant.numeric.dreamshader
+#                                                    ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                                     ^ source.dreamshader.dss punctuation.separator.comma.dreamshader
+#                                                      ^ source.dreamshader.dss
+#                                                       ^^^ source.dreamshader.dss constant.numeric.dreamshader
+#                                                          ^ source.dreamshader.dss punctuation.section.parens.dreamshader
+#                                                           ^ source.dreamshader.dss punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dss punctuation.section.block.dreamshader
+>

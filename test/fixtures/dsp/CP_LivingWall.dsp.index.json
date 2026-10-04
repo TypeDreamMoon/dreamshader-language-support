@@ -1,0 +1,824 @@
+{
+  "schema": "dreamshader-symbol-index",
+  "version": 1,
+  "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+  "declarations": [
+    {
+      "kind": "uniform",
+      "name": "Feed",
+      "signature": "uniform float Feed = 0.0545",
+      "type": "float",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 8,
+      "column": 15,
+      "offset": 547,
+      "length": 4
+    },
+    {
+      "kind": "uniform",
+      "name": "Kill",
+      "signature": "uniform float Kill = 0.062",
+      "type": "float",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 10,
+      "column": 15,
+      "offset": 614,
+      "length": 4
+    },
+    {
+      "kind": "uniform",
+      "name": "SporeRadius",
+      "signature": "uniform float SporeRadius = 6.0",
+      "type": "float",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 12,
+      "column": 15,
+      "offset": 675,
+      "length": 11
+    },
+    {
+      "kind": "buffer",
+      "name": "Field",
+      "signature": "buffer Field : RG32F",
+      "type": "RG32F",
+      "doc": "x = U, the substrate; y = V, what grows. 448 x 192 cells over the wall's 7 x 3 m, wrapping at the edges.",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 15,
+      "column": 8,
+      "offset": 817,
+      "length": 5
+    },
+    {
+      "kind": "buffer",
+      "name": "StepA",
+      "signature": "buffer StepA : RG32F",
+      "type": "RG32F",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 16,
+      "column": 8,
+      "offset": 921,
+      "length": 5
+    },
+    {
+      "kind": "buffer",
+      "name": "StepB",
+      "signature": "buffer StepB : RG32F",
+      "type": "RG32F",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 17,
+      "column": 8,
+      "offset": 994,
+      "length": 5
+    },
+    {
+      "kind": "pass",
+      "name": "Grow1",
+      "signature": "pass Grow1 : compute",
+      "type": "compute",
+      "doc": "Last frame's field, four steps on, planted.",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 132,
+      "column": 6,
+      "offset": 6154,
+      "length": 5
+    },
+    {
+      "kind": "pass",
+      "name": "Grow2",
+      "signature": "pass Grow2 : compute",
+      "type": "compute",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 145,
+      "column": 6,
+      "offset": 6433,
+      "length": 5
+    },
+    {
+      "kind": "pass",
+      "name": "Grow3",
+      "signature": "pass Grow3 : compute",
+      "type": "compute",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 158,
+      "column": 6,
+      "offset": 6703,
+      "length": 5
+    },
+    {
+      "kind": "pass",
+      "name": "Grow4",
+      "signature": "pass Grow4 : compute",
+      "type": "compute",
+      "doc": "The fourth four steps, into the field the wall reads.",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 172,
+      "column": 6,
+      "offset": 7037,
+      "length": 5
+    }
+  ],
+  "references": [
+    {
+      "name": "Field",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 136,
+          "column": 17,
+          "offset": 6239,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 137,
+          "column": 22,
+          "offset": 6267,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 149,
+          "column": 17,
+          "offset": 6518,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 162,
+          "column": 17,
+          "offset": 6788,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 176,
+          "column": 17,
+          "offset": 7122,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 178,
+          "column": 22,
+          "offset": 7178,
+          "length": 5
+        }
+      ]
+    },
+    {
+      "name": "StepA",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 138,
+          "column": 22,
+          "offset": 6304,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 150,
+          "column": 22,
+          "offset": 6546,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 164,
+          "column": 22,
+          "offset": 6844,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 177,
+          "column": 22,
+          "offset": 7150,
+          "length": 5
+        }
+      ]
+    },
+    {
+      "name": "Feed",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 139,
+          "column": 22,
+          "offset": 6332,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 152,
+          "column": 22,
+          "offset": 6602,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 165,
+          "column": 22,
+          "offset": 6872,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 179,
+          "column": 22,
+          "offset": 7206,
+          "length": 4
+        }
+      ]
+    },
+    {
+      "name": "Kill",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 140,
+          "column": 22,
+          "offset": 6359,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 153,
+          "column": 22,
+          "offset": 6629,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 166,
+          "column": 22,
+          "offset": 6899,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 180,
+          "column": 22,
+          "offset": 7233,
+          "length": 4
+        }
+      ]
+    },
+    {
+      "name": "SporeRadius",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 141,
+          "column": 22,
+          "offset": 6386,
+          "length": 11
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 154,
+          "column": 22,
+          "offset": 6656,
+          "length": 11
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 167,
+          "column": 22,
+          "offset": 6926,
+          "length": 11
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 181,
+          "column": 22,
+          "offset": 7260,
+          "length": 11
+        }
+      ]
+    },
+    {
+      "name": "StepB",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 151,
+          "column": 22,
+          "offset": 6574,
+          "length": 5
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+          "line": 163,
+          "column": 22,
+          "offset": 6816,
+          "length": 5
+        }
+      ]
+    }
+  ],
+  "includes": [
+  ],
+  "parameters": [
+    {
+      "name": "Feed",
+      "variable": "Feed",
+      "type": "float",
+      "group": "Growth",
+      "desc": "",
+      "sampler": "",
+      "defaultAsset": "",
+      "static": false,
+      "slider": { "min": 0.01, "max": 0.1 },
+      "default": [0.0545],
+      "directives": {},
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 8,
+      "column": 15,
+      "offset": 547,
+      "length": 4
+    },
+    {
+      "name": "Kill",
+      "variable": "Kill",
+      "type": "float",
+      "group": "Growth",
+      "desc": "",
+      "sampler": "",
+      "defaultAsset": "",
+      "static": false,
+      "slider": { "min": 0.03, "max": 0.08 },
+      "default": [0.062],
+      "directives": {},
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 10,
+      "column": 15,
+      "offset": 614,
+      "length": 4
+    },
+    {
+      "name": "SporeRadius",
+      "variable": "SporeRadius",
+      "type": "float",
+      "group": "Growth",
+      "desc": "",
+      "sampler": "",
+      "defaultAsset": "",
+      "static": false,
+      "slider": { "min": 2.0, "max": 12.0 },
+      "default": [6.0],
+      "directives": {},
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 12,
+      "column": 15,
+      "offset": 675,
+      "length": 11
+    }
+  ],
+  "pipeline": {
+    "order": 10,
+    "injection": "BeforePostProcess",
+    "views": [ "Game", "Editor" ],
+    "requires": [],
+    "enabled": "",
+    "pragmaSpan": {
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+      "line": 5,
+      "column": 1,
+      "offset": 443,
+      "length": 51
+    },
+    "uniforms": [
+      {
+        "name": "Feed",
+        "type": "float",
+        "default": "(0.0545)",
+        "group": "Growth",
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 8,
+        "column": 1,
+        "offset": 533,
+        "length": 28
+      },
+      {
+        "name": "Kill",
+        "type": "float",
+        "default": "(0.062)",
+        "group": "Growth",
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 10,
+        "column": 1,
+        "offset": 600,
+        "length": 27
+      },
+      {
+        "name": "SporeRadius",
+        "type": "float",
+        "default": "(6)",
+        "group": "Growth",
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 12,
+        "column": 1,
+        "offset": 661,
+        "length": 32
+      }
+    ],
+    "buffers": [
+      {
+        "name": "Field",
+        "format": "RG32F",
+        "resolution": "Fixed",
+        "scale": 1.0,
+        "size": [448, 192],
+        "history": true,
+        "export": true,
+        "desc": "x = U, the substrate; y = V, what grows. 448 x 192 cells over the wall's 7 x 3 m, wrapping at the edges.",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 15,
+        "column": 8,
+        "offset": 817,
+        "length": 5
+      },
+      {
+        "name": "StepA",
+        "format": "RG32F",
+        "resolution": "Fixed",
+        "scale": 1.0,
+        "size": [448, 192],
+        "history": false,
+        "export": false,
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 16,
+        "column": 8,
+        "offset": 921,
+        "length": 5
+      },
+      {
+        "name": "StepB",
+        "format": "RG32F",
+        "resolution": "Fixed",
+        "scale": 1.0,
+        "size": [448, 192],
+        "history": false,
+        "export": false,
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 17,
+        "column": 8,
+        "offset": 994,
+        "length": 5
+      }
+    ],
+    "passes": [
+      {
+        "name": "Grow1",
+        "kind": "compute",
+        "injection": "BeginView",
+        "enabled": "",
+        "material": "",
+        "materialObject": "",
+        "shader": "",
+        "entry": "GrowCS",
+        "desc": "Last frame's field, four steps on, planted.",
+        "bindings": {
+          "reads": [
+            {
+              "slot": "InField",
+              "buffer": "Field",
+              "previous": true,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 137,
+              "column": 5,
+              "offset": 6250,
+              "length": 32
+            }
+          ],
+          "writes": [
+            {
+              "slot": "OutField",
+              "buffer": "StepA",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 138,
+              "column": 5,
+              "offset": 6287,
+              "length": 23
+            }
+          ],
+          "params": [
+            {
+              "target": "FeedRate",
+              "source": "Parameter",
+              "parameter": "Feed",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 139,
+              "column": 5,
+              "offset": 6315,
+              "length": 22
+            },
+            {
+              "target": "KillRate",
+              "source": "Parameter",
+              "parameter": "Kill",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 140,
+              "column": 5,
+              "offset": 6342,
+              "length": 22
+            },
+            {
+              "target": "Spore",
+              "source": "Parameter",
+              "parameter": "SporeRadius",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 141,
+              "column": 5,
+              "offset": 6369,
+              "length": 29
+            },
+            {
+              "target": "Plant",
+              "source": "Constant",
+              "parameter": "",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 142,
+              "column": 5,
+              "offset": 6403,
+              "length": 21
+            }
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 132,
+        "column": 6,
+        "offset": 6154,
+        "length": 5
+      },
+      {
+        "name": "Grow2",
+        "kind": "compute",
+        "injection": "BeginView",
+        "enabled": "",
+        "material": "",
+        "materialObject": "",
+        "shader": "",
+        "entry": "GrowCS",
+        "desc": "",
+        "bindings": {
+          "reads": [
+            {
+              "slot": "InField",
+              "buffer": "StepA",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 150,
+              "column": 5,
+              "offset": 6529,
+              "length": 23
+            }
+          ],
+          "writes": [
+            {
+              "slot": "OutField",
+              "buffer": "StepB",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 151,
+              "column": 5,
+              "offset": 6557,
+              "length": 23
+            }
+          ],
+          "params": [
+            {
+              "target": "FeedRate",
+              "source": "Parameter",
+              "parameter": "Feed",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 152,
+              "column": 5,
+              "offset": 6585,
+              "length": 22
+            },
+            {
+              "target": "KillRate",
+              "source": "Parameter",
+              "parameter": "Kill",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 153,
+              "column": 5,
+              "offset": 6612,
+              "length": 22
+            },
+            {
+              "target": "Spore",
+              "source": "Parameter",
+              "parameter": "SporeRadius",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 154,
+              "column": 5,
+              "offset": 6639,
+              "length": 29
+            },
+            {
+              "target": "Plant",
+              "source": "Constant",
+              "parameter": "",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 155,
+              "column": 5,
+              "offset": 6673,
+              "length": 21
+            }
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 145,
+        "column": 6,
+        "offset": 6433,
+        "length": 5
+      },
+      {
+        "name": "Grow3",
+        "kind": "compute",
+        "injection": "BeginView",
+        "enabled": "",
+        "material": "",
+        "materialObject": "",
+        "shader": "",
+        "entry": "GrowCS",
+        "desc": "",
+        "bindings": {
+          "reads": [
+            {
+              "slot": "InField",
+              "buffer": "StepB",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 163,
+              "column": 5,
+              "offset": 6799,
+              "length": 23
+            }
+          ],
+          "writes": [
+            {
+              "slot": "OutField",
+              "buffer": "StepA",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 164,
+              "column": 5,
+              "offset": 6827,
+              "length": 23
+            }
+          ],
+          "params": [
+            {
+              "target": "FeedRate",
+              "source": "Parameter",
+              "parameter": "Feed",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 165,
+              "column": 5,
+              "offset": 6855,
+              "length": 22
+            },
+            {
+              "target": "KillRate",
+              "source": "Parameter",
+              "parameter": "Kill",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 166,
+              "column": 5,
+              "offset": 6882,
+              "length": 22
+            },
+            {
+              "target": "Spore",
+              "source": "Parameter",
+              "parameter": "SporeRadius",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 167,
+              "column": 5,
+              "offset": 6909,
+              "length": 29
+            },
+            {
+              "target": "Plant",
+              "source": "Constant",
+              "parameter": "",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 168,
+              "column": 5,
+              "offset": 6943,
+              "length": 21
+            }
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 158,
+        "column": 6,
+        "offset": 6703,
+        "length": 5
+      },
+      {
+        "name": "Grow4",
+        "kind": "compute",
+        "injection": "BeginView",
+        "enabled": "",
+        "material": "",
+        "materialObject": "",
+        "shader": "",
+        "entry": "GrowCS",
+        "desc": "The fourth four steps, into the field the wall reads.",
+        "bindings": {
+          "reads": [
+            {
+              "slot": "InField",
+              "buffer": "StepA",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 177,
+              "column": 5,
+              "offset": 7133,
+              "length": 23
+            }
+          ],
+          "writes": [
+            {
+              "slot": "OutField",
+              "buffer": "Field",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 178,
+              "column": 5,
+              "offset": 7161,
+              "length": 23
+            }
+          ],
+          "params": [
+            {
+              "target": "FeedRate",
+              "source": "Parameter",
+              "parameter": "Feed",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 179,
+              "column": 5,
+              "offset": 7189,
+              "length": 22
+            },
+            {
+              "target": "KillRate",
+              "source": "Parameter",
+              "parameter": "Kill",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 180,
+              "column": 5,
+              "offset": 7216,
+              "length": 22
+            },
+            {
+              "target": "Spore",
+              "source": "Parameter",
+              "parameter": "SporeRadius",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 181,
+              "column": 5,
+              "offset": 7243,
+              "length": 29
+            },
+            {
+              "target": "Plant",
+              "source": "Constant",
+              "parameter": "",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+              "line": 182,
+              "column": 5,
+              "offset": 7277,
+              "length": 21
+            }
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_LivingWall.dsp",
+        "line": 172,
+        "column": 6,
+        "offset": 7037,
+        "length": 5
+      }
+    ],
+    "injectionPoints": [ "BeginView", "BeforeBasePass", "AfterBasePass", "AfterOpaque", "BeforePostProcess", "PostProcess.BeforeDOF", "PostProcess.AfterDOF", "PostProcess.TranslucencyAfterDOF", "PostProcess.ReplaceTonemapper", "PostProcess.AfterMotionBlur", "PostProcess.AfterTonemap", "PostProcess.AfterFXAA", "EndOfView" ],
+    "formats": [ "R8", "RG8", "RGBA8", "R16F", "RG16F", "RGBA16F", "R32F", "RG32F", "RGBA32F", "R32U", "RG32U", "Depth32" ]
+  }
+}
