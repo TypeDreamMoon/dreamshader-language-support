@@ -1,0 +1,39 @@
+>// `hlsl` opens a block, and nothing else: without its `{` it is DSH2313.
+#^^ source.dreamshader.dsp comment.line.double-slash.dreamshader punctuation.definition.comment.dreamshader
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.dreamshader.dsp comment.line.double-slash.dreamshader
+>buffer Mask : R8;
+#^^^^^^ source.dreamshader.dsp meta.buffer.dreamshader storage.type.buffer.dreamshader
+#      ^ source.dreamshader.dsp meta.buffer.dreamshader
+#       ^^^^ source.dreamshader.dsp meta.buffer.dreamshader entity.name.variable.buffer.dreamshader
+#           ^ source.dreamshader.dsp meta.buffer.dreamshader
+#            ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.separator.colon.dreamshader
+#             ^ source.dreamshader.dsp meta.buffer.dreamshader
+#              ^^ source.dreamshader.dsp meta.buffer.dreamshader support.type.format.dreamshader
+#                ^ source.dreamshader.dsp meta.buffer.dreamshader punctuation.terminator.statement.dreamshader
+>
+>pass Fill : compute
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader storage.type.pass.dreamshader
+#    ^ source.dreamshader.dsp meta.pass.dreamshader
+#     ^^^^ source.dreamshader.dsp meta.pass.dreamshader entity.name.function.pass.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.separator.colon.dreamshader
+#           ^ source.dreamshader.dsp meta.pass.dreamshader
+#            ^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader support.type.pass-kind.dreamshader
+>{
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.begin.dreamshader
+>    write Result = Mask;
+#^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#    ^^^^^ source.dreamshader.dsp meta.pass.dreamshader keyword.other.binding.dreamshader
+#         ^ source.dreamshader.dsp meta.pass.dreamshader
+#          ^^^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.parameter.binding.dreamshader
+#                ^ source.dreamshader.dsp meta.pass.dreamshader
+#                 ^ source.dreamshader.dsp meta.pass.dreamshader keyword.operator.assignment.dreamshader
+#                  ^ source.dreamshader.dsp meta.pass.dreamshader
+#                   ^^^^ source.dreamshader.dsp meta.pass.dreamshader variable.other.buffer.dreamshader
+#                       ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>    hlsl;
+#^^^^^^^^ source.dreamshader.dsp meta.pass.dreamshader
+#        ^ source.dreamshader.dsp meta.pass.dreamshader punctuation.terminator.statement.dreamshader
+>}
+#^ source.dreamshader.dsp meta.pass.dreamshader punctuation.section.block.end.dreamshader
+>

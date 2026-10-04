@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { DREAMSHADER_EXTENSIONS } = require("../languageData");
 const { DSS_EXTENSIONS } = require("../dss/languageData");
+const { DSP_EXTENSIONS } = require("../dsp/languageData");
 const { normalizeFsPath, isSameOrSubPath } = require("../common/path");
 const { host } = require("../host");
 
@@ -334,9 +335,14 @@ function isDreamShaderDssDocument(document) {
     return Boolean(document && DSS_EXTENSIONS.has(path.extname(document.fileName).toLowerCase()));
 }
 
+/** A Custom Pass pipeline: `.dsp` (plugin 2.1.0). Compiled by the plugin like a `.dss`; its features are in src/dsp. */
+function isDreamShaderDspDocument(document) {
+    return Boolean(document && DSP_EXTENSIONS.has(path.extname(document.fileName).toLowerCase()));
+}
+
 /** Anything the plugin compiles or reads: what the bridge commands -- recompile, diagnostics -- apply to. */
 function isAnyDreamShaderDocument(document) {
-    return isDreamShaderDocument(document) || isDreamShaderDssDocument(document);
+    return isDreamShaderDocument(document) || isDreamShaderDssDocument(document) || isDreamShaderDspDocument(document);
 }
 
 function containsUproject(directory) {
@@ -378,5 +384,6 @@ module.exports = {
     findAncestorSourceRoot,
     isDreamShaderDocument,
     isDreamShaderDssDocument,
+    isDreamShaderDspDocument,
     isAnyDreamShaderDocument
 };

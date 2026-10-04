@@ -4,6 +4,7 @@
   "scopeName": "source.dreamshader.dss",
   "fileTypes": ["dss", "dsi"],
   "patterns": [
+    { "include": "#custom-function" },
     { "include": "#doc-comment" },
     { "include": "#comments" },
     { "include": "#pragma" },
@@ -24,6 +25,81 @@
     { "include": "#punctuation" }
   ],
   "repository": {
+    "custom-function": {
+      "comment": "A function whose doc block carries `@custom`: its body is HLSL, handed to the shader compiler verbatim. TextMate reads one line at a time and cannot look ahead from an earlier `///` line, so the region opens on the `///` line that names `@custom`, takes the rest of the doc block and the signature, and closes on the `}` that matches the body's `{` -- or on a `;`, which ends a prototype, so a stray `@custom` swallows nothing after it.",
+      "begin": "^(?=\\s*///(?:.*[\\s/])?@custom\\b)",
+      "end": "(\\})|(;)",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.block.end.dreamshader" },
+        "2": { "name": "punctuation.terminator.statement.dreamshader" }
+      },
+      "patterns": [
+        { "include": "#doc-comment" },
+        { "include": "#comments" },
+        { "include": "#custom-body" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#storage" },
+        { "include": "#constants" },
+        { "include": "#types" },
+        { "include": "#function-declaration" },
+        { "include": "#function-call" },
+        { "include": "#operators" },
+        { "include": "#punctuation" }
+      ]
+    },
+    "custom-body": {
+      "comment": "The `{` of a `@custom` body and what follows it, up to -- not including -- the `}` that matches it, which `custom-function` takes. A `UE.` call inside is lifted into the graph by the compiler, so it keeps its DreamShader colours.",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.block.begin.dreamshader" } },
+      "end": "(?=\\})",
+      "contentName": "meta.embedded.block.hlsl",
+      "patterns": [ { "include": "#custom-code" } ]
+    },
+    "custom-code": {
+      "patterns": [
+        { "include": "#hlsl-directive" },
+        { "include": "#custom-braces" },
+        { "include": "#namespace-call" },
+        { "include": "source.hlsl" }
+      ]
+    },
+    "custom-braces": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.block.begin.hlsl" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.block.end.hlsl" } },
+      "patterns": [ { "include": "#custom-code" } ]
+    },
+    "hlsl-body": {
+      "comment": "An embedded HLSL block: the `{` and what follows it, up to -- not including -- the `}` that matches it, which the rule including this one takes (the `.dsp` grammar's `hlsl-block`). Braces balance through `hlsl-braces`; one inside a comment, a string or a `#` line does not count, because those rules start earlier on the line and win.",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.block.begin.dreamshader" } },
+      "end": "(?=\\})",
+      "contentName": "meta.embedded.block.hlsl",
+      "patterns": [ { "include": "#hlsl-code" } ]
+    },
+    "hlsl-code": {
+      "patterns": [
+        { "include": "#hlsl-directive" },
+        { "include": "#hlsl-braces" },
+        { "include": "source.hlsl" }
+      ]
+    },
+    "hlsl-braces": {
+      "comment": "A nested pair of braces inside embedded HLSL, so that the `}` closing the block is the one that matches its `{`. Placed before `source.hlsl`, which has no brace rules of its own.",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.block.begin.hlsl" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.block.end.hlsl" } },
+      "patterns": [ { "include": "#hlsl-code" } ]
+    },
+    "hlsl-directive": {
+      "comment": "A `#` line of embedded HLSL: HLSL's own, coloured by `source.hlsl`, and a brace on it does not count -- the compiler's capture skips `#` lines too. A `\\` continuation is not followed, as the compiler does not follow one either.",
+      "begin": "^(?=\\s*#)",
+      "end": "$",
+      "patterns": [ { "include": "source.hlsl" } ]
+    },
     "doc-comment": {
       "comment": "A `///` line: free text is documentation, `@word` is a directive the binder reads.",
       "name": "comment.line.documentation.dreamshader",

@@ -1,0 +1,182 @@
+{
+  "Pipeline settings": {
+    "prefix": ["pipeline", "#pragma pipeline"],
+    "description": "The pipeline's own settings: its order among pipelines and the views it runs in.",
+    "body": [
+      "#pragma pipeline(Order = ${1:0}, Views = ${2:Game | Editor})"
+    ]
+  },
+  "Pipeline parameter": {
+    "prefix": "uniform",
+    "description": "A parameter an activation can override, with its group and slider.",
+    "body": [
+      "/// @group ${1:Look}   @slider ${2:0} ${3:1}",
+      "uniform ${4|float,float2,float3,float4,int,bool|} ${5:Name} = ${6:0.5};"
+    ]
+  },
+  "Buffer": {
+    "prefix": "buffer",
+    "description": "A texture the passes read and write. Scale, Size, Resolution, Clear, Mips, History, Export.",
+    "body": [
+      "/// @desc ${1:What it holds}",
+      "buffer ${2:Name} : ${3|R8,RG8,RGBA8,R16F,RG16F,RGBA16F,R32F,RG32F,RGBA32F|}(${4:Clear = 0});"
+    ]
+  },
+  "Fullscreen pass with a material": {
+    "prefix": ["fullscreen", "pass fullscreen"],
+    "description": "A Post Process material drawn over the view; its buffers arrive as UE.UserSceneTexture inputs.",
+    "body": [
+      "pass ${1:Composite} : fullscreen",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    Material  = \"${3:PP_Composite}\";",
+      "    read  ${4:Mask};",
+      "    write SceneColor;",
+      "}"
+    ]
+  },
+  "Fullscreen pass with HLSL": {
+    "prefix": ["fullscreen hlsl", "pass fullscreen hlsl"],
+    "description": "A pixel shader written in the pass: the statements of the entry, which sees UV, Pixel and SvPosition, and one float4 per write.",
+    "body": [
+      "pass ${1:Tint} : fullscreen",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    read  InColor = SceneColor;",
+      "    write Out     = SceneColor;",
+      "",
+      "    hlsl",
+      "    {",
+      "        Out = DreamPassSample(InColor, UV);$0",
+      "    }",
+      "}"
+    ]
+  },
+  "Compute pass with statements": {
+    "prefix": ["compute", "pass compute"],
+    "description": "A compute shader written in the pass as the statements of its entry: Id is the thread's texel, and threads past the dispatch have returned already.",
+    "body": [
+      "pass ${1:Step} : compute",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    Dispatch  = ${3:Output};",
+      "    read  Source = ${4:Input};",
+      "    write Result = ${3:Output};",
+      "",
+      "    hlsl",
+      "    {",
+      "        const float2 UV = (Id.xy + 0.5) * ResultSize.zw;",
+      "        Result[Id.xy] = Source.SampleLevel(DP_LinearClamp, UV, 0);$0",
+      "    }",
+      "}"
+    ]
+  },
+  "Compute pass with whole functions": {
+    "prefix": ["compute main", "pass compute main"],
+    "description": "A compute shader written in the pass as whole functions, the way a .usf holds them; Main is the entry.",
+    "body": [
+      "pass ${1:Step} : compute",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    Dispatch  = ${3:Output};",
+      "    read  Source = ${4:Input};",
+      "    write Result = ${3:Output};",
+      "",
+      "    hlsl",
+      "    {",
+      "        [numthreads(8, 8, 1)]",
+      "        void Main(uint3 Id : SV_DispatchThreadID)",
+      "        {",
+      "            if (any(Id.xy >= DP_DispatchSize.xy))",
+      "            {",
+      "                return;",
+      "            }",
+      "            Result[Id.xy] = Source.Load(int3(Id.xy, 0));$0",
+      "        }",
+      "    }",
+      "}"
+    ]
+  },
+  "Compute pass running an entry of the file's block": {
+    "prefix": ["compute entry", "pass compute entry"],
+    "description": "A compute pass whose code is an entry of the file's hlsl block, named with Entry.",
+    "body": [
+      "pass ${1:Step} : compute",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    Entry     = ${3:MainCS};",
+      "    Dispatch  = ${4:Output};",
+      "    read  Source = ${5:Input};",
+      "    write Result = ${4:Output};",
+      "}"
+    ]
+  },
+  "HLSL block": {
+    "prefix": "hlsl",
+    "description": "HLSL written in a pass: the statements of the entry, or whole functions.",
+    "body": [
+      "hlsl",
+      "{",
+      "    $0",
+      "}"
+    ]
+  },
+  "The file's HLSL block": {
+    "prefix": ["hlsl file", "hlsl shared"],
+    "description": "The file's one hlsl block: shared code every inline pass is compiled with, and entries a pass names with Entry.",
+    "body": [
+      "hlsl",
+      "{",
+      "    // Shared code: compiled into every pass whose code is in the .dsp. It uses no pass's names.",
+      "    $0",
+      "",
+      "    // An entry: compiled only for the passes that name it with `Entry = ${1:MainCS};`.",
+      "    [numthreads(8, 8, 1)]",
+      "    void ${1:MainCS}(uint3 Id : SV_DispatchThreadID)",
+      "    {",
+      "        if (any(Id.xy >= DP_DispatchSize.xy))",
+      "        {",
+      "            return;",
+      "        }",
+      "    }",
+      "}"
+    ]
+  },
+  "Mesh pass": {
+    "prefix": ["mesh", "pass mesh"],
+    "description": "Selected primitives drawn again into up to four buffers, through a material with UE.DreamPassOutput.",
+    "body": [
+      "pass ${1:DrawMask} : mesh",
+      "{",
+      "    Injection = ${2:AfterOpaque};",
+      "    Filter    = ${3|Layer(Name),Stencil(1),List(Name)|};",
+      "    Material  = \"${4:M_Mask}\";",
+      "    write Output0 = ${5:Mask};",
+      "}"
+    ]
+  },
+  "Clear pass": {
+    "prefix": ["clear", "pass clear"],
+    "description": "One buffer cleared to a value again later in the frame.",
+    "body": [
+      "pass ${1:Reset} : clear",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    Value     = ${3:0};",
+      "    write ${4:Mask};",
+      "}"
+    ]
+  },
+  "Copy pass": {
+    "prefix": ["copy", "pass copy"],
+    "description": "One texture copied, or drawn scaled and converted, into another.",
+    "body": [
+      "pass ${1:Grab} : copy",
+      "{",
+      "    Injection = ${2:BeforePostProcess};",
+      "    read  ${3:SceneColor};",
+      "    write ${4:Half};",
+      "}"
+    ]
+  }
+}

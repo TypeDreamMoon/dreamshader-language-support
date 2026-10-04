@@ -1,0 +1,472 @@
+{
+	"schema": "DreamShader.PassKeys",
+	"version": 1,
+	"generatedAt": "2026-10-03T03:27:40.033Z",
+	"supported": true,
+	"injectionPoints": [
+		{
+			"name": "BeginView",
+			"order": 0,
+			"postProcess": false,
+			"resolution": "Render"
+		},
+		{
+			"name": "BeforeBasePass",
+			"order": 1,
+			"postProcess": false,
+			"resolution": "Render"
+		},
+		{
+			"name": "AfterBasePass",
+			"order": 2,
+			"postProcess": false,
+			"resolution": "Render"
+		},
+		{
+			"name": "AfterOpaque",
+			"order": 3,
+			"postProcess": false,
+			"resolution": "Render"
+		},
+		{
+			"name": "BeforePostProcess",
+			"order": 4,
+			"postProcess": false,
+			"resolution": "Render"
+		},
+		{
+			"name": "PostProcess.BeforeDOF",
+			"order": 5,
+			"postProcess": true,
+			"resolution": "Render"
+		},
+		{
+			"name": "PostProcess.AfterDOF",
+			"order": 6,
+			"postProcess": true,
+			"resolution": "Render"
+		},
+		{
+			"name": "PostProcess.TranslucencyAfterDOF",
+			"order": 7,
+			"postProcess": true,
+			"resolution": "Render"
+		},
+		{
+			"name": "PostProcess.ReplaceTonemapper",
+			"order": 8,
+			"postProcess": true,
+			"resolution": "Output"
+		},
+		{
+			"name": "PostProcess.AfterMotionBlur",
+			"order": 9,
+			"postProcess": true,
+			"resolution": "Output"
+		},
+		{
+			"name": "PostProcess.AfterTonemap",
+			"order": 10,
+			"postProcess": true,
+			"resolution": "Output"
+		},
+		{
+			"name": "PostProcess.AfterFXAA",
+			"order": 11,
+			"postProcess": true,
+			"resolution": "Output"
+		},
+		{
+			"name": "EndOfView",
+			"order": 12,
+			"postProcess": false,
+			"resolution": "Output"
+		}
+	],
+	"pipelineKeys": [
+		{
+			"name": "Order",
+			"value": "int",
+			"default": "0",
+			"required": false,
+			"detail": "Pipelines with passes at one injection point run in ascending Order."
+		},
+		{
+			"name": "Injection",
+			"value": "injection",
+			"default": "BeforePostProcess",
+			"required": false,
+			"detail": "The injection point of a pass that names none."
+		},
+		{
+			"name": "Views",
+			"value": "viewFlags",
+			"default": "Game | Editor",
+			"required": false,
+			"detail": "The kinds of view the pipeline runs in, joined with |."
+		},
+		{
+			"name": "Requires",
+			"value": "requirementFlags",
+			"default": "",
+			"required": true,
+			"detail": "What a view must offer for the pipeline to run in it at all, joined with |."
+		},
+		{
+			"name": "Enabled",
+			"value": "boolParameter",
+			"default": "true",
+			"required": false,
+			"detail": "A bool uniform, or a constant: the whole pipeline is off where it is false."
+		}
+	],
+	"bufferFormats": [
+		"R8",
+		"RG8",
+		"RGBA8",
+		"R16F",
+		"RG16F",
+		"RGBA16F",
+		"R32F",
+		"RG32F",
+		"RGBA32F",
+		"R32U",
+		"RG32U",
+		"Depth32"
+	],
+	"bufferKeys": [
+		{
+			"name": "Scale",
+			"value": "float",
+			"default": "1.0",
+			"required": false,
+			"detail": "Relative to Resolution. Excludes Size."
+		},
+		{
+			"name": "Size",
+			"value": "int2",
+			"default": "",
+			"required": true,
+			"detail": "int2(w, h): a fixed size, independent of the view. Excludes Scale."
+		},
+		{
+			"name": "Resolution",
+			"value": "bufferResolution",
+			"default": "the first writer's",
+			"required": false,
+			"detail": "Render (before temporal upscaling) or Output (after)."
+		},
+		{
+			"name": "Clear",
+			"value": "clear",
+			"default": "0",
+			"required": false,
+			"detail": "A scalar, a float4(...), or None: not cleared, so a read before every write is an error."
+		},
+		{
+			"name": "Mips",
+			"value": "int",
+			"default": "1",
+			"required": false,
+			"detail": "The number of mips."
+		},
+		{
+			"name": "History",
+			"value": "bool",
+			"default": "false",
+			"required": false,
+			"detail": "Kept from one frame to the next; <Name>.Previous reads last frame's."
+		},
+		{
+			"name": "Export",
+			"value": "bool",
+			"default": "false",
+			"required": false,
+			"detail": "Copied into the render target <Pipeline>_<Name>, for ordinary materials, Blueprints, UMG and Niagara."
+		}
+	],
+	"bufferResolutions": [
+		"Render",
+		"Output"
+	],
+	"passKinds": [
+		{
+			"name": "fullscreen",
+			"keys": [
+				{
+					"name": "Material",
+					"value": "material",
+					"default": "",
+					"required": true,
+					"detail": "A Post Process material: a bare name built by a .dss under the same root, or an object path. Excludes Shader."
+				},
+				{
+					"name": "Shader",
+					"value": "shader",
+					"default": "",
+					"required": true,
+					"detail": "A .usf, relative to the .dsp or a virtual path; runs in a pixel shader slot. Excludes Material and an hlsl block."
+				},
+				{
+					"name": "Entry",
+					"value": "identifier",
+					"default": "",
+					"required": true,
+					"detail": "The entry function: the Shader file's (required with it), the pass's hlsl block's (Main when not written), or alone a function of the file's hlsl block."
+				}
+			],
+			"detail": "A Post Process material, or a .usf pixel shader, drawn over the view."
+		},
+		{
+			"name": "compute",
+			"keys": [
+				{
+					"name": "Shader",
+					"value": "shader",
+					"default": "",
+					"required": true,
+					"detail": "A .usf, relative to the .dsp or a virtual path; runs in a compute shader slot. Excludes an hlsl block."
+				},
+				{
+					"name": "Entry",
+					"value": "identifier",
+					"default": "",
+					"required": true,
+					"detail": "The entry function: the Shader file's (required with it), the pass's hlsl block's (Main when not written), or alone a function of the file's hlsl block."
+				},
+				{
+					"name": "Threads",
+					"value": "uint3",
+					"default": "the entry's [numthreads]",
+					"required": false,
+					"detail": "uint3(x, y, z): the thread group size."
+				},
+				{
+					"name": "Dispatch",
+					"value": "dispatch",
+					"default": "the first write",
+					"required": false,
+					"detail": "A buffer (one thread per texel), Buffer / n, Buffer * n, or uint3(x, y, z)."
+				}
+			],
+			"detail": "A .usf compute shader."
+		},
+		{
+			"name": "mesh",
+			"keys": [
+				{
+					"name": "Filter",
+					"value": "filter",
+					"default": "",
+					"required": true,
+					"detail": "Stencil(v[, mask]), Layer(name | ...), List(name), combined with | and &."
+				},
+				{
+					"name": "Material",
+					"value": "material",
+					"default": "none: every primitive draws with its own",
+					"required": false,
+					"detail": "The override material, with UE.DreamPassOutput. Needed by Mode = Override and OwnOrOverride."
+				},
+				{
+					"name": "Mode",
+					"value": "meshMode",
+					"default": "Override with a Material, Own without",
+					"required": false,
+					"detail": "Whose material draws the selected primitives."
+				},
+				{
+					"name": "Depth",
+					"value": "depthMode",
+					"default": "TestScene",
+					"required": false,
+					"detail": "TestScene, None, or Own(buffer) with a Depth32 buffer."
+				},
+				{
+					"name": "Cull",
+					"value": "cullMode",
+					"default": "Auto",
+					"required": false,
+					"detail": "Auto follows the primitive and its own material."
+				},
+				{
+					"name": "Blend",
+					"value": "blendMode",
+					"default": "Replace",
+					"required": false,
+					"detail": "How the pass's outputs combine with what the buffers hold."
+				},
+				{
+					"name": "Usage",
+					"value": "meshUsages",
+					"default": "StaticMesh | InstancedStaticMeshes | SkeletalMesh",
+					"required": false,
+					"detail": "The vertex factories the override material needs usage flags for."
+				},
+				{
+					"name": "Nanite",
+					"value": "nanitePolicy",
+					"default": "StencilMask with a Stencil filter, Skip otherwise",
+					"required": false,
+					"detail": "Skip, StencilMask, or AssignStencil(bits)."
+				},
+				{
+					"name": "NaniteValue",
+					"value": "float4",
+					"default": "float4(1, 0, 0, 0)",
+					"required": false,
+					"detail": "What StencilMask writes where a Nanite primitive is."
+				}
+			],
+			"detail": "Selected primitives drawn again, with an override material or their own."
+		},
+		{
+			"name": "clear",
+			"keys": [
+				{
+					"name": "Value",
+					"value": "clear",
+					"default": "0",
+					"required": false,
+					"detail": "A scalar or a float4(...)."
+				}
+			],
+			"detail": "One buffer cleared to a value: one write."
+		},
+		{
+			"name": "copy",
+			"keys": [],
+			"detail": "One texture copied, or drawn scaled, into another: one read, one write."
+		}
+	],
+	"commonPassKeys": [
+		{
+			"name": "Injection",
+			"value": "injection",
+			"default": "the pipeline's",
+			"required": false,
+			"detail": "Where in the frame the pass runs."
+		},
+		{
+			"name": "Enabled",
+			"value": "boolParameter",
+			"default": "true",
+			"required": false,
+			"detail": "A bool uniform, or a constant: the pass is skipped where it is false."
+		}
+	],
+	"bindingStatements": [
+		{
+			"name": "read",
+			"value": "binding",
+			"default": "",
+			"required": true,
+			"detail": "read [Name =] Buffer[.Previous]; -- what the pass reads, under the name its material or shader knows it by."
+		},
+		{
+			"name": "write",
+			"value": "binding",
+			"default": "",
+			"required": true,
+			"detail": "write [Name =] Buffer; -- what the pass writes; Output0..3 in a mesh pass."
+		},
+		{
+			"name": "param",
+			"value": "expression",
+			"default": "",
+			"required": true,
+			"detail": "param Name = Expression; -- a uniform, a static const, a literal, DreamPassWeight, or simple arithmetic on them."
+		}
+	],
+	"filterKinds": [
+		{
+			"name": "Stencil",
+			"snippet": "Stencil(${1:1})",
+			"detail": "Primitives whose CustomStencil matches the value, under the mask when one is given."
+		},
+		{
+			"name": "Layer",
+			"snippet": "Layer(${1:Name})",
+			"detail": "Primitives with one of the layers (a layer component); the names are the project's layer table."
+		},
+		{
+			"name": "List",
+			"snippet": "List(${1:Name})",
+			"detail": "Primitives registered under the list's name (UDreamPassSubsystem::AddToList)."
+		}
+	],
+	"meshModes": [
+		"Override",
+		"Own",
+		"OwnOrOverride"
+	],
+	"depthModes": [
+		"TestScene",
+		"None",
+		"Own"
+	],
+	"cullModes": [
+		"Auto",
+		"Back",
+		"Front",
+		"None"
+	],
+	"blendModes": [
+		"Replace",
+		"Add",
+		"Max",
+		"Min",
+		"AlphaBlend"
+	],
+	"nanitePolicies": [
+		"Skip",
+		"StencilMask",
+		"AssignStencil"
+	],
+	"meshUsages": [
+		"StaticMesh",
+		"InstancedStaticMeshes",
+		"SkeletalMesh",
+		"Landscape",
+		"SplineMesh",
+		"GeometryCache"
+	],
+	"viewFlags": [
+		"Game",
+		"Editor",
+		"SceneCapture",
+		"PlanarReflection",
+		"ReflectionCapture",
+		"Thumbnail"
+	],
+	"requirementFlags": [
+		"PostProcess",
+		"SceneResolve",
+		"CustomStencil"
+	],
+	"parameterTypes": [
+		"float",
+		"float2",
+		"float3",
+		"float4",
+		"int",
+		"bool",
+		"Texture2D"
+	],
+	"builtinBuffers": [
+		"SceneColor",
+		"SceneDepth",
+		"CustomDepth",
+		"CustomStencil",
+		"GBufferA",
+		"GBufferB",
+		"GBufferC",
+		"GBufferD",
+		"GBufferE",
+		"GBufferF",
+		"Velocity",
+		"Translucency"
+	],
+	"weightParameter": "DreamPassWeight",
+	"layerNames": []
+}

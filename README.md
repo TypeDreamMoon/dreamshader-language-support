@@ -1,6 +1,6 @@
 # DreamShaderLang Language Support
 
-VS Code language support for DreamShaderLang: the 2.0 `.dss` sources and `.dsi` material instances, and the 1.x `.dsm` material files, `.dsf` function files, and `.dsh` shared headers.
+VS Code language support for DreamShaderLang: the 2.0 `.dss` sources and `.dsi` material instances, the 2.1 `.dsp` Custom Pass pipelines, and the 1.x `.dsm` material files, `.dsf` function files, and `.dsh` shared headers.
 
 > 中文文档: [README.zh-CN.md](./README.zh-CN.md)
 
@@ -47,6 +47,8 @@ See the [changelog](./CHANGELOG.md) for what each release changed.
 - Live material preview that streams from the running Unreal Editor: raw RGBA8 frames painted on a canvas, drag-to-orbit, mesh and frame-rate controls, and per-panel viewport sizing.
 - **Graph breakpoints:** set a breakpoint (F9) on a `Graph` line to preview that line's value on the mesh — the text-source equivalent of the Material Editor's *Start Previewing Node*. The previewed line is marked in the gutter.
 - Package commands for installing, browsing, updating, and removing DreamShader packages.
+- `.dsp` Custom Pass pipelines: grammar, snippets, and completion, hover, Go to Definition and the Outline from the plugin's `pass-keys.json` and symbol index — see [below](#custom-pass-pipelines--dsp).
+- Embedded HLSL highlighting for the `hlsl { }` blocks of a `.dsp` and the body of a `/// @custom` function in a `.dss`.
 
 ## DreamShader 2.0 — `.dss` and `.dsi`
 
@@ -79,6 +81,34 @@ Source Line*. It needs the project open in an editor, and assets compiled by 2.0
 
 Recompile, the bridge diagnostics panel, the live preview and graph breakpoints (F9) work on a `.dss`
 as they do on a `.dsm`. Formatting a 2.0 source is the compiler's printer: `dsc fmt`.
+
+The body of a `/// @custom` function is HLSL handed to the shader compiler verbatim, and is highlighted as
+HLSL; a `UE.` call inside it keeps its DreamShader colours, because the compiler lifts it into the graph.
+
+## Custom Pass pipelines — `.dsp`
+
+DreamShader 2.1.0 adds Custom Pass pipelines: a `.dsp` file declares buffers, parameters and render passes
+that run at injection points of Unreal's renderer (UE 5.8 and later). It opens as the language **DreamShader
+Pipeline** (`dreamshader-dsp`), with its own grammar and snippets for the pipeline, every pass kind and the
+three ways to write a pass's HLSL — the statements of its entry, whole functions, or an entry of the file's
+`hlsl` block named by `Entry`.
+
+The HLSL a pipeline holds is highlighted as HLSL, through VS Code's built-in HLSL grammar, and comment
+toggling, bracket matching and snippets inside a block follow HLSL. A block ends at the `}` that matches its
+`{`; a brace inside a comment, a string or a `#` line does not count, as the compiler reads it.
+
+| Feature | Answered from |
+| :-- | :-- |
+| Completion and hover of keys and their values — injection points, formats, pass kinds, modes, the project's pass layers inside `Layer(...)` | **`pass-keys.json`**, which the plugin writes to `Saved/DreamShader/Bridge` at editor startup and on *Open Dream Shader Workspace*; until it exists, the copy bundled with the extension |
+| Go to Definition and hover of buffers, parameters, constants and passes; details in the Outline | the pipeline's **symbol index** and its `pipeline` section |
+| Inside an `hlsl` block: a pass's binding names (`Source`, `SourceSize`, `SourceUVRect`, ...), the names written around the statements of an entry (`Id`, `UV`, ...), `DP_*` and the `DreamPass*` helpers — completion, hover, semantic colouring, and Go to Definition to the binding | the pass's statements, read from the text |
+| `Entry =` | the functions of the file's `hlsl` block, `[numthreads]` ones first for a compute pass |
+| Diagnostics | the bridge; a `DSHnnnn` code links to its page of the plugin's documentation |
+
+Where the index is missing, older than the text (a position it names no longer holds the name) or of a
+version the extension does not read, definitions and the Outline come from the text instead; a version
+mismatch between the plugin and the extension is reported once. Recompile Current Source, Clean Generated
+Shaders and the bridge panel work on a `.dsp`.
 
 ## Supported Keywords
 
@@ -420,6 +450,11 @@ a real VS Code:
 ```powershell
 npm test
 ```
+
+`test:dss` and `test:dsp` check the 2.0 and pipeline features against index files, a catalog and a
+`pass-keys.json` in the plugin's shape, and `test:grammar` runs the TextMate grammars over assertion files
+and snapshots of the plugin's corpus (`vscode-tmgrammar-test`, with a copy of VS Code's HLSL grammar for
+the embedded blocks).
 
 `test:corpus` is opt-in, because the plugin is not part of this repository. Point it at one and it
 asserts both directions — nothing flagged on a source the compiler accepts, and a matching

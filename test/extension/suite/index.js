@@ -32,6 +32,7 @@ async function run() {
     await assertBridgeDiagnosticsRefresh(workspaceRoot, document);
 
     await assertDssLanguageFeatures(workspaceRoot);
+    await assertDspLanguageFeatures(workspaceRoot);
 
     console.log("extension smoke tests passed");
 }
@@ -212,6 +213,81 @@ async function assertDssLanguageFeatures(workspaceRoot) {
     // machine's, and a checked-in one would be wrong everywhere else.
     fs.rmSync(path.join(workspaceRoot, "Saved", "DreamShader", "Index"), { recursive: true, force: true });
     fs.rmSync(sourcePath, { force: true });
+}
+
+// Custom Pass pipelines: a `.dsp` opens as its own language and answers from the index and pass-keys.json the plugin
+// wrote. The files are the real ones of test/fixtures/dsp (scripts/dsp-smoke.js checks the queries on them); here they
+// are laid out in the workspace's project, with the index's paths pointed at it, and removed again afterwards.
+async function assertDspLanguageFeatures(workspaceRoot) {
+    const fixtures = path.join(__dirname, "..", "..", "fixtures", "dsp");
+    const sourcePath = path.join(workspaceRoot, "DShader", "CP_Highlight.dsp").replace(/\\/g, "/");
+    const indexDirectory = path.join(workspaceRoot, "Saved", "DreamShader", "Index");
+    const passKeysPath = path.join(workspaceRoot, "Saved", "DreamShader", "Bridge", "pass-keys.json");
+    const diagnosticsPath = path.join(workspaceRoot, "Saved", "DreamShader", "Bridge", "diagnostics.json");
+    const diagnosticsBefore = fs.readFileSync(diagnosticsPath, "utf8");
+
+    const text = fs.readFileSync(path.join(fixtures, "CP_Highlight.dsp"), "utf8").replace(/\r\n/g, "\n");
+    const index = JSON.parse(fs.readFileSync(path.join(fixtures, "CP_Highlight.dsp.index.json"), "utf8"));
+    const relocate = (value) => {
+        if (Array.isArray(value)) {
+            value.forEach(relocate);
+        } else if (value && typeof value === "object") {
+            for (const key of Object.keys(value)) {
+                if (key === "file") {
+                    value[key] = sourcePath;
+                } else {
+                    relocate(value[key]);
+                }
+            }
+        }
+    };
+    relocate(index);
+    fs.writeFileSync(sourcePath, text, "utf8");
+    fs.mkdirSync(path.join(indexDirectory, "Project"), { recursive: true });
+    fs.writeFileSync(path.join(indexDirectory, "Project", "CP_Highlight.dsp.index.json"), JSON.stringify(index), "utf8");
+    fs.copyFileSync(path.join(fixtures, "pass-keys.json"), passKeysPath);
+
+    try {
+        const document = await vscode.workspace.openTextDocument(sourcePath);
+        await vscode.window.showTextDocument(document);
+        assert.strictEqual(document.languageId, "dreamshader-dsp", "A .dsp file should open as a DreamShader pipeline");
+        const positionOf = (needle, delta = 0) => document.positionAt(text.indexOf(needle) + delta);
+
+        const definitions = await vscode.commands.executeCommand("vscode.executeDefinitionProvider", document.uri, positionOf("Source = Mask", 10));
+        const target = (definitions || []).map((entry) => entry.targetRange || entry.range)[0];
+        assert(target, "Definition provider should answer for a buffer named in a .dsp binding");
+        assert.strictEqual(target.start.line, 10, "...with the line of its declaration");
+
+        const symbols = await vscode.commands.executeCommand("vscode.executeDocumentSymbolProvider", document.uri);
+        const names = (symbols || []).map((entry) => entry.name);
+        assert(["Mask", "Blurred", "DrawMask", "Blur", "Composite"].every((name) => names.includes(name)), `Outline should list buffers and passes (got ${names.join(", ")})`);
+
+        const hovers = await vscode.commands.executeCommand("vscode.executeHoverProvider", document.uri, positionOf("Injection = AfterOpaque", 2));
+        const hoverText = (hovers || []).flatMap((hover) => hover.contents || []).map((content) => typeof content === "string" ? content : content.value || "").join("\n");
+        assert(/Where in the frame the pass runs/.test(hoverText), "Hover on a key should show pass-keys.json's description");
+
+        const completions = await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", document.uri, positionOf("AfterOpaque;\n    Dispatch"));
+        const labels = new Set((completions?.items || []).map((entry) => typeof entry.label === "string" ? entry.label : entry.label.label));
+        assert(labels.has("AfterOpaque") && labels.has("PostProcess.AfterTonemap"), "Completion after Injection = should offer injection points");
+
+        // A bridge diagnostic on a .dsp, carrying a DSH code, reaches the editor with a link to its documentation.
+        fs.writeFileSync(diagnosticsPath, JSON.stringify({
+            updatedAtUtc: new Date(0).toISOString(),
+            files: [{ path: "DShader/CP_Highlight.dsp", diagnostics: [{ severity: "error", message: "Bridge .dsp diagnostic", line: 31, column: 5, code: "DSH8322", source: "DreamShader" }] }]
+        }), "utf8");
+        await vscode.commands.executeCommand("dreamshader.refreshBridgeDiagnostics");
+        const diagnostic = vscode.languages.getDiagnostics(document.uri).find((entry) => entry.message === "Bridge .dsp diagnostic");
+        assert(diagnostic, "Bridge diagnostics should be published for a .dsp");
+        assert.strictEqual(diagnostic.range.start.line, 30, "...at the 1-based line made 0-based");
+        assert.strictEqual(diagnostic.code?.value, "DSH8322");
+        assert.strictEqual(String(diagnostic.code?.target), "https://github.com/TypeDreamMoon/DreamShader/blob/main/Docs/diagnostics/DSH8xxx.md#dsh8322");
+    } finally {
+        fs.writeFileSync(diagnosticsPath, diagnosticsBefore, "utf8");
+        await vscode.commands.executeCommand("dreamshader.refreshBridgeDiagnostics");
+        fs.rmSync(indexDirectory, { recursive: true, force: true });
+        fs.rmSync(passKeysPath, { force: true });
+        fs.rmSync(sourcePath, { force: true });
+    }
 }
 
 module.exports = {

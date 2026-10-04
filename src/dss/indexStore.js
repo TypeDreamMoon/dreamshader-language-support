@@ -60,6 +60,83 @@ function normalizeSpan(entry) {
     };
 }
 
+function asArray(value) {
+    return Array.isArray(value) ? value : [];
+}
+
+function normalizeBinding(entry) {
+    return {
+        ...normalizeSpan(entry || {}),
+        slot: String((entry && entry.slot) || ""),
+        buffer: String((entry && entry.buffer) || ""),
+        previous: Boolean(entry && entry.previous)
+    };
+}
+
+/**
+ * The `pipeline` section a `.dsp`'s index carries (plugin 2.1.0): the `#pragma pipeline` values as bound, the
+ * parameters, the buffers and the passes with their bindings. Every span is the plugin's: a buffer's and a pass's point
+ * at the name, a parameter's and a binding's cover the whole statement. Null for a source of any other kind.
+ */
+function normalizePipeline(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        return null;
+    }
+    const strings = (value) => asArray(value).map(String);
+    return {
+        order: Number(raw.order) || 0,
+        injection: String(raw.injection || ""),
+        views: strings(raw.views),
+        requires: strings(raw.requires),
+        enabled: String(raw.enabled || ""),
+        pragmaSpan: raw.pragmaSpan && typeof raw.pragmaSpan === "object" ? normalizeSpan(raw.pragmaSpan) : null,
+        uniforms: asArray(raw.uniforms).map((entry) => ({
+            ...normalizeSpan(entry || {}),
+            name: String((entry && entry.name) || ""),
+            type: String((entry && entry.type) || ""),
+            default: String((entry && entry.default) || ""),
+            group: String((entry && entry.group) || ""),
+            desc: String((entry && entry.desc) || "")
+        })).filter((entry) => entry.name),
+        buffers: asArray(raw.buffers).map((entry) => ({
+            ...normalizeSpan(entry || {}),
+            name: String((entry && entry.name) || ""),
+            format: String((entry && entry.format) || ""),
+            resolution: String((entry && entry.resolution) || ""),
+            scale: Number(entry && entry.scale) || 0,
+            size: asArray(entry && entry.size).map((value) => Number(value) || 0),
+            history: Boolean(entry && entry.history),
+            export: Boolean(entry && entry.export),
+            desc: String((entry && entry.desc) || "")
+        })).filter((entry) => entry.name),
+        passes: asArray(raw.passes).map((entry) => {
+            const bindings = (entry && entry.bindings) || {};
+            return {
+                ...normalizeSpan(entry || {}),
+                name: String((entry && entry.name) || ""),
+                kind: String((entry && entry.kind) || ""),
+                injection: String((entry && entry.injection) || ""),
+                enabled: String((entry && entry.enabled) || ""),
+                material: String((entry && entry.material) || ""),
+                materialObject: String((entry && entry.materialObject) || ""),
+                shader: String((entry && entry.shader) || ""),
+                entry: String((entry && entry.entry) || ""),
+                desc: String((entry && entry.desc) || ""),
+                reads: asArray(bindings.reads).map(normalizeBinding),
+                writes: asArray(bindings.writes).map(normalizeBinding),
+                params: asArray(bindings.params).map((param) => ({
+                    ...normalizeSpan(param || {}),
+                    target: String((param && param.target) || ""),
+                    source: String((param && param.source) || ""),
+                    parameter: String((param && param.parameter) || "")
+                }))
+            };
+        }).filter((entry) => entry.name),
+        injectionPoints: strings(raw.injectionPoints),
+        formats: strings(raw.formats)
+    };
+}
+
 function normalizeIndex(raw, indexPath) {
     if (!raw || raw.schema !== INDEX_SCHEMA || !Array.isArray(raw.declarations)) {
         return null;
@@ -97,7 +174,8 @@ function normalizeIndex(raw, indexPath) {
         references,
         includes: (Array.isArray(raw.includes) ? raw.includes : []).map((entry) => normalizeFsPath(entry)),
         includeKeys: new Set((Array.isArray(raw.includes) ? raw.includes : []).map(pathKey)),
-        parameters: Array.isArray(raw.parameters) ? raw.parameters : []
+        parameters: Array.isArray(raw.parameters) ? raw.parameters : [],
+        pipeline: normalizePipeline(raw.pipeline)
     };
 }
 
@@ -181,5 +259,6 @@ module.exports = {
     getIndexDirectory,
     pathKey,
     normalizeIndex,
+    normalizePipeline,
     createIndexStore
 };

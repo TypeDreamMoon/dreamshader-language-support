@@ -26,6 +26,7 @@ const { installVscodeHost } = require("./vscode/host");
 const { createLanguageClient } = require("./vscode/languageClient");
 const { collectKnownProjectRoots, invalidateProjectRootCache } = require("./project/projects");
 const { registerDssLanguageFeatures } = require("./dss/providers");
+const { registerDspLanguageFeatures } = require("./dsp/providers");
 
 function activate(context) {
     // First, before anything asks for a project root: the shared language modules resolve one
@@ -71,6 +72,10 @@ function activate(context) {
     // from the symbol index and the node catalog the plugin writes -- see src/dss/providers.js for why the
     // language server is not the one asked.
     registerDssLanguageFeatures(context);
+
+    // Custom Pass pipelines (`.dsp`): completion and hover from pass-keys.json, definition and the outline from the
+    // index's `pipeline` section, with the text behind both -- see src/dsp/providers.js.
+    registerDspLanguageFeatures(context);
 
     // Greys out the `#if` branches this project's define table cuts. It owns its own watchers and
     // debounce because it answers to a different clock from the bridge diagnostics above: the
@@ -175,7 +180,7 @@ function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {
         // nothing fires. Watching creates as well so restoring the file brings its diagnostics back.
         // `**/DShader/**` rather than `DShader/**` because plugins carry source roots of their own.
         const sources = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.Uri.file(root), "**/DShader/**/*.{dsm,dsf,dsh,dss,dsi}"), false, true, false);
+            new vscode.RelativePattern(vscode.Uri.file(root), "**/DShader/**/*.{dsm,dsf,dsh,dss,dsi,dsp}"), false, true, false);
         registerWatcher(sources);
     }
 }

@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.1.0
+
+**Custom Pass pipelines: `.dsp`.** DreamShader 2.1.0 adds pipelines — buffers, parameters and render passes
+that run at injection points of Unreal's renderer — written in `.dsp` files. They open as **DreamShader
+Pipeline**, under the language id `dreamshader-dsp` that the plugin's generated workspace now associates with
+`.dsp` (`dreamshaderlang` and `dreamshader-dss` are unchanged), with a grammar for `#pragma pipeline`,
+`uniform`, `static const`, `buffer`, `pass` and a pass's keys and `read` / `write` / `param` bindings, and
+snippets for the pipeline, every pass kind and the three ways to write a pass's HLSL.
+
+**HLSL inside, coloured as HLSL.** A `.dsp`'s `hlsl { }` blocks — the file's and a pass's — and the body of a
+`/// @custom` function in a `.dss` embed VS Code's HLSL grammar, so comment toggling, bracket matching and
+snippets in them follow HLSL too. A block ends at the `}` that matches its `{`, and a brace inside a comment,
+a string or a `#` line does not count — the capture the compiler makes. A `UE.` call in a `@custom` body keeps
+its DreamShader colours, since the compiler lifts it into the graph.
+
+**Completion, hover, definition and the outline for `.dsp`, from the compiler.** Keys and their values —
+injection points, formats, pass kinds, modes, the project's pass layers inside `Layer(...)` — and their
+descriptions come from the `pass-keys.json` the plugin exports; a project whose editor has never written it
+gets the vocabulary bundled with the extension, and is told so. Buffers, parameters, constants and passes are
+looked up in the symbol index's new `pipeline` section. Inside an `hlsl` block a pass's binding names
+(`Source`, `SourceSize`, `SourceUVRect`, …), the names the compiler writes around the statements of an entry
+(`Id`, `UV`, …) and the `DP_*` parameters and `DreamPass*` helpers complete, hover and are coloured as what
+they are (semantic tokens), and a binding name goes to its `read` / `write` / `param`; `Entry =` offers the
+functions of the file's block. Where the index is
+missing, older than the text or of a version this extension does not read, the answers come from the text —
+the version mismatch is reported once.
+
+**The bridge features take a `.dsp`.** Recompile Current Source, Clean Generated Shaders and the bridge panel
+work on a pipeline, and a bridge diagnostic carrying a `DSHnnnn` code now links to its page of the plugin's
+documentation, as the language server's own diagnostics already did. Needs DreamShader 2.1.0 for
+`pass-keys.json` and the pipeline index; without them the grammar, the snippets and the text-based answers
+still work.
+
 ## 2.0.0
 
 **DreamShader 2.0: `.dss` and `.dsi`.** The plugin's 2.0 line adds an HLSL-shaped language — `uniform`

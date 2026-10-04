@@ -1,0 +1,54 @@
+// SYNTAX TEST "source.dreamshader.dss" "a /// @custom function's body is HLSL"
+/// @desc Pulses; the block may name @custom on any of its lines.
+/// @custom
+/// @name Pulse Node; a doc line may end with a brace }
+float Pulse(float2 UV, float Gain)
+// <----- storage.type.scalar.dreamshader
+//          ^^^^^^ storage.type.vector.dreamshader
+{
+// <- punctuation.section.block.begin.dreamshader - meta.embedded.block.hlsl
+    float T = UE.Time();
+//  ^^^^^ meta.embedded.block.hlsl storage.type.basic.hlsl
+//            ^^ meta.embedded.block.hlsl support.class.namespace.dreamshader
+//               ^^^^ meta.embedded.block.hlsl support.function.node.dreamshader
+#if 1
+// <--- meta.embedded.block.hlsl keyword.preprocessor.hlsl
+#define OPEN {
+//           ^ meta.embedded.block.hlsl - punctuation.section.block.begin.hlsl
+    float Mixed = lerp(0.0, Gain, 0.5); // {
+//                ^^^^ meta.embedded.block.hlsl support.function.hlsl
+//                                      ^^^^ meta.embedded.block.hlsl comment.line.double-slash.hlsl
+#endif
+    if (T > 0) { T = 1; }
+//             ^ meta.embedded.block.hlsl punctuation.section.block.begin.hlsl
+//                      ^ meta.embedded.block.hlsl punctuation.section.block.end.hlsl
+    return sin(UV.x * 8.0 + T) * Mixed; /* } */
+//  ^^^^^^ meta.embedded.block.hlsl keyword.control.hlsl
+//                                      ^^^^^^^ meta.embedded.block.hlsl comment.line.block.hlsl
+}
+// <- punctuation.section.block.end.dreamshader - meta.embedded.block.hlsl
+
+float Plain(float x)
+{
+    return x;
+//  ^^^^^^ keyword.control.dreamshader - meta.embedded.block.hlsl
+}
+
+/// @desc An address like name@custom.com opens nothing.
+float Mail(float x)
+{
+    return x;
+//  ^^^^^^ keyword.control.dreamshader - meta.embedded.block.hlsl
+}
+
+///@custom
+extern float Proto(float x);
+//                         ^ punctuation.terminator.statement.dreamshader
+float After(float x) { return x; }
+//                     ^^^^^^ keyword.control.dreamshader - meta.embedded.block.hlsl
+
+export void M(inout material m)
+{
+    m.Opacity = Pulse(UE.TexCoord(), 2.0);
+//                    ^^ support.class.namespace.dreamshader - meta.embedded.block.hlsl
+}

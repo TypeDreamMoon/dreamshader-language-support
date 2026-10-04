@@ -1,0 +1,460 @@
+{
+  "schema": "dreamshader-symbol-index",
+  "version": 1,
+  "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+  "declarations": [
+    {
+      "kind": "uniform",
+      "name": "OutlineColor",
+      "signature": "uniform float4 OutlineColor = float4(1.0, 0.6, 0.0, 1.0)",
+      "type": "float4",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 6,
+      "column": 16,
+      "offset": 240,
+      "length": 12
+    },
+    {
+      "kind": "uniform",
+      "name": "OutlineWidth",
+      "signature": "uniform float OutlineWidth = 3.0",
+      "type": "float",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 8,
+      "column": 16,
+      "offset": 328,
+      "length": 12
+    },
+    {
+      "kind": "buffer",
+      "name": "Mask",
+      "signature": "buffer Mask : R8",
+      "type": "R8",
+      "doc": "What the objects cover.",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 11,
+      "column": 8,
+      "offset": 390,
+      "length": 4
+    },
+    {
+      "kind": "buffer",
+      "name": "Blurred",
+      "signature": "buffer Blurred : R8",
+      "type": "R8",
+      "doc": "The blurred mask; the ground material reads it too.",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 13,
+      "column": 8,
+      "offset": 484,
+      "length": 7
+    },
+    {
+      "kind": "pass",
+      "name": "DrawMask",
+      "signature": "pass DrawMask : mesh",
+      "type": "mesh",
+      "doc": "No depth test: the outline shows through walls.",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 16,
+      "column": 6,
+      "offset": 590,
+      "length": 8
+    },
+    {
+      "kind": "pass",
+      "name": "Blur",
+      "signature": "pass Blur : compute",
+      "type": "compute",
+      "doc": "A (2R+1)^2 box over the mask, into the half-size Blurred. The block holds the statements of the entry, whose",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 27,
+      "column": 6,
+      "offset": 998,
+      "length": 4
+    },
+    {
+      "kind": "pass",
+      "name": "Composite",
+      "signature": "pass Composite : fullscreen",
+      "type": "fullscreen",
+      "doc": "",
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 51,
+      "column": 6,
+      "offset": 1603,
+      "length": 9
+    }
+  ],
+  "references": [
+    {
+      "name": "None",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 21,
+          "column": 17,
+          "offset": 722,
+          "length": 4
+        }
+      ]
+    },
+    {
+      "name": "Mask",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 22,
+          "column": 21,
+          "offset": 748,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 31,
+          "column": 20,
+          "offset": 1088,
+          "length": 4
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 55,
+          "column": 11,
+          "offset": 1712,
+          "length": 4
+        }
+      ]
+    },
+    {
+      "name": "Blurred",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 30,
+          "column": 17,
+          "offset": 1060,
+          "length": 7
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 32,
+          "column": 20,
+          "offset": 1113,
+          "length": 7
+        },
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 56,
+          "column": 11,
+          "offset": 1728,
+          "length": 7
+        }
+      ]
+    },
+    {
+      "name": "OutlineWidth",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 33,
+          "column": 20,
+          "offset": 1141,
+          "length": 12
+        }
+      ]
+    },
+    {
+      "name": "SceneColor",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 57,
+          "column": 11,
+          "offset": 1747,
+          "length": 10
+        }
+      ]
+    },
+    {
+      "name": "OutlineColor",
+      "spans": [
+        {
+          "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+          "line": 58,
+          "column": 19,
+          "offset": 1777,
+          "length": 12
+        }
+      ]
+    }
+  ],
+  "includes": [
+  ],
+  "parameters": [
+    {
+      "name": "OutlineColor",
+      "variable": "OutlineColor",
+      "type": "float4",
+      "group": "Look",
+      "desc": "",
+      "sampler": "",
+      "defaultAsset": "",
+      "static": false,
+      "default": [1.0, 0.6, 0.0, 1.0],
+      "directives": {},
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 6,
+      "column": 16,
+      "offset": 240,
+      "length": 12
+    },
+    {
+      "name": "OutlineWidth",
+      "variable": "OutlineWidth",
+      "type": "float",
+      "group": "Look",
+      "desc": "",
+      "sampler": "",
+      "defaultAsset": "",
+      "static": false,
+      "slider": { "min": 1.0, "max": 8.0 },
+      "default": [3.0],
+      "directives": {},
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 8,
+      "column": 16,
+      "offset": 328,
+      "length": 12
+    }
+  ],
+  "pipeline": {
+    "order": 100,
+    "injection": "BeforePostProcess",
+    "views": [ "Game", "Editor" ],
+    "requires": [],
+    "enabled": "",
+    "pragmaSpan": {
+      "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+      "line": 3,
+      "column": 1,
+      "offset": 178,
+      "length": 29
+    },
+    "uniforms": [
+      {
+        "name": "OutlineColor",
+        "type": "float4",
+        "default": "(1, 0.6, 0, 1)",
+        "group": "Look",
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 6,
+        "column": 1,
+        "offset": 225,
+        "length": 57
+      },
+      {
+        "name": "OutlineWidth",
+        "type": "float",
+        "default": "(3)",
+        "group": "Look",
+        "desc": "",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 8,
+        "column": 1,
+        "offset": 313,
+        "length": 34
+      }
+    ],
+    "buffers": [
+      {
+        "name": "Mask",
+        "format": "R8",
+        "resolution": "Render",
+        "scale": 1.0,
+        "size": [0, 0],
+        "history": false,
+        "export": false,
+        "desc": "What the objects cover.",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 11,
+        "column": 8,
+        "offset": 390,
+        "length": 4
+      },
+      {
+        "name": "Blurred",
+        "format": "R8",
+        "resolution": "Render",
+        "scale": 0.5,
+        "size": [0, 0],
+        "history": false,
+        "export": true,
+        "desc": "The blurred mask; the ground material reads it too.",
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 13,
+        "column": 8,
+        "offset": 484,
+        "length": 7
+      }
+    ],
+    "passes": [
+      {
+        "name": "DrawMask",
+        "kind": "mesh",
+        "injection": "AfterOpaque",
+        "enabled": "",
+        "material": "M_HighlightMask",
+        "materialObject": "/Game/PassDemo/M_HighlightMask.M_HighlightMask",
+        "shader": "",
+        "entry": "",
+        "desc": "No depth test: the outline shows through walls.",
+        "bindings": {
+          "reads": [
+          ],
+          "writes": [
+            {
+              "slot": "Output0",
+              "buffer": "Mask",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 22,
+              "column": 5,
+              "offset": 732,
+              "length": 21
+            }
+          ],
+          "params": [
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 16,
+        "column": 6,
+        "offset": 590,
+        "length": 8
+      },
+      {
+        "name": "Blur",
+        "kind": "compute",
+        "injection": "AfterOpaque",
+        "enabled": "",
+        "material": "",
+        "materialObject": "",
+        "shader": "",
+        "entry": "",
+        "desc": "A (2R+1)^2 box over the mask, into the half-size Blurred. The block holds the statements of the entry, whose",
+        "bindings": {
+          "reads": [
+            {
+              "slot": "Source",
+              "buffer": "Mask",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 31,
+              "column": 5,
+              "offset": 1073,
+              "length": 20
+            }
+          ],
+          "writes": [
+            {
+              "slot": "Result",
+              "buffer": "Blurred",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 32,
+              "column": 5,
+              "offset": 1098,
+              "length": 23
+            }
+          ],
+          "params": [
+            {
+              "target": "Radius",
+              "source": "Parameter",
+              "parameter": "OutlineWidth",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 33,
+              "column": 5,
+              "offset": 1126,
+              "length": 28
+            }
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 27,
+        "column": 6,
+        "offset": 998,
+        "length": 4
+      },
+      {
+        "name": "Composite",
+        "kind": "fullscreen",
+        "injection": "BeforePostProcess",
+        "enabled": "",
+        "material": "PP_OutlineComposite",
+        "materialObject": "/Game/PassDemo/PP_OutlineComposite.PP_OutlineComposite",
+        "shader": "",
+        "entry": "",
+        "desc": "",
+        "bindings": {
+          "reads": [
+            {
+              "slot": "Mask",
+              "buffer": "Mask",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 55,
+              "column": 5,
+              "offset": 1706,
+              "length": 11
+            },
+            {
+              "slot": "Blurred",
+              "buffer": "Blurred",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 56,
+              "column": 5,
+              "offset": 1722,
+              "length": 14
+            }
+          ],
+          "writes": [
+            {
+              "slot": "SceneColor",
+              "buffer": "SceneColor",
+              "previous": false,
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 57,
+              "column": 5,
+              "offset": 1741,
+              "length": 17
+            }
+          ],
+          "params": [
+            {
+              "target": "Color",
+              "source": "Parameter",
+              "parameter": "OutlineColor",
+              "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+              "line": 58,
+              "column": 5,
+              "offset": 1763,
+              "length": 27
+            }
+          ]
+        },
+        "file": "C:/Users/10678/Documents/Unreal Projects/58/DreamShaderTestHost/DShader/PassDemo/CP_Highlight.dsp",
+        "line": 51,
+        "column": 6,
+        "offset": 1603,
+        "length": 9
+      }
+    ],
+    "injectionPoints": [ "BeginView", "BeforeBasePass", "AfterBasePass", "AfterOpaque", "BeforePostProcess", "PostProcess.BeforeDOF", "PostProcess.AfterDOF", "PostProcess.TranslucencyAfterDOF", "PostProcess.ReplaceTonemapper", "PostProcess.AfterMotionBlur", "PostProcess.AfterTonemap", "PostProcess.AfterFXAA", "EndOfView" ],
+    "formats": [ "R8", "RG8", "RGBA8", "R16F", "RG16F", "RGBA16F", "R32F", "RG32F", "RGBA32F", "R32U", "RG32U", "Depth32" ]
+  }
+}
