@@ -1,7 +1,7 @@
 {
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
-  "description": "Language support for DreamShaderLang: 2.0 .dss sources and .dsi material instances, and the 1.x .dsm materials, .dsf function files and .dsh shared headers.",
+  "description": "Language support for DreamShaderLang: 2.0 .dss sources, .dsi material instances and .dsp Custom Pass pipelines, and the 1.x .dsm materials, .dsf function files and .dsh shared headers.",
   "version": "2.0.0",
   "publisher": "typedreammoon",
   "author": {
@@ -34,7 +34,9 @@
     "dsf",
     "dsh",
     "dss",
-    "dsi"
+    "dsi",
+    "dsp",
+    "custom pass"
   ],
   "activationEvents": [
     "onLanguage:dreamshaderlang",
@@ -61,7 +63,8 @@
     "onCommand:dreamshader.createTextureSample",
     "onCommand:dreamshader.createNoiseMaterial",
     "onLanguage:dreamshader-dss",
-    "onCommand:dreamshader.revealInMaterialEditor"
+    "onCommand:dreamshader.revealInMaterialEditor",
+    "onLanguage:dreamshader-dsp"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -209,6 +212,18 @@
           ".dsi"
         ],
         "configuration": "./language-configuration-dss.json"
+      },
+      {
+        "id": "dreamshader-dsp",
+        "aliases": [
+          "DreamShader Pipeline",
+          "DreamShader Custom Pass",
+          "dsp"
+        ],
+        "extensions": [
+          ".dsp"
+        ],
+        "configuration": "./language-configuration-dss.json"
       }
     ],
     "grammars": [
@@ -221,6 +236,14 @@
         "language": "dreamshader-dss",
         "scopeName": "source.dreamshader.dss",
         "path": "./syntaxes/dreamshader-dss.tmLanguage.json"
+      },
+      {
+        "language": "dreamshader-dsp",
+        "scopeName": "source.dreamshader.dsp",
+        "path": "./syntaxes/dreamshader-dsp.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.hlsl": "hlsl"
+        }
       }
     ],
     "breakpoints": [

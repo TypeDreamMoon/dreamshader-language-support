@@ -1,0 +1,207 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "DreamShader Pipeline",
+  "scopeName": "source.dreamshader.dsp",
+  "fileTypes": ["dsp"],
+  "patterns": [
+    { "include": "source.dreamshader.dss#doc-comment" },
+    { "include": "source.dreamshader.dss#comments" },
+    { "include": "#pragma-pipeline" },
+    { "include": "source.dreamshader.dss#preprocessor" },
+    { "include": "#hlsl-block" },
+    { "include": "#uniform" },
+    { "include": "#constant" },
+    { "include": "#buffer" },
+    { "include": "#pass" },
+    { "include": "#expression" }
+  ],
+  "repository": {
+    "pragma-pipeline": {
+      "comment": "`#pragma pipeline(Order = 100, Views = Game | Editor, ...)`: keys are capitalised, values are words, numbers and `|` lists. The key vocabulary is pass-keys.json's, not this grammar's.",
+      "begin": "^\\s*(#)\\s*(pragma)\\s+(pipeline)\\b",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.directive.dreamshader" },
+        "2": { "name": "keyword.control.directive.pragma.dreamshader" },
+        "3": { "name": "entity.name.function.preprocessor.dreamshader" }
+      },
+      "end": "$",
+      "name": "meta.preprocessor.pragma.dreamshader",
+      "patterns": [
+        { "include": "#key" },
+        { "include": "#value" }
+      ]
+    },
+    "hlsl-block": {
+      "comment": "`hlsl { ... }`, at file scope (one) or as a statement of a pass: HLSL for the shader compiler, kept verbatim. Two levels, because the `{` may stand on the next line and TextMate sees one line at a time: this rule runs from `hlsl` to the `}` that matches the block's `{`, which it takes itself; `hlsl-body` (kept in the .dss grammar, so the two grammars share one set of embedding rules) takes the `{` and the HLSL between. The second `end` branch gives up when the line after `hlsl` is neither the `{` nor a comment, so a missing brace does not swallow the file. `hlsl` is a keyword only at the start of a statement -- `^` or after `;` / `{` stands in for that.",
+      "begin": "(?:^|(?<=[;{]))\\s*(hlsl)\\b(?=\\s*(?:\\{|//|/\\*|$))",
+      "beginCaptures": { "1": { "name": "keyword.other.hlsl-block.dreamshader" } },
+      "end": "(\\})|^(?=\\s*[^\\s{/])",
+      "endCaptures": { "1": { "name": "punctuation.section.block.end.dreamshader" } },
+      "patterns": [
+        { "include": "source.dreamshader.dss#comments" },
+        { "include": "source.dreamshader.dss#hlsl-body" }
+      ]
+    },
+    "uniform": {
+      "comment": "`uniform <type> <Name>`: a parameter an activation can override. The rest of the declaration is an expression.",
+      "match": "^\\s*(uniform)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.modifier.dreamshader" },
+        "2": { "name": "storage.type.dreamshader" },
+        "3": { "name": "entity.name.variable.uniform.dreamshader" }
+      }
+    },
+    "constant": {
+      "comment": "`static const <type> <Name>`.",
+      "match": "^\\s*(static)\\s+(const)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.modifier.dreamshader" },
+        "2": { "name": "storage.modifier.dreamshader" },
+        "3": { "name": "storage.type.dreamshader" },
+        "4": { "name": "variable.other.constant.dreamshader" }
+      }
+    },
+    "buffer": {
+      "comment": "`buffer <Name> : <Format>[(<Key> = <Value>, ...)];`. `buffer` begins a declaration only when a name and a `:` follow it, so `uniform float buffer` stays a name. Ends at the `;`, or before the next declaration when the `;` is missing.",
+      "begin": "^\\s*(buffer)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*([A-Za-z_][A-Za-z0-9_]*)?",
+      "beginCaptures": {
+        "1": { "name": "storage.type.buffer.dreamshader" },
+        "2": { "name": "entity.name.variable.buffer.dreamshader" },
+        "3": { "name": "punctuation.separator.colon.dreamshader" },
+        "4": { "name": "support.type.format.dreamshader" }
+      },
+      "end": "(;)|^(?=\\s*(?:(?:buffer|pass|uniform|static|hlsl)\\b|#))",
+      "endCaptures": { "1": { "name": "punctuation.terminator.statement.dreamshader" } },
+      "name": "meta.buffer.dreamshader",
+      "patterns": [
+        { "include": "#key" },
+        { "include": "#value" }
+      ]
+    },
+    "pass": {
+      "comment": "`pass <Name> : <kind> { ... }`. Two levels, as `hlsl-block`: the `{` may stand on the next line.",
+      "begin": "^\\s*(pass)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*([A-Za-z_][A-Za-z0-9_]*)?",
+      "beginCaptures": {
+        "1": { "name": "storage.type.pass.dreamshader" },
+        "2": { "name": "entity.name.function.pass.dreamshader" },
+        "3": { "name": "punctuation.separator.colon.dreamshader" },
+        "4": { "name": "support.type.pass-kind.dreamshader" }
+      },
+      "end": "(\\})|^(?=\\s*[^\\s{/])",
+      "endCaptures": { "1": { "name": "punctuation.section.block.end.dreamshader" } },
+      "name": "meta.pass.dreamshader",
+      "patterns": [
+        { "include": "source.dreamshader.dss#comments" },
+        { "include": "#pass-body" }
+      ]
+    },
+    "pass-body": {
+      "comment": "The statements of a pass, up to -- not including -- its closing `}`, which `pass` takes.",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.block.begin.dreamshader" } },
+      "end": "(?=\\})",
+      "patterns": [
+        { "include": "source.dreamshader.dss#doc-comment" },
+        { "include": "source.dreamshader.dss#comments" },
+        { "include": "#hlsl-block" },
+        { "include": "#binding" },
+        { "include": "#param" },
+        { "include": "#setting" },
+        { "include": "source.dreamshader.dss#preprocessor" },
+        { "include": "#expression" }
+      ]
+    },
+    "binding": {
+      "comment": "`read [<name> =] <buffer>[.Previous]` and `write [<name> =] <buffer>`. A keyword only at the start of a statement; whatever follows it is a name, so `read write;` reads a buffer called `write`. `Previous` is the one member a buffer has.",
+      "patterns": [
+        {
+          "match": "(?:^|(?<=[;{]))\\s*(read|write)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(=)(?!=)\\s*([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(\\.)\\s*(?:(Previous)\\b|([A-Za-z_][A-Za-z0-9_]*)))?",
+          "captures": {
+            "1": { "name": "keyword.other.binding.dreamshader" },
+            "2": { "name": "variable.parameter.binding.dreamshader" },
+            "3": { "name": "keyword.operator.assignment.dreamshader" },
+            "4": { "name": "variable.other.buffer.dreamshader" },
+            "5": { "name": "punctuation.accessor.dreamshader" },
+            "6": { "name": "variable.language.previous.dreamshader" },
+            "7": { "name": "invalid.illegal.member.dreamshader" }
+          }
+        },
+        {
+          "match": "(?:^|(?<=[;{]))\\s*(read|write)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*(\\.)\\s*(?:(Previous)\\b|([A-Za-z_][A-Za-z0-9_]*)))?",
+          "captures": {
+            "1": { "name": "keyword.other.binding.dreamshader" },
+            "2": { "name": "variable.other.buffer.dreamshader" },
+            "3": { "name": "punctuation.accessor.dreamshader" },
+            "4": { "name": "variable.language.previous.dreamshader" },
+            "5": { "name": "invalid.illegal.member.dreamshader" }
+          }
+        }
+      ]
+    },
+    "param": {
+      "comment": "`param <name> = <expression>`: the expression is coloured as any other.",
+      "match": "(?:^|(?<=[;{]))\\s*(param)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(=)(?!=)",
+      "captures": {
+        "1": { "name": "keyword.other.binding.dreamshader" },
+        "2": { "name": "variable.parameter.binding.dreamshader" },
+        "3": { "name": "keyword.operator.assignment.dreamshader" }
+      }
+    },
+    "setting": {
+      "comment": "`<Key> = <Value>;` in a pass: a key is a capitalised name, whatever it is called -- the vocabulary moves with the plugin and lives in pass-keys.json, not here.",
+      "begin": "(?:^|(?<=[;{]))\\s*([A-Z][A-Za-z0-9_]*)\\s*(=)(?!=)",
+      "beginCaptures": {
+        "1": { "name": "variable.other.property.dreamshader" },
+        "2": { "name": "keyword.operator.assignment.dreamshader" }
+      },
+      "end": "(;)|(?=\\})|$",
+      "endCaptures": { "1": { "name": "punctuation.terminator.statement.dreamshader" } },
+      "patterns": [ { "include": "#value" } ]
+    },
+    "key": {
+      "comment": "`Key =` inside `#pragma pipeline(...)` and a buffer's argument list.",
+      "match": "\\b([A-Z][A-Za-z0-9_]*)\\s*(=)(?!=)",
+      "captures": {
+        "1": { "name": "variable.other.property.dreamshader" },
+        "2": { "name": "keyword.operator.assignment.dreamshader" }
+      }
+    },
+    "value": {
+      "comment": "A key's value: a word (an injection point, a mode, a flag -- dotted like `PostProcess.AfterTonemap`), a call-shaped value (`Layer(...)`, `Own(...)`, `float4(...)`), a number, a string, or `|` / `&` between them.",
+      "patterns": [
+        { "include": "source.dreamshader.dss#comments" },
+        { "include": "source.dreamshader.dss#strings" },
+        { "include": "source.dreamshader.dss#numbers" },
+        { "include": "source.dreamshader.dss#constants" },
+        { "include": "source.dreamshader.dss#types" },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": { "1": { "name": "support.function.dreamshader" } }
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?:(\\.)([A-Za-z_][A-Za-z0-9_]*))?",
+          "captures": {
+            "1": { "name": "constant.other.enumerator.dreamshader" },
+            "2": { "name": "punctuation.accessor.dreamshader" },
+            "3": { "name": "constant.other.enumerator.dreamshader" }
+          }
+        },
+        { "match": "\\||&", "name": "keyword.operator.bitwise.dreamshader" },
+        { "include": "source.dreamshader.dss#operators" },
+        { "include": "source.dreamshader.dss#punctuation" }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "source.dreamshader.dss#strings" },
+        { "include": "source.dreamshader.dss#numbers" },
+        { "include": "source.dreamshader.dss#constants" },
+        { "include": "source.dreamshader.dss#types" },
+        { "include": "source.dreamshader.dss#storage" },
+        { "include": "source.dreamshader.dss#function-call" },
+        { "include": "source.dreamshader.dss#operators" },
+        { "include": "source.dreamshader.dss#punctuation" }
+      ]
+    }
+  }
+}
