@@ -1,6 +1,6 @@
 # DreamShaderLang Language Support
 
-DreamShaderLang `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文件的 VS Code 语言支持扩展。
+DreamShaderLang 的 VS Code 语言支持扩展:2.0 的 `.dss` 源文件与 `.dsi` 材质实例、2.1 的 `.dsp` Custom Pass 管线,以及 1.x 的 `.dsm` 材质文件、`.dsf` 函数文件和 `.dsh` 共享头文件。
 
 主 README 使用英文展示；本文件为中文版本。
 
@@ -42,6 +42,8 @@ DreamShader 插件保持同步。
 - Go to Definition、Find References、Hover、Signature Help、Inlay Hints、文档格式化、折叠和文档符号。
 - Unreal Bridge 诊断面板。
 - DreamShader Package 的安装、浏览、更新和移除命令。
+- `.dsp` Custom Pass 管线:语法高亮、代码片段,以及来自插件 `pass-keys.json` 与符号索引的补全、悬停、转到定义和大纲 —— 见[下文](#custom-pass-管线--dsp)。
+- `.dsp` 的 `hlsl { }` 块和 `.dss` 里 `/// @custom` 函数体按 HLSL 嵌入高亮。
 
 ## DreamShader 2.0 —— `.dss` 与 `.dsi`
 
@@ -68,6 +70,29 @@ DreamShader 2.0 在 1.x 语言旁边加了一门 HLSL 形状的语言:`.dss` 是
 需要工程已在编辑器中打开,且资产由 2.0 编译。
 
 重新编译、bridge 诊断面板、实时预览与 Graph 断点(F9)对 `.dss` 与对 `.dsm` 一样可用。2.0 源码的格式化用编译器自己的打印器:`dsc fmt`。
+
+`/// @custom` 函数的函数体是原样交给着色器编译器的 HLSL,按 HLSL 着色;其中的 `UE.` 调用保留 DreamShader 的颜色,
+因为编译器会把它提到 Graph 里。
+
+## Custom Pass 管线 —— `.dsp`
+
+DreamShader 2.1.0 加入了 Custom Pass 管线:一个 `.dsp` 文件声明 buffer、参数,以及在 Unreal 渲染器的注入点上运行的
+Pass(UE 5.8 及以上)。它以语言 **DreamShader Pipeline**(`dreamshader-dsp`)打开,有自己的语法高亮,以及管线、
+每种 Pass 和 Pass 的 HLSL 三种写法(入口的语句、完整函数、用 `Entry` 指定文件级 `hlsl` 块里的入口)的代码片段。
+
+管线里的 HLSL 通过 VS Code 自带的 HLSL 语法按 HLSL 着色,块内的注释切换、括号匹配和代码片段也都按 HLSL 走。
+块在和它的 `{` 配对的 `}` 处结束;注释、字符串和 `#` 行里的花括号不算 —— 和编译器的读法一致。
+
+| 功能 | 答案来自 |
+| :-- | :-- |
+| 键及其取值的补全和悬停——注入点、格式、Pass 种类、各种模式、`Layer(...)` 里工程自己的 Pass 层 | 插件在编辑器启动时和 *Open Dream Shader Workspace* 时写到 `Saved/DreamShader/Bridge` 的 **`pass-keys.json`**;它还不存在时,用扩展自带的一份 |
+| buffer、参数、常量和 Pass 的转到定义与悬停;大纲里的细节 | 管线的**符号索引**及其 `pipeline` 节 |
+| `hlsl` 块内:Pass 的绑定名(`Source`、`SourceSize`、`SourceUVRect`……)、编译器围绕入口语句写出的名字(`Id`、`UV`……)、`DP_*` 和 `DreamPass*` 辅助宏——补全、悬停,转到定义跳到绑定那一行 | 从文本读出的 Pass 语句 |
+| `Entry =` | 文件级 `hlsl` 块里的函数;compute Pass 优先列出带 `[numthreads]` 的 |
+| 诊断 | bridge;`DSHnnnn` 码链接到插件文档里对应的条目 |
+
+索引不存在、比文本旧(它记录的位置上已经不是那个名字)或版本是扩展不认识的,定义和大纲就改从文本得出;
+插件与扩展版本不匹配只提示一次。重新编译当前源文件、清理生成的着色器和 bridge 面板对 `.dsp` 同样可用。
 
 ## 支持的关键字
 
@@ -376,6 +401,10 @@ npm install
 ```powershell
 npm test
 ```
+
+`test:dss` 和 `test:dsp` 拿插件格式的索引文件、内建目录和 `pass-keys.json` 校对 2.0 与管线的功能,
+`test:grammar` 用断言文件和插件语料的快照跑 TextMate 语法(`vscode-tmgrammar-test`,嵌入块用的是 VS Code 自带
+HLSL 语法的一份拷贝)。
 
 `test:corpus` 需要显式开启,因为插件不在本仓库里。指向一个插件目录,它会双向断言 —— 编译器接受的源
 一条诊断都不许报,编译器因文本可见的原因拒绝的源必须报出对应那条：
