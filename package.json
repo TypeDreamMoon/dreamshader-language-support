@@ -235,7 +235,10 @@
       {
         "language": "dreamshader-dss",
         "scopeName": "source.dreamshader.dss",
-        "path": "./syntaxes/dreamshader-dss.tmLanguage.json"
+        "path": "./syntaxes/dreamshader-dss.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.hlsl": "hlsl"
+        }
       },
       {
         "language": "dreamshader-dsp",
