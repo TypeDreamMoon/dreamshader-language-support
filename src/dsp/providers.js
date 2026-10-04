@@ -41,6 +41,9 @@ const SYMBOL_KINDS = {
     namespace: vscode.SymbolKind.Namespace
 };
 
+/** The token types and modifiers queries.semanticTokens hands out: all standard, so every theme knows them. */
+const SEMANTIC_LEGEND = new vscode.SemanticTokensLegend(["parameter", "variable", "function", "macro"], ["readonly", "defaultLibrary"]);
+
 /** A provider must not throw at the editor: an answer it cannot give is no answer. */
 function safely(fallback, run) {
     try {
@@ -203,7 +206,19 @@ function registerDspLanguageFeatures(context) {
                     return queries.documentSymbols(contextFor(document)).map(toSymbol);
                 });
             }
-        }, { label: "DreamShader Pipeline" })
+        }, { label: "DreamShader Pipeline" }),
+
+        vscode.languages.registerDocumentSemanticTokensProvider(selector, {
+            provideDocumentSemanticTokens(document) {
+                return safely(undefined, () => {
+                    const builder = new vscode.SemanticTokensBuilder(SEMANTIC_LEGEND);
+                    for (const token of queries.semanticTokens(contextFor(document))) {
+                        builder.push(toRange(document, token.start, token.end), token.type, token.modifiers);
+                    }
+                    return builder.build();
+                });
+            }
+        }, SEMANTIC_LEGEND)
     );
 }
 

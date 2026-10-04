@@ -21,8 +21,9 @@ descriptions come from the `pass-keys.json` the plugin exports; a project whose 
 gets the vocabulary bundled with the extension, and is told so. Buffers, parameters, constants and passes are
 looked up in the symbol index's new `pipeline` section. Inside an `hlsl` block a pass's binding names
 (`Source`, `SourceSize`, `SourceUVRect`, …), the names the compiler writes around the statements of an entry
-(`Id`, `UV`, …) and the `DP_*` parameters and `DreamPass*` helpers complete and hover, and a binding name goes
-to its `read` / `write` / `param`; `Entry =` offers the functions of the file's block. Where the index is
+(`Id`, `UV`, …) and the `DP_*` parameters and `DreamPass*` helpers complete, hover and are coloured as what
+they are (semantic tokens), and a binding name goes to its `read` / `write` / `param`; `Entry =` offers the
+functions of the file's block. Where the index is
 missing, older than the text or of a version this extension does not read, the answers come from the text —
 the version mismatch is reported once.
 

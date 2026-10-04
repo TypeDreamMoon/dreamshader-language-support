@@ -76,9 +76,9 @@ const FIXED_NAMES = [
     { name: "DP_Time", kind: "variable", type: "float4", doc: "World time, world delta time, real time (seconds), frame number. Stands in for `View`'s timing at `BeginView`." },
     { name: "DP_PointClamp", kind: "variable", type: "SamplerState", doc: "A point sampler, clamped." },
     { name: "DP_LinearClamp", kind: "variable", type: "SamplerState", doc: "A linear sampler, clamped." },
-    { name: "DreamPassSample", kind: "function", signature: "DreamPassSample(Name, UV)", doc: "The `read` Name sampled (linear) at a UV over the view, inside its picture. A macro: it reads `<Name>UVRect`." },
-    { name: "DreamPassLoad", kind: "function", signature: "DreamPassLoad(Name, Pixel)", doc: "A texel of the `read` Name, at a pixel counted from the view's top left." },
-    { name: "DreamPassSceneUV", kind: "function", signature: "DreamPassSceneUV(UV)", doc: "A UV over the view as a UV of the scene textures, for `CalcSceneDepth` and the rest. Not at `BeginView`." },
+    { name: "DreamPassSample", kind: "function", macro: true, signature: "DreamPassSample(Name, UV)", doc: "The `read` Name sampled (linear) at a UV over the view, inside its picture. A macro: it reads `<Name>UVRect`." },
+    { name: "DreamPassLoad", kind: "function", macro: true, signature: "DreamPassLoad(Name, Pixel)", doc: "A texel of the `read` Name, at a pixel counted from the view's top left." },
+    { name: "DreamPassSceneUV", kind: "function", macro: true, signature: "DreamPassSceneUV(UV)", doc: "A UV over the view as a UV of the scene textures, for `CalcSceneDepth` and the rest. Not at `BeginView`." },
     { name: "DreamPassInputUV", kind: "function", signature: "DreamPassInputUV(i, uv)", doc: "`uv` over input i's picture, as a UV in its texture." },
     { name: "View", kind: "variable", type: "FViewUniformShaderParameters", doc: "The engine's view uniform buffer. It does not exist yet at `BeginView`." },
     { name: "SceneTexturesStruct", kind: "variable", type: "FSceneTextureUniformParameters", doc: "The engine's scene textures: `CalcSceneDepth`, `CalcSceneCustomStencil` and the rest of `SceneTexturesCommon.ush` work. Placeholders at `BeginView`." }

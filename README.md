@@ -101,7 +101,7 @@ toggling, bracket matching and snippets inside a block follow HLSL. A block ends
 | :-- | :-- |
 | Completion and hover of keys and their values — injection points, formats, pass kinds, modes, the project's pass layers inside `Layer(...)` | **`pass-keys.json`**, which the plugin writes to `Saved/DreamShader/Bridge` at editor startup and on *Open Dream Shader Workspace*; until it exists, the copy bundled with the extension |
 | Go to Definition and hover of buffers, parameters, constants and passes; details in the Outline | the pipeline's **symbol index** and its `pipeline` section |
-| Inside an `hlsl` block: a pass's binding names (`Source`, `SourceSize`, `SourceUVRect`, ...), the names written around the statements of an entry (`Id`, `UV`, ...), `DP_*` and the `DreamPass*` helpers — completion, hover, and Go to Definition to the binding | the pass's statements, read from the text |
+| Inside an `hlsl` block: a pass's binding names (`Source`, `SourceSize`, `SourceUVRect`, ...), the names written around the statements of an entry (`Id`, `UV`, ...), `DP_*` and the `DreamPass*` helpers — completion, hover, semantic colouring, and Go to Definition to the binding | the pass's statements, read from the text |
 | `Entry =` | the functions of the file's `hlsl` block, `[numthreads]` ones first for a compute pass |
 | Diagnostics | the bridge; a `DSHnnnn` code links to its page of the plugin's documentation |
 

@@ -952,6 +952,63 @@ function documentSymbols(context) {
     return symbols.sort((left, right) => left.start - right.start);
 }
 
+// ------------------------------------------------------------------------------------------- semantic tokens
+
+/**
+ * The names an `hlsl` block borrows from DreamShader, for semantic colouring. TextMate cannot tell them from any other
+ * identifier: a pass's binding names are `#define`s the compiler makes per pass, and the names around the statements
+ * of an entry are parameters of a function nobody wrote. So: the binding names a block sees (its pass's, or in an entry
+ * of the file's block the passes' that name it) and those parameters as `parameter`; DreamPass.ush's names as library
+ * variables, functions and macros. A name after `.` is a member, not one of these. `[{ start, end, type, modifiers }]`
+ * in text order.
+ */
+function semanticTokens(context) {
+    const { scan } = context;
+    const fixed = new Map(FIXED_NAMES.map((entry) => [entry.name, entry]));
+    const result = [];
+    for (const block of scan.blocks) {
+        const pass = block.passIndex >= 0 ? scan.passes[block.passIndex] : null;
+        const own = new Set();
+        if (pass) {
+            bindingNames(pass).forEach((entry) => own.add(entry.name));
+            if (block.form === "statements") {
+                (BODY_NAMES[pass.kind] || []).forEach((entry) => own.add(entry.name));
+            }
+        }
+        const byEntry = new Map(block.functions.map((fn) => [fn, new Set(
+            pass ? [] : passesNamingEntry(context, fn.name).flatMap((named) => bindingNames(named).map((entry) => entry.name)))]));
+
+        for (let index = 0; index < scan.tokens.length; index += 1) {
+            const token = scan.tokens[index];
+            if (token.s < block.contentStart) {
+                continue;
+            }
+            if (token.s >= block.contentEnd) {
+                break;
+            }
+            const previous = scan.tokens[index - 1];
+            if (token.t !== "id" || (previous && previous.t === "p" && previous.v === ".")) {
+                continue;
+            }
+            let names = own;
+            if (!pass) {
+                const fn = block.functions.find((entry) => entry.bodyOpen < token.s && (entry.bodyClose < 0 || token.s < entry.bodyClose));
+                names = fn ? byEntry.get(fn) : new Set();
+            }
+            if (names.has(token.v)) {
+                result.push({ start: token.s, end: token.e, type: "parameter", modifiers: [] });
+                continue;
+            }
+            const name = fixed.get(token.v);
+            if (name) {
+                const type = name.kind !== "function" ? "variable" : name.macro ? "macro" : "function";
+                result.push({ start: token.s, end: token.e, type, modifiers: type === "variable" ? ["defaultLibrary", "readonly"] : ["defaultLibrary"] });
+            }
+        }
+    }
+    return result;
+}
+
 module.exports = {
     computeLineStarts,
     createContext,
@@ -961,5 +1018,6 @@ module.exports = {
     completionsAt,
     hoverAt,
     definitionAt,
-    documentSymbols
+    documentSymbols,
+    semanticTokens
 };

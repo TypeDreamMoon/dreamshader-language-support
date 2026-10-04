@@ -87,7 +87,7 @@ Pass(UE 5.8 及以上)。它以语言 **DreamShader Pipeline**(`dreamshader-dsp`
 | :-- | :-- |
 | 键及其取值的补全和悬停——注入点、格式、Pass 种类、各种模式、`Layer(...)` 里工程自己的 Pass 层 | 插件在编辑器启动时和 *Open Dream Shader Workspace* 时写到 `Saved/DreamShader/Bridge` 的 **`pass-keys.json`**;它还不存在时,用扩展自带的一份 |
 | buffer、参数、常量和 Pass 的转到定义与悬停;大纲里的细节 | 管线的**符号索引**及其 `pipeline` 节 |
-| `hlsl` 块内:Pass 的绑定名(`Source`、`SourceSize`、`SourceUVRect`……)、编译器围绕入口语句写出的名字(`Id`、`UV`……)、`DP_*` 和 `DreamPass*` 辅助宏——补全、悬停,转到定义跳到绑定那一行 | 从文本读出的 Pass 语句 |
+| `hlsl` 块内:Pass 的绑定名(`Source`、`SourceSize`、`SourceUVRect`……)、编译器围绕入口语句写出的名字(`Id`、`UV`……)、`DP_*` 和 `DreamPass*` 辅助宏——补全、悬停、语义着色,转到定义跳到绑定那一行 | 从文本读出的 Pass 语句 |
 | `Entry =` | 文件级 `hlsl` 块里的函数;compute Pass 优先列出带 `[numthreads]` 的 |
 | 诊断 | bridge;`DSHnnnn` 码链接到插件文档里对应的条目 |
 

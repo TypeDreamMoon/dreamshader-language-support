@@ -227,6 +227,16 @@ const labels = (items) => items.map((entry) => entry.label);
     assert.deepStrictEqual(queries.definitionAt(context, at("(int)Radius", 6)).map((target) => target.start), [at("param Radius", 6)]);
     assert.deepStrictEqual(queries.definitionAt(context, at("= OutlineWidth;", 4)).map((target) => target.start), [at("float  OutlineWidth", 7)]);
 
+    // Semantic tokens: the names the block borrows, and only inside the block.
+    const tokens = queries.semanticTokens(context);
+    const tokenAt = (offset) => tokens.find((token) => token.start === offset) || null;
+    assert.strictEqual(tokenAt(at("Source.SampleLevel")).type, "parameter", "a binding name in the block");
+    assert.strictEqual(tokenAt(at("ResultSize.zw")).type, "parameter", "...and the size it makes");
+    assert.strictEqual(tokenAt(at("(Id.xy") + 1).type, "parameter", "a name written around the statements");
+    assert.deepStrictEqual(tokenAt(at("DP_LinearClamp")), { start: at("DP_LinearClamp"), end: at("DP_LinearClamp") + 14, type: "variable", modifiers: ["defaultLibrary", "readonly"] });
+    assert.strictEqual(tokenAt(at("SampleLevel")), null, "a member is not one of them");
+    assert.strictEqual(tokenAt(at("read  Source") + 6), null, "outside the block a binding is DreamShader's, coloured by the grammar");
+
     // The outline.
     const outline = queries.documentSymbols(context);
     assert.deepStrictEqual(outline.map((entry) => entry.name), ["OutlineColor", "OutlineWidth", "Mask", "Blurred", "DrawMask", "Blur", "Composite"]);
@@ -251,6 +261,9 @@ const labels = (items) => items.map((entry) => entry.label);
     assert.ok(queries.hoverAt(context, at("InField.Load", 2)).markdown.includes("`Grow4`: read InField = StepA"));
     assert.deepStrictEqual(queries.definitionAt(context, at("GrowCS;\n    Dispatch", 2)).map((target) => target.start), [at("void GrowCS", 5)], "Entry = goes to the function");
     assert.ok(queries.hoverAt(context, at("GrowCS;\n    Dispatch", 2)).markdown.includes("[numthreads(16, 16, 1)]"));
+    const tokens = queries.semanticTokens(context);
+    assert.ok(tokens.some((token) => token.start === at("InField.Load") && token.type === "parameter"), "an entry sees the names of the passes naming it");
+    assert.ok(!tokens.some((token) => token.start > at("float2 LwReact") && token.start < at("void LwStepAToB") && token.type === "parameter"), "shared code sees none");
 }
 
 {
