@@ -2,7 +2,7 @@
   "name": "dreamshaderlang-language-support",
   "displayName": "DreamShaderLang Language Support",
   "description": "Language support for DreamShaderLang: 2.0 .dss sources, .dsi material instances and .dsp Custom Pass pipelines, and the 1.x .dsm materials, .dsf function files and .dsh shared headers.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "publisher": "typedreammoon",
   "author": {
     "name": "TypeDreamMoon",

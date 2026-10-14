@@ -67,6 +67,7 @@ JavaScript would be wrong in exactly the places that matter. So the editor asks 
 | Completion and hover for `UE.` and `Substrate.` — node names, their pins and properties, the Substrate sugar arguments (`BaseColor`, `Metallic`, `Haziness`, ...) | the **builtin catalog** the plugin exports once the editor has loaded, and on `dsc export-catalog`: `Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json` |
 | Diagnostics | the bridge, as for 1.x — the compiler's own, with their `DSHnnnn` codes |
 | `/// @` directives, `#pragma` forms, keywords and types | the extension's own word lists |
+| `#include "` paths; `BL::` and the other header namespaces; what the included headers declare, with hover, definition and signature help — in a file that has not been compiled yet | the **text of the headers**: the include closure is read on the spot, 1.x and 2.0 headers alike |
 
 Answers are therefore as fresh as the last compile — and the plugin compiles on save. A position the
 text no longer matches is dropped from an answer rather than shown, and a rename refuses outright and
@@ -84,6 +85,17 @@ as they do on a `.dsm`. Formatting a 2.0 source is the compiler's printer: `dsc 
 
 The body of a `/// @custom` function is HLSL handed to the shader compiler verbatim, and is highlighted as
 HLSL; a `UE.` call inside it keeps its DreamShader colours, because the compiler lifts it into the graph.
+
+A `.dsh` header is shared by both languages. One written in 2.0 — `#include`, `/// @custom`, `T Name(...)`
+and no 1.x block — opens as **DreamShader 2.0** and gets everything above; a header with any 1.x block
+stays 1.x, as the plugin reads a mixed header.
+
+The file-level forms of the plugin after 2.1.2 complete, hover and are coloured: `#pragma generate(...)`
+and `/// @generate` in a package's header, `#pragma nogeneration` and `/// @nogeneration`,
+`#pragma disable_warning(...)` / `#pragma disable_error(...)` and `// disable_warning DSHnnnn` on a line —
+whose code list offers the codes the file reports now. The 1.x side takes the same pragmas at its top level,
+`Function(Generate = ...)` / `GraphFunction(...)` headers, `NoGeneration = true` and the `Namespace`
+`Generate` / `Library` / `Description` keys, and its own diagnostics honour the disable lists.
 
 ## Custom Pass pipelines — `.dsp`
 
