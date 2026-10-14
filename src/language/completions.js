@@ -399,14 +399,43 @@ function addKeywordAndTemplateItems(add) {
     }
 }
 
+// The keys a package's header generates material functions with (plugin after 2.1.2).
+function addGenerateAttributeItems(add, template) {
+    add({
+        label: "Generate",
+        kind: "Property",
+        insertText: template ? "Generate=\"${1:MF_}{Name}\"" : "Generate=\"${1:MF_Name}\"",
+        detail: template ? "Material function name template for every member" : "Material function to generate from this function",
+        documentation: template
+            ? "In a package's header: every member generates a material function, named by the template (`{Name}` is the member's name). A member's own `Generate = \"\"` opts it out."
+            : "In a package's header: the material function asset generated from this function, under the package's asset root. `Generate = \"\"` opts it out of its namespace's template."
+    });
+    add({ label: "Library", kind: "Property", insertText: "Library=\"${1:Category}\"", detail: "Expose the generated material function under this library category" });
+    add({ label: "Description", kind: "Property", insertText: "Description=\"$1\"", detail: "The generated material function's description" });
+}
+
 function addBlockAttributeItems(add, context) {
     const kind = context.block?.kind;
+    if (kind === "Function" || kind === "GraphFunction") {
+        addGenerateAttributeItems(add, false);
+        return;
+    }
     if (kind === "Namespace" || kind === "VirtualFunction") {
         add({ label: "Name", kind: "Property", insertText: "Name=\"${1:MyFunction}\"", detail: `Required ${kind} name` });
+        if (kind === "Namespace") {
+            addGenerateAttributeItems(add, true);
+        }
         return;
     }
     add({ label: "Name", kind: "Property", insertText: "Name=\"${1:Materials/MyMaterial}\"", detail: "Generated asset path relative to Root" });
     add({ label: "Root", kind: "Property", insertText: "Root=\"${1:Game}\"", detail: "Generated asset root" });
+    add({
+        label: "NoGeneration",
+        kind: "Property",
+        insertText: "NoGeneration=${1|true,false|}",
+        detail: "Built only by a compile that names the file",
+        documentation: "Only a compile that names the source builds this block's asset (Compile in the Material Content Browser, `compile -Source`). The startup sweep, a save, a dependency's rebuild, `compile -All` and a cook leave it as it is on disk."
+    });
 }
 
 function addSectionItems(add, context) {
@@ -536,7 +565,19 @@ function addPreprocessorDirectives(add, context, info) {
             add({ label, kind: "Snippet", insertText, detail, documentation, range, sortText: `zz-${label}` });
         }
     }
+    // The file-level `#pragma` lines a 1.x file takes too (plugin after 2.1.2), at the top level only.
+    if (context.kind === "TopLevel") {
+        for (const [label, insertText, detail] of LEGACY_FILE_PRAGMA_ITEMS) {
+            add({ label, kind: "Keyword", insertText, detail, range, sortText: `zy-${label}` });
+        }
+    }
 }
+
+const LEGACY_FILE_PRAGMA_ITEMS = [
+    ["#pragma nogeneration", "#pragma nogeneration", "Only a compile that names this file builds its assets"],
+    ["#pragma disable_warning", "#pragma disable_warning(${1:DSH0000})", "These warnings are not reported for this file"],
+    ["#pragma disable_error", "#pragma disable_error(${1:DSH0000})", "These errors are not reported, and do not fail the compile"]
+];
 
 // The four directives that get nothing here are each a case where an offer would be an offer to
 // write a diagnostic, which is not a completion:

@@ -15,7 +15,21 @@
   "repository": {
     "comments": {
       "patterns": [
-        { "name": "comment.line.double-slash.dreamshader", "match": "//.*$" },
+        {
+          "name": "comment.line.double-slash.dreamshader",
+          "begin": "//",
+          "end": "$",
+          "patterns": [
+            {
+              "comment": "`// disable_warning DSHnnnn` / `// disable_error DSHnnnn`: a line's disable list (plugin after 2.1.2).",
+              "match": "\\G\\s*(disable_warning|disable_error)\\b(.*)$",
+              "captures": {
+                "1": { "name": "keyword.other.disable.dreamshader" },
+                "2": { "patterns": [ { "match": "\\bDSH[0-9]{4}\\b", "name": "constant.other.diagnostic-code.dreamshader" } ] }
+              }
+            }
+          ]
+        },
         { "name": "comment.block.dreamshader", "begin": "/\\*", "end": "\\*/" }
       ]
     },

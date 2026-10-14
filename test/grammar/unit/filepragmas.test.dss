@@ -1,0 +1,13 @@
+// SYNTAX TEST "source.dreamshader.dss" "the file-level pragmas and a line's disable list"
+#pragma nogeneration
+//      ^^^^^^^^^^^^ entity.name.function.preprocessor.dreamshader
+#pragma disable_warning(DSH7224, DSH8237)
+//      ^^^^^^^^^^^^^^^ entity.name.function.preprocessor.dreamshader
+#pragma generate(Functions = "MF_{Name}", Library = "Blender|Noise")
+//      ^^^^^^^^ entity.name.function.preprocessor.dreamshader
+//               ^^^^^^^^^ variable.other.property.dreamshader
+float Half(float x) { return x * 0.5; } // disable_warning DSH5251
+//                                         ^^^^^^^^^^^^^^^ comment.line.double-slash.dreamshader keyword.other.disable.dreamshader
+//                                                         ^^^^^^^ comment.line.double-slash.dreamshader constant.other.diagnostic-code.dreamshader
+// an ordinary comment that mentions DSH5251
+//                                   ^^^^^^^ comment.line.double-slash.dreamshader - constant.other.diagnostic-code.dreamshader

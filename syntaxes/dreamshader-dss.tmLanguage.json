@@ -138,7 +138,17 @@
           "name": "comment.line.double-slash.dreamshader",
           "begin": "//",
           "beginCaptures": { "0": { "name": "punctuation.definition.comment.dreamshader" } },
-          "end": "$"
+          "end": "$",
+          "patterns": [
+            {
+              "comment": "`// disable_warning DSHnnnn` / `// disable_error DSHnnnn`: a line's disable list (plugin after 2.1.2).",
+              "match": "\\G\\s*(disable_warning|disable_error)\\b(.*)$",
+              "captures": {
+                "1": { "name": "keyword.other.disable.dreamshader" },
+                "2": { "patterns": [ { "match": "\\bDSH[0-9]{4}\\b", "name": "constant.other.diagnostic-code.dreamshader" } ] }
+              }
+            }
+          ]
         },
         {
           "name": "comment.block.dreamshader",
@@ -150,8 +160,8 @@
       ]
     },
     "pragma": {
-      "comment": "`#pragma material(Key = Value, ...)`, `#pragma instance(...)`, `#pragma region \"Title\"`, `#pragma layout(...)`.",
-      "begin": "^\\s*(#)\\s*(pragma)\\s+(material|instance|region|endregion|layout)\\b",
+      "comment": "`#pragma material(Key = Value, ...)`, `#pragma instance(...)`, `#pragma region \"Title\"`, `#pragma layout(...)`, `#pragma generate(...)`, `#pragma nogeneration`, `#pragma disable_warning(...)` / `disable_error(...)`.",
+      "begin": "^\\s*(#)\\s*(pragma)\\s+(material|instance|region|endregion|layout|generate|nogeneration|disable_warning|disable_error)\\b",
       "beginCaptures": {
         "1": { "name": "punctuation.definition.directive.dreamshader" },
         "2": { "name": "keyword.control.directive.pragma.dreamshader" },
