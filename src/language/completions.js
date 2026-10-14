@@ -218,6 +218,13 @@ function getCompletionSpecs(text, offset, services = {}) {
         return dedupe(specs);
     }
 
+    // `BL::`: nothing but that namespace's functions.
+    if (/([A-Za-z_][A-Za-z0-9_]*)::[A-Za-z0-9_]*$/.test(context.linePrefix || "")
+        && ["FunctionBody", "GraphFunctionBody", "Graph", "OutputsValue"].includes(context.kind)) {
+        addReachableFunctions(add, context, services);
+        return dedupe(specs);
+    }
+
     if (context.afterUEAccessor && isGraphLike(context)) {
         addUEBuiltinMembers(add, services, context);
         return dedupe(specs);
@@ -785,27 +792,46 @@ function addReachableFunctions(add, context, services) {
     const namespacePrefix = namespaceMatch ? `${namespaceMatch[1]}::` : "";
     const callables = mergeCallables(collectCallables(context.ast), callService(services, "collectReachableCallableSignatures", new Map()));
     const seen = new Set();
+    const namespaces = new Set();
 
     for (const [key, entries] of mapEntries(callables)) {
-        const entry = entries[0];
-        if (!entry) {
-            continue;
+        for (const entry of entries) {
+            if (!entry) {
+                continue;
+            }
+            const fullName = String(entry.name || key);
+            const qualified = fullName.includes("::");
+            let name;
+            if (namespacePrefix) {
+                // After `BL::`: that namespace's members, by the member name -- the prefix is typed already.
+                if (!fullName.startsWith(namespacePrefix)) {
+                    continue;
+                }
+                name = fullName.slice(namespacePrefix.length);
+            } else if (qualified) {
+                // A namespace member is called `BL::Name`: offer the namespace, and the members under it.
+                namespaces.add(fullName.split("::")[0]);
+                continue;
+            } else {
+                name = getCallableShortName(entry.localName || fullName);
+            }
+            const normalized = normalizeSymbolKey(name);
+            if (!normalized || seen.has(normalized)) {
+                continue;
+            }
+            seen.add(normalized);
+            add({
+                label: name,
+                kind: "Function",
+                insertText: name,
+                detail: getCallableDetail(entry),
+                documentation: entry.doc || undefined
+            });
         }
-        const name = namespacePrefix ? String(entry.name || key) : getCallableShortName(entry.localName || entry.name || key);
-        if (namespacePrefix && !String(entry.name || "").startsWith(namespacePrefix)) {
-            continue;
-        }
-        const normalized = normalizeSymbolKey(name);
-        if (!normalized || seen.has(normalized)) {
-            continue;
-        }
-        seen.add(normalized);
-        add({
-            label: name,
-            kind: "Function",
-            insertText: name,
-            detail: getCallableDetail(entry)
-        });
+    }
+
+    for (const namespaceName of namespaces) {
+        add({ label: namespaceName, kind: "Module", insertText: `${namespaceName}::`, detail: "DreamShader namespace" });
     }
 }
 
