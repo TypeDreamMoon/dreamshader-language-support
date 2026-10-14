@@ -6,6 +6,7 @@ const { parseDocument } = require("./parser");
 const { collectCallables, flatten } = require("./symbols");
 const { collectCallNames } = require("./calls");
 const { normalizeSymbolKey, normalizeFsPath } = require("./utils");
+const { scanDssFunctions, scanIncludes, toLegacyCallable } = require("../project/headerScan");
 
 function buildDocumentIndex({ fileName = "", text = "", resolveImportPath, readFileText } = {}) {
     const files = [];
@@ -35,13 +36,43 @@ function buildDocumentIndex({ fileName = "", text = "", resolveImportPath, readF
                 modifier: block.modifier || ""
             }));
 
+        // A header written in 2.0 -- dreamshader-blender is one -- declares its functions as `T Name(...)`, a namespace
+        // member as `BL_Name` with `/// @name BL::Name`. A 1.x source imports it all the same and calls `BL::Name`.
+        if (!isRoot) {
+            for (const scanned of scanDssFunctions(sourceText || "")) {
+                if (scanned.linkage === "export") {
+                    continue;
+                }
+                const callable = toLegacyCallable(scanned);
+                for (const name of new Set([callable.name, callable.localName, scanned.name])) {
+                    const key = normalizeSymbolKey(name);
+                    if (!callables.has(key)) {
+                        callables.set(key, []);
+                    }
+                    callables.get(key).push(callable);
+                }
+                functions.push({
+                    kind: "Function",
+                    name: callable.name,
+                    localName: callable.localName,
+                    fsPath: normalizedPath,
+                    nameOffset: scanned.nameOffset,
+                    nameRangeLength: scanned.name.length,
+                    bodyText: "",
+                    modifier: ""
+                });
+            }
+        }
+
         files.push({ fsPath: normalizedPath, text: sourceText || "", ast, callables, functions, isRoot });
 
-        for (const importStatement of ast.imports || []) {
+        // `import "x";` and, for a 2.0 header, `#include "x"`.
+        const specifiers = new Set((ast.imports || []).map((entry) => entry.path).concat(scanIncludes(sourceText || "")));
+        for (const specifier of specifiers) {
             if (typeof resolveImportPath !== "function") {
                 continue;
             }
-            const resolved = resolveImportPath(importStatement.path, normalizedPath);
+            const resolved = resolveImportPath(specifier, normalizedPath);
             if (!resolved || visited.has(normalizeFsPath(resolved))) {
                 continue;
             }

@@ -65,6 +65,9 @@ const DIRECTIVE_KEYWORDS = Object.freeze({
  */
 const GRAPH_DIRECTIVE_KEYWORDS = Object.freeze(["region", "endregion"]);
 
+/** `#pragma nogeneration`, `#pragma disable_warning(...)`, `#pragma disable_error(...)`: file-level, legal in 1.x. */
+const LEGACY_FILE_PRAGMAS = new Set(["nogeneration", "disable_warning", "disable_error"]);
+
 /** `#if` blocks nest to 64; the 65th is DSH1037. */
 const MAX_CONDITIONAL_DEPTH = 64;
 
@@ -408,6 +411,15 @@ function classifyDirectiveLine(line) {
 
     if (GRAPH_DIRECTIVE_KEYWORDS.includes(keyword.toLowerCase())) {
         return { kind: DIRECTIVE_KIND.None, ...split };
+    }
+
+    // The three `#pragma` lines a 1.x file takes too (plugin after 2.1.2): they say something about the file, and
+    // the plugin's 1.x preprocessor passes them to its parser. Every other `#pragma` is still DSH1035, as in 1.x.
+    if (keyword === "pragma") {
+        const pragmaName = /^\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(split.rest);
+        if (pragmaName && LEGACY_FILE_PRAGMAS.has(pragmaName[1])) {
+            return { kind: DIRECTIVE_KIND.None, ...split };
+        }
     }
 
     if (Object.prototype.hasOwnProperty.call(DIRECTIVE_KEYWORDS, keyword) && DIRECTIVE_KEYWORDS[keyword] === keyword) {

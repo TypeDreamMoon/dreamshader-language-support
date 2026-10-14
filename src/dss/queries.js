@@ -54,6 +54,19 @@ function wordAt(lineText, character) {
     }
     let member = false;
     let namespace = "";
+    // `BL::TexNoise3D`: a function of a header namespace, declared as `BL_TexNoise3D`.
+    let qualifier = "";
+    if (text[before] === ":" && text[before - 1] === ":") {
+        let end = before - 2;
+        while (end >= 0 && /\s/.test(text[end])) {
+            end -= 1;
+        }
+        let begin = end;
+        while (begin >= 0 && isIdentifierChar(text[begin])) {
+            begin -= 1;
+        }
+        qualifier = text.slice(begin + 1, end + 1);
+    }
     if (text[before] === ".") {
         member = true;
         let end = before - 1;
@@ -69,7 +82,7 @@ function wordAt(lineText, character) {
             namespace = owner;
         }
     }
-    return { word: match[0], start, end: start + match[0].length, member, namespace };
+    return { word: match[0], start, end: start + match[0].length, member, namespace, qualifier };
 }
 
 /** The text under a span is still `name`. `lines` is the file split into lines; the index counts from one. */
@@ -363,6 +376,18 @@ function callAt(textBeforeCaret) {
             // `owner` is the namespace a member call hangs off -- `UE` in `UE.Lerp(` -- read here because
             // only here is it known where the callee starts.
             let owner = "";
+            // `BL::TexNoise3D(`: the namespace, kept apart from a `.` owner.
+            if (textBeforeCaret[before] === ":" && textBeforeCaret[before - 1] === ":") {
+                let qualifierEnd = before - 2;
+                while (qualifierEnd >= 0 && /\s/.test(textBeforeCaret[qualifierEnd])) {
+                    qualifierEnd -= 1;
+                }
+                let qualifierBegin = qualifierEnd;
+                while (qualifierBegin >= 0 && isIdentifierChar(textBeforeCaret[qualifierBegin])) {
+                    qualifierBegin -= 1;
+                }
+                return { name, argument, member: false, owner: "", qualifier: textBeforeCaret.slice(qualifierBegin + 1, qualifierEnd + 1) };
+            }
             if (textBeforeCaret[before] === ".") {
                 let ownerEnd = before - 1;
                 while (ownerEnd >= 0 && /\s/.test(textBeforeCaret[ownerEnd])) {
@@ -374,7 +399,7 @@ function callAt(textBeforeCaret) {
                 }
                 owner = textBeforeCaret.slice(ownerBegin + 1, ownerEnd + 1);
             }
-            return { name, argument, member: textBeforeCaret[before] === ".", owner };
+            return { name, argument, member: textBeforeCaret[before] === ".", owner, qualifier: "" };
         } else if (char === "," && depth === 0) {
             argument += 1;
         } else if (char === ";" && depth === 0) {

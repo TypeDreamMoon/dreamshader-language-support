@@ -13,8 +13,11 @@
 // which finished last -- a hazard that the split into two processes does not change and does not
 // create.
 
+const path = require("path");
 const vscode = require("vscode");
 const { BRIDGE_DIAGNOSTIC_COLLECTION_NAME } = require("./languageData");
+const { DSS_LANGUAGE_ID } = require("./dss/languageData");
+const { detectHeaderDialect } = require("./project/dialect");
 const { createDebouncedDisposable } = require("./common/debounce");
 const { createEmptyBridgeDiagnosticsState, refreshBridgeDiagnostics } = require("./bridge/diagnostics");
 const { initializeBridgeDatabaseSupport } = require("./bridge/database");
@@ -72,6 +75,18 @@ function activate(context) {
     // from the symbol index and the node catalog the plugin writes -- see src/dss/providers.js for why the
     // language server is not the one asked.
     registerDssLanguageFeatures(context);
+
+    // A `.dsh` opens as 1.x by its extension; one written in 2.0 is switched to the 2.0 language, so it gets the 2.0
+    // grammar and the features above rather than a 1.x server that reads it as nothing it knows.
+    const adoptHeaderDialect = (document) => {
+        if (document.languageId === "dreamshaderlang"
+            && path.extname(document.fileName).toLowerCase() === ".dsh"
+            && detectHeaderDialect(document.getText()) === "2.0") {
+            void vscode.languages.setTextDocumentLanguage(document, DSS_LANGUAGE_ID);
+        }
+    };
+    vscode.workspace.textDocuments.forEach(adoptHeaderDialect);
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(adoptHeaderDialect));
 
     // Custom Pass pipelines (`.dsp`): completion and hover from pass-keys.json, definition and the outline from the
     // index's `pipeline` section, with the text behind both -- see src/dsp/providers.js.

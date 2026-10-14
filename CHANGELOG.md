@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.2.0
+
+For DreamShader after 2.1.2. Everything from 2.1.0 keeps working with older plugins.
+
+**`#include` and `BL::` complete, in a file that has never been compiled.** A `.dss` answered only from the
+symbol index the plugin writes after a compile, so a new file — or a header added since — completed nothing it
+included, and `BL::` completed nothing at all. Now `#include "` offers the headers the include resolver finds
+(the file's own root and its packages, as the resolver spells them), `BL::` the functions of that namespace,
+a bare word the namespaces and the plain functions of the include closure, and hover, Go to Definition and
+signature help answer for them — `BL::TexNoise3D` included, which the index knows as `BL_TexNoise3D`. The
+headers are read as text, 1.x and 2.0 alike; where the index answers, it still comes first.
+
+**`BL::` in a 1.x source offers that namespace's functions only.** It offered every intrinsic, `UE.` node and
+symbol in reach, and not the namespace's members: a member was kept under its bare name. It is kept as
+`BL::Name` now, offered after `BL::` and as the namespace `BL` elsewhere. A 1.x source that imports a header
+written in 2.0 — dreamshader-blender 0.10.0 is one — sees its functions too, through its `#include`s.
+
+**A `.dsh` written in 2.0 opens as DreamShader 2.0.** Every `.dsh` opened as 1.x, and a 2.0 header got the 1.x
+grammar and a language server that read it as nothing it knew. A header with 2.0 declarations and no 1.x block
+is switched to the 2.0 language when it opens; a mixed one stays 1.x.
+
+**The plugin's new file-level forms.**
+- `#pragma generate(...)`, `#pragma nogeneration`, `#pragma disable_warning(...)` and `#pragma disable_error(...)`
+  complete (also after `#pragma `), hover and are coloured; `/// @generate`, `/// @nogeneration` and `/// @root`
+  complete and hover.
+- `// disable_warning DSHnnnn` and `// disable_error DSHnnnn` are coloured, and a disable list completes the
+  codes the file reports now.
+- 1.x: the three pragmas are no longer DSH1035 at the top level of a `.dsm` / `.dsf`; a `Function(Generate = ...)`
+  or `GraphFunction(...)` header no longer breaks the function's outline, hover and parameters; the headers
+  complete `NoGeneration` (asset blocks), `Generate` / `Library` / `Description` (`Namespace`, `Function`,
+  `GraphFunction`); the `#` completion offers the three pragmas.
+- The diagnostics this extension finds on its own honour the disable lists, as the compiler's do.
+
 ## 2.1.0
 
 **Custom Pass pipelines: `.dsp`.** DreamShader 2.1.0 adds pipelines — buffers, parameters and render passes

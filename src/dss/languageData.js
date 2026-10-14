@@ -40,7 +40,10 @@ const DIRECTIVES = [
     { name: "asset", on: "function", detail: "@asset /Game/Functions/MF_Existing", doc: "On an `extern` prototype: the existing material function asset this declares." },
     { name: "custom", on: "function", detail: "@custom", doc: "The body is HLSL for a Custom node, handed to the shader compiler verbatim." },
     { name: "layer", on: "function", detail: "@layer", doc: "The function is a material layer asset: `export void L(inout material m)`." },
-    { name: "layerblend", on: "function", detail: "@layerblend", doc: "The function is a material layer blend asset: `export void B(material Bottom, material Top, inout material Result)`." }
+    { name: "layerblend", on: "function", detail: "@layerblend", doc: "The function is a material layer blend asset: `export void B(material Bottom, material Top, inout material Result)`." },
+    { name: "root", on: "function", detail: "@root Game", doc: "The 1.x `Root=` of the block a migrated function came from: `Game`, `Engine`, `Plugin.Name`, `/Mount`. `dsc migrate` writes it." },
+    { name: "generate", on: "function", detail: "@generate Folder/MF_Name", doc: "In a package's header: the material function asset to generate from this function, under the package's asset root. `@generate none` opts it out of a `#pragma generate`. Anywhere else it does nothing (DSH7234)." },
+    { name: "nogeneration", on: "function", detail: "@nogeneration", doc: "On an `export`: only a compile that names the file builds its asset -- not the startup sweep, a save, a dependency's rebuild, `compile -All` or a cook. Whatever uses it uses the asset on disk." }
 ];
 
 const PRAGMAS = [
@@ -48,7 +51,17 @@ const PRAGMAS = [
     { name: "instance", snippet: "pragma instance(Parent = \"${1:/Game/Materials/M_Parent}\")", doc: "A `.dsi` file: the material instance's parent. The `uniform`s below it are the overrides." },
     { name: "region", snippet: "pragma region \"${1:Title}\"\n$0\n#pragma endregion", doc: "A comment box around the nodes of the statements up to `#pragma endregion`." },
     { name: "endregion", snippet: "pragma endregion", doc: "Closes `#pragma region`." },
-    { name: "layout", snippet: "pragma layout(Node, Var = ${1:Name}, X = ${2:0}, Y = ${3:0})", doc: "Pins the node a variable's value is at a position, or declares a comment box (`Comment, Text = \"...\", X, Y, Width, Height`)." }
+    { name: "layout", snippet: "pragma layout(Node, Var = ${1:Name}, X = ${2:0}, Y = ${3:0})", doc: "Pins the node a variable's value is at a position, or declares a comment box (`Comment, Text = \"...\", X, Y, Width, Height`)." },
+    { name: "generate", snippet: "pragma generate(Functions = \"${1:MF_}{Name}\", Library = \"${2:Category}\")", doc: "In a package's header: every function after it with a body and no linkage keyword generates a material function, named by the template (`{Name}` is the function's name). `/// @generate` on one function overrides it; `@generate none` opts out." },
+    { name: "nogeneration", snippet: "pragma nogeneration", doc: "Every asset this file builds is built only by a compile that names the file (*Compile* in the Material Content Browser, `compile -Source`). The startup sweep, a save, a dependency's rebuild, `compile -All` and a cook leave it as it is on disk." },
+    { name: "disable_warning", snippet: "pragma disable_warning(${1:DSH0000})", doc: "These warnings are not reported -- anywhere in this file, and in the file being compiled for everything the compile reports. `// disable_warning DSHnnnn` disables one line." },
+    { name: "disable_error", snippet: "pragma disable_error(${1:DSH0000})", doc: "These errors are not reported and do not fail the compile. A stage that cannot go on without one still stops, and then the error is reported after all. `// disable_error DSHnnnn` disables one line." }
+];
+
+/** `// disable_warning DSHnnnn` / `// disable_error DSHnnnn`: one line's list, in either language. */
+const DISABLE_COMMENTS = [
+    { name: "disable_warning", doc: "These warnings are not reported on this line -- or, alone on its line, on the next line that holds code." },
+    { name: "disable_error", doc: "These errors are not reported, and do not fail the compile, on this line -- or, alone on its line, on the next line that holds code." }
 ];
 
 const SUBSTRATE_MODES = ["Legacy", "Bridge", "Native"];
@@ -61,6 +74,7 @@ module.exports = {
     TYPES,
     DIRECTIVES,
     PRAGMAS,
+    DISABLE_COMMENTS,
     SUBSTRATE_MODES,
     BACKENDS
 };

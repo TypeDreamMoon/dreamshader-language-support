@@ -58,7 +58,8 @@ function collectCallables(ast) {
             }
             addCallable(result, {
                 kind: block.kind,
-                name: block.name,
+                // A namespace member is called `BL::Name`; the namespace is what completion after `BL::` filters on.
+                name: block.namespace ? `${block.namespace}::${block.name}` : block.name,
                 localName: block.localName || block.name,
                 inputs: (block.params || []).filter((param) => param.qualifier !== "out"),
                 outputs

@@ -25,6 +25,7 @@ const languageCore = require("../language");
 const { SEMANTIC_TOKEN_TYPES, SEMANTIC_TOKEN_MODIFIERS } = require("../languageData");
 const { resolveImportPath } = require("../project/imports");
 const { createLanguageServices } = require("./services");
+const { scanDisableLists, isDisabled } = require("../common/disableLists");
 const {
     fileNameOf,
     isDreamShaderDocument,
@@ -494,8 +495,13 @@ const DIAGNOSTIC_SOURCE = "dreamshaderlang";
 const DIAGNOSTIC_DOCS_BASE = "https://github.com/TypeDreamMoon/DreamShader/blob/main/Docs/diagnostics";
 
 function diagnostics(document, services) {
+    const text = document.getText();
+    // What the source disables for itself (`#pragma disable_warning(...)`, `// disable_error DSH...`) is not shown
+    // here either: the compiler would not report it.
+    const disabled = scanDisableLists(text);
     return languageCore
-        .getDiagnostics(document.getText(), fileNameOf(document), createLanguageServices(document, services))
+        .getDiagnostics(text, fileNameOf(document), createLanguageServices(document, services))
+        .filter((entry) => !isDisabled(disabled, entry.severity, entry.code, document.positionAt(entry.startOffset).line + 1))
         .map((entry) => {
             const diagnostic = {
                 range: rangeFromOffsets(document, entry.startOffset, entry.endOffset),

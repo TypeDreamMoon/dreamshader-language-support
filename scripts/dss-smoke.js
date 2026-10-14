@@ -191,8 +191,14 @@ const indices = store.findForSource(sourcePath);
     const hover = queries.describeDeclaration(indices[0].declarations.find((entry) => entry.name === "M_Glow"));
     assert.ok(hover.includes("export void M_Glow(inout material m)") && hover.includes("material entry"));
 
-    assert.deepStrictEqual(queries.callAt("m.Opacity = UE.Lerp(A = 0.0, B = "), { name: "Lerp", argument: 1, member: true, owner: "UE" });
-    assert.deepStrictEqual(queries.callAt("float y = Half(max(a, b), "), { name: "Half", argument: 1, member: false, owner: "" });
+    assert.deepStrictEqual(queries.callAt("m.Opacity = UE.Lerp(A = 0.0, B = "), { name: "Lerp", argument: 1, member: true, owner: "UE", qualifier: "" });
+    assert.deepStrictEqual(queries.callAt("float y = Half(max(a, b), "), { name: "Half", argument: 1, member: false, owner: "", qualifier: "" });
+    assert.deepStrictEqual(queries.callAt("BL::TexNoise3D(p, 5.0, "), { name: "TexNoise3D", argument: 2, member: false, owner: "", qualifier: "BL" },
+        "a header namespace's call keeps its namespace apart from a `.` owner");
+    const qualifiedWord = queries.wordAt("    BL::TexNoise3D(p);", 10);
+    assert.strictEqual(qualifiedWord.word, "TexNoise3D");
+    assert.strictEqual(qualifiedWord.qualifier, "BL", "the word under the caret knows its `Ns::`");
+    assert.strictEqual(queries.wordAt("    Half(p);", 6).qualifier, "", "and a plain name has none");
     assert.strictEqual(queries.callAt("float y = 1; "), null, "no call is open after a statement ended");
     assert.deepStrictEqual(queries.parametersOf(indices[0], indices[0].declarations.find((entry) => entry.name === "Half")).map((entry) => entry.name), ["x"]);
     assert.deepStrictEqual(queries.completionDeclarations(indices).map((entry) => entry.name).sort(), ["Gain", "Half", "M_Glow", "Tint"]);

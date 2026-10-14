@@ -264,6 +264,27 @@ class Parser {
             endOffset: kindToken.end
         };
 
+        // `Function(Generate = "MF_X", Library = "...") Name(...)` (plugin after 2.1.2): an attribute header between the
+        // keyword and the rest, told from a parameter list by its `Key =`. What a package's header generates.
+        const maybeAttributes = this.skipTriviaAndPeek();
+        if (maybeAttributes && maybeAttributes.value === "(") {
+            const significant = [];
+            for (let lookahead = this.index + 1; lookahead < this.tokens.length && significant.length < 2; lookahead += 1) {
+                if (!this.isTrivia(this.tokens[lookahead])) {
+                    significant.push(this.tokens[lookahead]);
+                }
+            }
+            if (significant.length === 2 && significant[0].type === "identifier" && significant[1].value === "=") {
+                const closeParenIndex = this.findMatchingTokenIndex(this.index, "(", ")");
+                block.attributeOpenOffset = maybeAttributes.start;
+                block.attributeCloseOffset = closeParenIndex >= 0 ? this.tokens[closeParenIndex].start : -1;
+                block.attributes = parseAssignments(
+                    this.text.slice(maybeAttributes.end, closeParenIndex >= 0 ? this.tokens[closeParenIndex].start : maybeAttributes.end),
+                    maybeAttributes.end);
+                this.index = closeParenIndex >= 0 ? closeParenIndex + 1 : this.index + 1;
+            }
+        }
+
         if (block.kind === "Function") {
             const maybeModifier = this.skipTriviaAndPeek();
             if (maybeModifier && maybeModifier.type === "identifier" && ["SelfContained", "Inline"].includes(maybeModifier.value)) {
