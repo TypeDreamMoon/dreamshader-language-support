@@ -18,10 +18,16 @@ const vscode = require("vscode");
 const { findProjectRoot } = require("../project/projects");
 const { createIndexStore, getIndexDirectory, pathKey } = require("./indexStore");
 const { createCatalogReader, findExpression, describeExpression } = require("./catalog");
+const path = require("path");
 const queries = require("./queries");
-const { DSS_LANGUAGE_ID, KEYWORDS, TYPES, DIRECTIVES, PRAGMAS, SUBSTRATE_MODES, BACKENDS } = require("./languageData");
+const { resolveImportPath, collectAvailableImports } = require("../project/imports");
+const headerScan = require("../project/headerScan");
+const { DSS_LANGUAGE_ID, KEYWORDS, TYPES, DIRECTIVES, PRAGMAS, DISABLE_COMMENTS, SUBSTRATE_MODES, BACKENDS } = require("./languageData");
 
 const REFRESH_INTERVAL_MS = 400;
+
+/** How long a document's include closure is trusted before its headers are read again. */
+const CLOSURE_TTL_MS = 2000;
 
 const SYMBOL_KINDS = {
     struct: vscode.SymbolKind.Struct,
@@ -85,6 +91,78 @@ function registerDssLanguageFeatures(context) {
         return queries.wordAt(document.lineAt(position.line).text, position.character);
     }
 
+    // The functions a document can call through its `#include`s, read off the text -- the compiler's index answers
+    // only for a file it has compiled, and the time someone types `BL::` is usually before that.
+    const closures = new Map();
+    function closureFor(document) {
+        const key = document.uri.toString();
+        const now = Date.now();
+        const cached = closures.get(key);
+        if (cached && cached.version === document.version && now - cached.at < CLOSURE_TTL_MS) {
+            return cached.closure;
+        }
+        let closure;
+        try {
+            closure = headerScan.collectIncludeClosure(
+                document.fileName,
+                document.getText(),
+                (specifier, fromFile) => resolveImportPath(fromFile, specifier),
+                (file) => readLines(file).join("\n"));
+        } catch (_error) {
+            closure = { functions: [], files: [] };
+        }
+        closures.set(key, { version: document.version, at: now, closure });
+        return closure;
+    }
+
+    /** The functions a name means when the index has nothing: `BL::X` by its namespace, a bare name by itself. */
+    function findInClosure(document, word) {
+        const functions = closureFor(document).functions;
+        if (word.qualifier) {
+            const qualified = `${word.qualifier}::${word.word}`;
+            const symbol = `${word.qualifier}_${word.word}`;
+            return functions.filter((entry) => entry.qualifiedName === qualified || entry.name === symbol);
+        }
+        return functions.filter((entry) => entry.name === word.word);
+    }
+
+    /** The index's declarations of a name; `BL::X` is looked up under the symbol `BL_X` it is declared as. */
+    function findIndexed(document, position, word) {
+        const lookup = word.qualifier ? { ...word, word: `${word.qualifier}_${word.word}`, qualifier: "" } : word;
+        return queries.findDeclarations(indicesFor(document), document.fileName, position, lookup);
+    }
+
+    function describeScanned(entry) {
+        const lines = ["```hlsl", headerScan.formatSignature(entry), "```"];
+        const facts = [entry.dialect === "1.x" ? "1.x function" : "function"];
+        if (entry.qualifiedName) {
+            facts.push(`declared as \`${entry.name}\``);
+        }
+        facts.push(`in \`${path.basename(entry.file)}\``);
+        lines.push("", `*${facts.join(" · ")}*`);
+        if (entry.doc) {
+            lines.push("", entry.doc);
+        }
+        return lines.join("\n");
+    }
+
+    /** The codes the document reports now, of one severity: what a disable list most likely wants. */
+    function reportedCodes(document, wantErrors) {
+        const codes = new Map();
+        for (const diagnostic of vscode.languages.getDiagnostics(document.uri)) {
+            const code = typeof diagnostic.code === "object" && diagnostic.code ? diagnostic.code.value : diagnostic.code;
+            if (!code || !/^DSH\d{4}$/.test(String(code))) {
+                continue;
+            }
+            const isError = diagnostic.severity === vscode.DiagnosticSeverity.Error;
+            const isWarning = diagnostic.severity === vscode.DiagnosticSeverity.Warning;
+            if ((wantErrors && isError) || (!wantErrors && isWarning)) {
+                codes.set(String(code), diagnostic.message);
+            }
+        }
+        return codes;
+    }
+
     function toRange(span, length) {
         const start = new vscode.Position(Math.max(span.line - 1, 0), Math.max(span.column - 1, 0));
         return new vscode.Range(start, start.translate(0, Math.max(length, 1)));
@@ -117,8 +195,12 @@ function registerDssLanguageFeatures(context) {
                 if (!word) {
                     return null;
                 }
-                return queries.findDeclarations(indicesFor(document), document.fileName, position, word)
-                    .map((declaration) => toLocation(declaration, word.word.length));
+                const indexed = findIndexed(document, position, word);
+                if (indexed.length > 0) {
+                    return indexed.map((declaration) => toLocation(declaration, declaration.name.length));
+                }
+                return findInClosure(document, word).map((entry) =>
+                    new vscode.Location(vscode.Uri.file(entry.file), new vscode.Position(Math.max(entry.line - 1, 0), Math.max(entry.column - 1, 0))));
             }
         }),
 
@@ -155,11 +237,14 @@ function registerDssLanguageFeatures(context) {
                     return expression ? new vscode.Hover(new vscode.MarkdownString(describeExpression(expression)), range) : null;
                 }
 
-                const declarations = queries.findDeclarations(indicesFor(document), document.fileName, position, word);
-                if (declarations.length === 0) {
-                    return null;
+                const declarations = findIndexed(document, position, word);
+                if (declarations.length > 0) {
+                    return new vscode.Hover(declarations.map((declaration) => new vscode.MarkdownString(queries.describeDeclaration(declaration))), range);
                 }
-                return new vscode.Hover(declarations.map((declaration) => new vscode.MarkdownString(queries.describeDeclaration(declaration))), range);
+                const scanned = findInClosure(document, word);
+                return scanned.length > 0
+                    ? new vscode.Hover(scanned.map((entry) => new vscode.MarkdownString(describeScanned(entry))), range)
+                    : null;
             }
         }),
 
@@ -243,8 +328,9 @@ function registerDssLanguageFeatures(context) {
                     return help;
                 }
 
+                const symbol = call.qualifier ? `${call.qualifier}_${call.name}` : call.name;
                 for (const index of indicesFor(document)) {
-                    const declaration = index.declarations.find((entry) => entry.kind === "function" && entry.name === call.name);
+                    const declaration = index.declarations.find((entry) => entry.kind === "function" && entry.name === symbol);
                     if (!declaration) {
                         continue;
                     }
@@ -258,7 +344,20 @@ function registerDssLanguageFeatures(context) {
                     help.activeParameter = Math.min(call.argument, Math.max(parameters.length - 1, 0));
                     return help;
                 }
-                return null;
+
+                // Not compiled yet: the header's text.
+                const scanned = findInClosure(document, { word: call.name, qualifier: call.qualifier || "" })[0];
+                if (!scanned) {
+                    return null;
+                }
+                const signature = new vscode.SignatureInformation(headerScan.formatSignature(scanned));
+                signature.documentation = new vscode.MarkdownString(scanned.doc || "");
+                signature.parameters = scanned.parameters.map((parameter) =>
+                    new vscode.ParameterInformation(`${parameter.qualifier !== "in" ? `${parameter.qualifier} ` : ""}${parameter.type} ${parameter.name}`));
+                help.signatures = [signature];
+                help.activeSignature = 0;
+                help.activeParameter = Math.min(call.argument, Math.max(scanned.parameters.length - 1, 0));
+                return help;
             }
         }, "(", ","),
 
@@ -281,6 +380,88 @@ function registerDssLanguageFeatures(context) {
                     items.push(item);
                     return item;
                 };
+
+                // ----- `#include "`: the headers the include resolves, spelled the way it resolves them
+                const include = /^\s*#\s*include\s+"([^"]*)$/.exec(before);
+                if (include) {
+                    const typed = include[1];
+                    const range = new vscode.Range(position.line, position.character - typed.length, position.line, position.character);
+                    let headers = [];
+                    try {
+                        // The 2.0 include resolver reads no `Project:` / `Plugin.X:` qualifier, so only this file's own
+                        // root and its packages are offered.
+                        headers = collectAvailableImports(document.fileName).filter((entry) => !entry.includes(":") && /\.dsh$/i.test(entry));
+                    } catch (_error) {
+                        headers = [];
+                    }
+                    for (const entry of headers) {
+                        add(entry, vscode.CompletionItemKind.File, entry.startsWith("@") ? "package header" : "header").range = range;
+                    }
+                    return items;
+                }
+
+                // ----- `#pragma ` and the name being typed
+                const pragmaName = /^\s*#\s*pragma\s+([A-Za-z_]*)$/.exec(before);
+                if (pragmaName) {
+                    const range = new vscode.Range(position.line, position.character - pragmaName[1].length, position.line, position.character);
+                    for (const pragma of PRAGMAS) {
+                        add(pragma.name, vscode.CompletionItemKind.Keyword, "#pragma", pragma.doc,
+                            new vscode.SnippetString(pragma.snippet.replace(/^pragma\s+/, ""))).range = range;
+                    }
+                    return items;
+                }
+
+                // ----- the codes of a disable list: the ones this file reports now
+                const disableList = /^\s*#\s*pragma\s+disable_(warning|error)\s*\([^)]*$/.exec(before)
+                    || /\/\/\s*disable_(warning|error)\b.*$/.exec(before);
+                if (disableList) {
+                    const errors = disableList[1] === "error";
+                    for (const [code, message] of reportedCodes(document, errors)) {
+                        add(code, vscode.CompletionItemKind.Value, errors ? "an error this file reports" : "a warning this file reports", message);
+                    }
+                    return items;
+                }
+
+                // ----- `// disable_` in a comment
+                if (/\/\/\s*disable[a-z_]*$/.test(before)) {
+                    for (const entry of DISABLE_COMMENTS) {
+                        add(entry.name, vscode.CompletionItemKind.Keyword, `// ${entry.name} DSHnnnn`, entry.doc,
+                            new vscode.SnippetString(`${entry.name} \${1:DSH0000}`));
+                    }
+                    return items;
+                }
+
+                // ----- `BL::`: the functions of a header namespace
+                const qualified = /\b([A-Za-z_][A-Za-z0-9_]*)\s*::\s*[A-Za-z_0-9]*$/.exec(before);
+                if (qualified) {
+                    const prefix = `${qualified[1]}::`;
+                    const seen = new Set();
+                    for (const entry of closureFor(document).functions) {
+                        if (!entry.qualifiedName || !entry.qualifiedName.startsWith(prefix)) {
+                            continue;
+                        }
+                        const memberName = entry.qualifiedName.slice(prefix.length);
+                        if (seen.has(memberName)) {
+                            continue;
+                        }
+                        seen.add(memberName);
+                        add(memberName, vscode.CompletionItemKind.Function, headerScan.formatSignature(entry), entry.doc)
+                            .command = { command: "editor.action.triggerParameterHints", title: "" };
+                    }
+                    // A compiled file's index knows them as well, by the symbol they are declared as.
+                    const symbolPrefix = `${qualified[1]}_`;
+                    for (const declaration of queries.completionDeclarations(indicesFor(document))) {
+                        if (declaration.kind !== "function" || !declaration.name.startsWith(symbolPrefix)) {
+                            continue;
+                        }
+                        const memberName = declaration.name.slice(symbolPrefix.length);
+                        if (!seen.has(memberName)) {
+                            seen.add(memberName);
+                            add(memberName, vscode.CompletionItemKind.Function, declaration.signature || declaration.type, declaration.doc);
+                        }
+                    }
+                    return items;
+                }
 
                 // ----- `/// @`
                 if (/^\s*\/\/\/.*@[A-Za-z]*$/.test(before)) {
@@ -385,8 +566,25 @@ function registerDssLanguageFeatures(context) {
                 add("Substrate", vscode.CompletionItemKind.Module, "Substrate nodes");
 
                 const indices = indicesFor(document);
+                const offered = new Set();
                 for (const declaration of queries.completionDeclarations(indices)) {
+                    offered.add(declaration.name);
                     add(declaration.name, COMPLETION_KINDS[declaration.kind] || vscode.CompletionItemKind.Variable, declaration.signature || declaration.type, declaration.doc);
+                }
+
+                // What the includes declare, for a file the compiler has not indexed yet, or a header added since. A
+                // namespace's functions are offered under the namespace -- `BL`, then `BL::` -- as they are called.
+                const closure = closureFor(document);
+                for (const namespaceName of headerScan.collectNamespaces(closure.functions)) {
+                    add(namespaceName, vscode.CompletionItemKind.Module, "header namespace", "", `${namespaceName}::`)
+                        .command = { command: "editor.action.triggerSuggest", title: "" };
+                }
+                for (const entry of closure.functions) {
+                    if (entry.qualifiedName || offered.has(entry.name)) {
+                        continue;
+                    }
+                    offered.add(entry.name);
+                    add(entry.name, vscode.CompletionItemKind.Function, headerScan.formatSignature(entry), entry.doc);
                 }
                 if (indices.length > 0) {
                     const scope = queries.enclosingFunction(indices[0], pathKey(document.fileName), position.line + 1);
@@ -398,7 +596,7 @@ function registerDssLanguageFeatures(context) {
                 }
                 return items;
             }
-        }, ".", "@", "#", "(", ",")
+        }, ".", "@", "#", "(", ",", ":", "\"", "/")
     );
 
     return {
