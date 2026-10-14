@@ -32,6 +32,7 @@ async function run() {
     await assertBridgeDiagnosticsRefresh(workspaceRoot, document);
 
     await assertDssLanguageFeatures(workspaceRoot);
+    await assertDssHeaderFeatures(workspaceRoot);
     await assertDspLanguageFeatures(workspaceRoot);
 
     console.log("extension smoke tests passed");
@@ -213,6 +214,88 @@ async function assertDssLanguageFeatures(workspaceRoot) {
     // machine's, and a checked-in one would be wrong everywhere else.
     fs.rmSync(path.join(workspaceRoot, "Saved", "DreamShader", "Index"), { recursive: true, force: true });
     fs.rmSync(sourcePath, { force: true });
+}
+
+// A `.dss` that has never been compiled still completes what its headers declare: `#include "` offers the headers the
+// resolver finds (a package's included), `BL::` the functions of that namespace, and a hover shows one -- all read off
+// the text, since no index exists yet. A header written in 2.0 opens as DreamShader 2.0.
+async function assertDssHeaderFeatures(workspaceRoot) {
+    const packageDirectory = path.join(workspaceRoot, "DShader", "Packages", "@smoke", "lib", "Library");
+    const headerPath = path.join(packageDirectory, "Noise.dsh");
+    const sourcePath = path.join(workspaceRoot, "DShader", "M_Uses.dss");
+    fs.mkdirSync(packageDirectory, { recursive: true });
+    fs.writeFileSync(headerPath, [
+        "#pragma generate(Functions = \"MF_{Name}\")",
+        "/// @custom",
+        "float BLNoise_fade(float t)",
+        "{",
+        "    return t * t * (3.0 - 2.0 * t);",
+        "}",
+        "",
+        "/// @custom",
+        "/// @name BL::TexNoise3D",
+        "/// @desc Blender's Noise Texture.",
+        "void BL_TexNoise3D(float3 co, float scale, out float fac, out float3 color)",
+        "{",
+        "    fac = BLNoise_fade(co.x * scale);",
+        "    color = float3(fac, fac, fac);",
+        "}"
+    ].join("\n"), "utf8");
+    const sourceText = [
+        "#include \"@smoke/lib/Library/Noise.dsh\"",
+        "#include \"\"",
+        "export void M_Uses(inout material m)",
+        "{",
+        "    float Fac;",
+        "    float3 Color;",
+        "    BL::TexNoise3D(float3(0, 0, 0), 5.0, Fac, Color);",
+        "    BL::",
+        "}"
+    ].join("\n");
+    fs.writeFileSync(sourcePath, sourceText, "utf8");
+
+    try {
+        const document = await vscode.workspace.openTextDocument(sourcePath);
+        await vscode.window.showTextDocument(document);
+        const lines = sourceText.split("\n");
+        const labelsAt = async (line, character) => {
+            const list = await vscode.commands.executeCommand("vscode.executeCompletionItemProvider", document.uri, new vscode.Position(line, character));
+            return new Set((list?.items || []).map((entry) => typeof entry.label === "string" ? entry.label : entry.label.label));
+        };
+
+        const includeLabels = await labelsAt(1, lines[1].indexOf("\"\"") + 1);
+        assert(includeLabels.has("@smoke/lib/Library/Noise.dsh"), `#include "" should offer a package's header (got ${[...includeLabels].slice(0, 10).join(", ")})`);
+
+        const memberLabels = await labelsAt(7, lines[7].length);
+        assert(memberLabels.has("TexNoise3D"), `BL:: should offer the namespace's functions (got ${[...memberLabels].slice(0, 10).join(", ")})`);
+        assert(!memberLabels.has("BLNoise_fade"), "...and nothing that is not in it");
+
+        const plainLabels = await labelsAt(4, 4);
+        assert(plainLabels.has("BL"), "A namespace is offered by its name");
+
+        const usage = new vscode.Position(6, lines[6].indexOf("TexNoise3D") + 2);
+        const hovers = await vscode.commands.executeCommand("vscode.executeHoverProvider", document.uri, usage);
+        const hoverText = (hovers || []).flatMap((hover) => hover.contents || [])
+            .map((content) => typeof content === "string" ? content : content.value || "").join("\n");
+        assert(/BL::TexNoise3D\(float3 co, float scale, out float fac, out float3 color\)/.test(hoverText), `Hover on BL::TexNoise3D should show its signature (got ${hoverText})`);
+        assert(/Blender's Noise Texture/.test(hoverText), "...and its description");
+
+        const definitions = await vscode.commands.executeCommand("vscode.executeDefinitionProvider", document.uri, usage);
+        const target = (definitions || [])[0];
+        const targetUri = target && (target.targetUri || target.uri);
+        assert(targetUri && /Noise\.dsh$/.test(targetUri.fsPath), "Go to definition of BL::TexNoise3D should reach the header");
+
+        let header = await vscode.workspace.openTextDocument(headerPath);
+        for (let attempt = 0; attempt < 20 && header.languageId !== "dreamshader-dss"; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            header = vscode.workspace.textDocuments.find((entry) => entry.uri.fsPath === header.uri.fsPath) || header;
+        }
+        assert.strictEqual(header.languageId, "dreamshader-dss", "A .dsh written in 2.0 should open as DreamShader 2.0");
+    } finally {
+        await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+        fs.rmSync(path.join(workspaceRoot, "DShader", "Packages"), { recursive: true, force: true });
+        fs.rmSync(sourcePath, { force: true });
+    }
 }
 
 // Custom Pass pipelines: a `.dsp` opens as its own language and answers from the index and pass-keys.json the plugin

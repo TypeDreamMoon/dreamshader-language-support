@@ -483,8 +483,9 @@
     "test:server": "node scripts/server-smoke.js",
     "test:corpus": "node scripts/corpus-smoke.js",
     "test:extension": "node scripts/run-extension-tests.js",
-    "test": "npm run test:language && npm run test:imports && npm run test:preprocessor && npm run test:server && npm run test:corpus && npm run test:dss && npm run test:dsp && npm run test:grammar && npm run test:extension",
+    "test": "npm run test:language && npm run test:headers && npm run test:imports && npm run test:preprocessor && npm run test:server && npm run test:corpus && npm run test:dss && npm run test:dsp && npm run test:grammar && npm run test:extension",
     "package": "npx @vscode/vsce package",
+    "test:headers": "node scripts/headers-smoke.js",
     "test:dss": "node scripts/dss-smoke.js",
     "test:dsp": "node scripts/dsp-smoke.js",
     "test:grammar": "vscode-tmgrammar-test -g test/grammar/hlsl.tmLanguage.json \"test/grammar/unit/*.test.*\" && vscode-tmgrammar-snap -g test/grammar/hlsl.tmLanguage.json \"test/grammar/snap/*.{dsp,dss}\""
