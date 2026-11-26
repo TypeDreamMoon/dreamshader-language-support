@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const vscode = require("vscode");
 const { findProjectRootForCommand } = require("../../packages/projectRoot");
+const { getShaderSourceDirectory } = require("../../project/projects");
 const {
     buildTemplate,
     getTemplateSpec,
@@ -52,7 +53,7 @@ async function createDreamShaderTemplateCommand(kind) {
             if (!normalized) {
                 return "A file name is required.";
             }
-            return isSafeRelativePath(normalized) ? undefined : "Use a relative path inside DShader without '..'.";
+            return isSafeRelativePath(normalized) ? undefined : "Use a relative path inside the source directory without '..'.";
         }
     });
     if (!relativePathInput) {
@@ -60,11 +61,12 @@ async function createDreamShaderTemplateCommand(kind) {
     }
 
     const relativePath = normalizeTemplateRelativePath(relativePathInput, template.extension);
-    const targetPath = path.resolve(projectRoot, "DShader", relativePath);
-    const dshaderRoot = path.resolve(projectRoot, "DShader");
-    const relativeToRoot = path.relative(dshaderRoot, targetPath);
+    // The project source directory as spec 12.2 resolves it: DreamSource/Shader, or the legacy DShader.
+    const sourceRoot = path.resolve(getShaderSourceDirectory(projectRoot));
+    const targetPath = path.resolve(sourceRoot, relativePath);
+    const relativeToRoot = path.relative(sourceRoot, targetPath);
     if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
-        vscode.window.showErrorMessage("DreamShader template path must stay inside DShader.");
+        vscode.window.showErrorMessage("DreamShader template path must stay inside the source directory.");
         return;
     }
 

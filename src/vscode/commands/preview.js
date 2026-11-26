@@ -19,7 +19,9 @@ const vscode = require("vscode");
 const { createDebouncedDisposable } = require("../../common/debounce");
 const { readJsonFile } = require("../../common/json");
 const { normalizeFsPath } = require("../../common/path");
-const { getPreviewDirectory, getPreviewFilePath } = require("../../bridge/paths");
+const { getPreviewDirectories, getPreviewFilePath } = require("../../bridge/paths");
+const { DOCUMENTS, isShaderDatabasePresent, readShaderDocument } = require("../../bridge/database");
+const { SHADER_DATABASE_PATTERN, legacyBridgePattern } = require("../watchers");
 const { writePreviewMaterialRequest } = require("../../bridge/requests");
 const { findProjectRoot, isDreamShaderDocument } = require("../../project/projects");
 
@@ -132,7 +134,7 @@ class MaterialPreviewPanelManager {
                 retainContextWhenHidden: true,
                 localResourceRoots: [
                     vscode.Uri.joinPath(this.context.extensionUri, "media"),
-                    vscode.Uri.file(getPreviewDirectory(this.projectRoot))
+                    ...getPreviewDirectories(this.projectRoot).map((directory) => vscode.Uri.file(directory))
                 ]
             });
 
@@ -353,8 +355,14 @@ class MaterialPreviewPanelManager {
             watcher.onDidChange(() => this.debouncedFileRefresh.run());
             this.watchers.push(watcher);
         };
+        // The result is shader.db's `preview` document now, preview.json for a plugin from before
+        // DreamSource; the images are files in either layout.
         add(vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.Uri.file(this.projectRoot), "Saved/DreamShader/Bridge/preview.json")));
+            new vscode.RelativePattern(vscode.Uri.file(this.projectRoot), SHADER_DATABASE_PATTERN)));
+        add(vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(this.projectRoot), "Intermediate/DreamSource/Shader/Preview/*.png")));
+        add(vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(this.projectRoot), legacyBridgePattern("preview.json"))));
         add(vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(vscode.Uri.file(this.projectRoot), "Saved/DreamShader/Bridge/Preview/*.png")));
     }
@@ -420,8 +428,10 @@ function isPreviewDocument(document) {
 }
 
 function readPreviewResult(projectRoot, sourceFile) {
-    const previewFile = getPreviewFilePath(projectRoot);
-    const result = readJsonFile(previewFile, null);
+    // shader.db's `preview` document when the project has one (spec 12.3); the old preview.json otherwise.
+    const result = isShaderDatabasePresent(projectRoot)
+        ? readShaderDocument(projectRoot, DOCUMENTS.preview)
+        : readJsonFile(getPreviewFilePath(projectRoot), null);
     if (!result || typeof result !== "object") {
         return null;
     }

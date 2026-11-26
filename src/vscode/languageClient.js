@@ -2,10 +2,13 @@
 
 // Starting the language server, and the one thing the client has to keep telling it.
 //
-// Not bundled, so the server runs from the same `src/` the extension ships. That is a deliberate
-// difference from the sibling extension: `bridge/database.js` loads sql.js's WASM by resolving a
-// path inside `node_modules`, and a bundler that inlined the JavaScript would leave that path
-// pointing at nothing. This .vsix already ships `node_modules`, so there is nothing to gain by it.
+// Not bundled, so the server runs from the same `src/` the extension ships; this .vsix already ships
+// `node_modules`, so there is nothing to gain by bundling.
+//
+// The server is started as a `module`, which vscode-languageclient forks with the editor's own runtime
+// (Electron as Node). That runtime is what `bridge/database.js` needs `node:sqlite` from: VS Code 1.147
+// ships Node 24, which has it. On a runtime without it every database read answers null and the server
+// reads the old json files instead, so a missing module costs the new layout, not the language features.
 
 const path = require("path");
 const { LanguageClient, TransportKind } = require("vscode-languageclient/node");

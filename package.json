@@ -16,7 +16,7 @@
   "license": "MIT",
   "copyright": "Copyright (c) 2026 TypeDreamMoon. All rights reserved.",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.147.0"
   },
   "categories": [
     "Programming Languages",
@@ -64,6 +64,7 @@
     "onCommand:dreamshader.createNoiseMaterial",
     "onLanguage:dreamshader-dss",
     "onCommand:dreamshader.revealInMaterialEditor",
+    "onCommand:dreamshader.migrateToDreamSource",
     "onLanguage:dreamshader-dsp"
   ],
   "main": "./extension.js",
@@ -88,6 +89,10 @@
         "command": "dreamshader.cleanGeneratedShaders",
         "title": "DreamShaderLang: Clean Generated Shaders",
         "icon": "$(trash)"
+      },
+      {
+        "command": "dreamshader.migrateToDreamSource",
+        "title": "DreamShader: Migrate to DreamSource"
       },
       {
         "command": "dreamshader.showMaterialPreview",
@@ -496,7 +501,6 @@
     "vscode-tmgrammar-test": "^0.1.3"
   },
   "dependencies": {
-    "sql.js": "^1.14.1",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12",

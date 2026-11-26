@@ -276,7 +276,7 @@ function item(label, kind, detail, documentation, insertText, extra = {}) {
 
 function bundledNote(context) {
     return context.keysSource === "bundled"
-        ? "\n\n*From the vocabulary bundled with the extension: this project has no `Saved/DreamShader/Bridge/pass-keys.json` yet. Opening the project in the Unreal editor writes it, with the project's own pass layers.*"
+        ? "\n\n*From the vocabulary bundled with the extension: this project's editor has not written its pass keys yet (`Intermediate/DreamSource/shader.db`). Opening the project in the Unreal editor writes it, with the project's own pass layers.*"
         : "";
 }
 

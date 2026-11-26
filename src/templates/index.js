@@ -6,31 +6,31 @@ function getTemplateSpec(kind) {
     const specs = {
         material: {
             title: "Create DreamShader Material",
-            prompt: "Relative .dsm path under DShader.",
+            prompt: "Relative .dsm path under the project source directory (DreamSource/Shader).",
             placeHolder: "Materials/M_NewMaterial.dsm",
             extension: ".dsm"
         },
         functionFile: {
             title: "Create DreamShader Function File",
-            prompt: "Relative .dsf path under DShader.",
+            prompt: "Relative .dsf path under the project source directory (DreamSource/Shader).",
             placeHolder: "Functions/F_NewFunction.dsf",
             extension: ".dsf"
         },
         header: {
             title: "Create DreamShader Header",
-            prompt: "Relative .dsh path under DShader.",
+            prompt: "Relative .dsh path under the project source directory (DreamSource/Shader).",
             placeHolder: "Shared/Common.dsh",
             extension: ".dsh"
         },
         texture: {
             title: "Create DreamShader Texture Sample",
-            prompt: "Relative .dsm path under DShader.",
+            prompt: "Relative .dsm path under the project source directory (DreamSource/Shader).",
             placeHolder: "Materials/M_TextureSample.dsm",
             extension: ".dsm"
         },
         noise: {
             title: "Create DreamShader Noise Material",
-            prompt: "Relative .dsm path under DShader.",
+            prompt: "Relative .dsm path under the project source directory (DreamSource/Shader).",
             placeHolder: "Materials/M_Noise.dsm",
             extension: ".dsm"
         }

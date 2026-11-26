@@ -27,7 +27,12 @@ const NO_HOST = {
      */
     getActiveDocumentPath: () => "",
     /** Paths of every open document. Commands only, for the same reason. */
-    getOpenDocumentPaths: () => []
+    getOpenDocumentPaths: () => [],
+    /**
+     * Tell the author something (`info` or `warning`). The client shows it; the server says nothing,
+     * because the client reads the same files and would say it too.
+     */
+    notify: (_level, _message) => {}
 };
 
 let current = NO_HOST;

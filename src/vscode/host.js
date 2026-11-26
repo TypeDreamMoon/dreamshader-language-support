@@ -20,7 +20,14 @@ function installVscodeHost() {
         getActiveDocumentPath: () => vscode.window.activeTextEditor?.document?.uri?.fsPath || "",
         getOpenDocumentPaths: () => vscode.workspace.textDocuments
             .map((document) => document.uri?.fsPath)
-            .filter(Boolean)
+            .filter(Boolean),
+        notify: (level, message) => {
+            if (level === "warning") {
+                void vscode.window.showWarningMessage(message);
+            } else {
+                void vscode.window.showInformationMessage(message);
+            }
+        }
     });
 }
 

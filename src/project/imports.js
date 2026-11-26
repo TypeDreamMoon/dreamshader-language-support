@@ -8,7 +8,7 @@ const {
     collectSourceRoots,
     findSourceRootForFile,
     findAncestorSourceRoot,
-    getDShaderRoot,
+    getShaderSourceDirectory,
     getPackagesDirectory
 } = require("./projects");
 
@@ -134,7 +134,7 @@ function resolveImportPath(fromFilePath, importPath) {
     // fixture, a scratch file outside the tree -- still resolves against the project root, which is
     // what every file did before roots existed.
     const { projectRoot, roots, owningRoot } = getResolutionContext(fromFilePath);
-    const rootDirectory = owningRoot ? owningRoot.directory : getDShaderRoot(projectRoot);
+    const rootDirectory = owningRoot ? owningRoot.directory : getShaderSourceDirectory(projectRoot);
     const packagesDirectory = owningRoot ? owningRoot.packagesDirectory : getPackagesDirectory(projectRoot);
     const fromDirectory = fromFilePath ? path.dirname(fromFilePath) : "";
 

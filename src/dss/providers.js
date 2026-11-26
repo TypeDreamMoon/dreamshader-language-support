@@ -16,7 +16,8 @@
 const fs = require("fs");
 const vscode = require("vscode");
 const { findProjectRoot } = require("../project/projects");
-const { createIndexStore, getIndexDirectory, pathKey } = require("./indexStore");
+const { createIndexStore, describeIndexLocation, pathKey } = require("./indexStore");
+const { SHADER_DATABASE_PATTERN } = require("../vscode/watchers");
 const { createCatalogReader, findExpression, describeExpression } = require("./catalog");
 const path = require("path");
 const queries = require("./queries");
@@ -172,22 +173,28 @@ function registerDssLanguageFeatures(context) {
         return new vscode.Location(vscode.Uri.file(span.file), toRange(span, length));
     }
 
-    // A watcher per workspace rather than per project: the index folder of every project the workspace
-    // holds matches the one pattern, and a change only has to make the next question re-read.
-    const watcher = vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Index/**/*.index.json");
+    // Watchers per workspace rather than per project: every project the workspace holds matches the one
+    // pattern, and a change only has to make the next question re-read. shader.db carries the index now;
+    // the old index folder is watched for a plugin from before DreamSource.
     const invalidate = () => {
         for (const services of projects.values()) {
             services.refreshedAt = 0;
         }
     };
-    watcher.onDidCreate(invalidate);
-    watcher.onDidChange(invalidate);
-    watcher.onDidDelete(invalidate);
+    const watchers = [
+        vscode.workspace.createFileSystemWatcher(`**/${SHADER_DATABASE_PATTERN}`),
+        vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Index/**/*.index.json")
+    ];
+    for (const watcher of watchers) {
+        watcher.onDidCreate(invalidate);
+        watcher.onDidChange(invalidate);
+        watcher.onDidDelete(invalidate);
+    }
 
     const selector = { language: DSS_LANGUAGE_ID };
 
     context.subscriptions.push(
-        watcher,
+        ...watchers,
 
         vscode.languages.registerDefinitionProvider(selector, {
             provideDefinition(document, position) {
@@ -604,7 +611,7 @@ function registerDssLanguageFeatures(context) {
         describe(document) {
             const services = servicesFor(document);
             return services
-                ? { indexDirectory: getIndexDirectory(services.store.projectRoot), indices: services.store.findForSource(document.fileName).length, hasCatalog: Boolean(services.catalog.get()) }
+                ? { indexDirectory: describeIndexLocation(services.store.projectRoot), indices: services.store.findForSource(document.fileName).length, hasCatalog: Boolean(services.catalog.get()) }
                 : { indexDirectory: "", indices: 0, hasCatalog: false };
         }
     };

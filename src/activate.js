@@ -20,14 +20,16 @@ const { DSS_LANGUAGE_ID } = require("./dss/languageData");
 const { detectHeaderDialect } = require("./project/dialect");
 const { createDebouncedDisposable } = require("./common/debounce");
 const { createEmptyBridgeDiagnosticsState, refreshBridgeDiagnostics } = require("./bridge/diagnostics");
-const { initializeBridgeDatabaseSupport } = require("./bridge/database");
+const { invalidateBridgeDatabaseCache } = require("./bridge/database");
+const { registerDreamSourceMigration } = require("./vscode/migration");
+const { SHADER_DATABASE_PATTERN, SOURCE_SETTINGS_PATTERN, legacyBridgePattern } = require("./vscode/watchers");
 const { createBridgeDiagnosticsTreeProvider } = require("./vscode/views/bridgeDiagnostics");
 const { registerInactiveRegionDecorations } = require("./vscode/inactiveRegions");
 const { updateStatusBar } = require("./vscode/statusBar");
 const { registerCommands } = require("./vscode/commands");
 const { installVscodeHost } = require("./vscode/host");
 const { createLanguageClient } = require("./vscode/languageClient");
-const { collectKnownProjectRoots, invalidateProjectRootCache } = require("./project/projects");
+const { collectKnownProjectRoots, collectSourceRoots, invalidateProjectRootCache } = require("./project/projects");
 const { registerDssLanguageFeatures } = require("./dss/providers");
 const { registerDspLanguageFeatures } = require("./dsp/providers");
 
@@ -134,12 +136,13 @@ function activate(context) {
     void refreshBridge();
     refreshUi();
 
-    // sql.js's WASM module loads asynchronously; refresh once it's ready so the diagnostics view
-    // picks up bridge.db instead of the (now deprecated) JSON Bridge files as soon as possible,
-    // rather than waiting for the next unrelated trigger. The server loads its own copy for the
-    // manifests behind completion, and does the same thing when it lands.
-    void initializeBridgeDatabaseSupport().then((SQL) => {
-        if (SQL) {
+    // A project still on `DShader/` is told once, with a way to move it (spec 12.5).
+    registerDreamSourceMigration(context, {
+        onMigrated: () => {
+            invalidateProjectRootCache();
+            invalidateBridgeDatabaseCache();
+            bridgeWatcherState.rootsKey = "";
+            refreshBridgeWatchers();
             void refreshBridge();
         }
     });
@@ -180,23 +183,44 @@ function updateBridgeWatchers(context, state, debouncedBridgeRefresh) {
         context.subscriptions.push(watcher);
     };
 
-    registerWatcher(vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/diagnostics.json"));
-    registerWatcher(vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/bridge.db"));
+    registerWatcher(vscode.workspace.createFileSystemWatcher(`**/${SHADER_DATABASE_PATTERN}`));
+    registerWatcher(vscode.workspace.createFileSystemWatcher(`**/${legacyBridgePattern("diagnostics.json", "bridge.db")}`));
     for (const root of roots) {
+        // shader.db for the current plugin, the old Bridge files for one from before DreamSource. A project
+        // root can sit outside every workspace folder, which the globs above would never see.
         registerWatcher(vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/diagnostics.json")));
+            new vscode.RelativePattern(vscode.Uri.file(root), SHADER_DATABASE_PATTERN)));
         registerWatcher(vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/bridge.db")));
+            new vscode.RelativePattern(vscode.Uri.file(root), legacyBridgePattern("diagnostics.json", "bridge.db"))));
+        // Where the source directory is configured: a change moves it, and every cached root with it.
+        const settings = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.Uri.file(root), SOURCE_SETTINGS_PATTERN));
+        const settingsChanged = () => {
+            invalidateProjectRootCache();
+            // The source-file watchers below are per source root, so they are rebuilt; after this
+            // callback returns, since it belongs to one of the watchers being replaced.
+            state.rootsKey = "";
+            setTimeout(() => updateBridgeWatchers(context, state, debouncedBridgeRefresh), 0);
+            debouncedBridgeRefresh.run();
+        };
+        settings.onDidCreate(settingsChanged);
+        settings.onDidChange(settingsChanged);
+        settings.onDidDelete(settingsChanged);
+        state.watchers.push(settings);
+        context.subscriptions.push(settings);
         // Deleting a source file is the one edit that changes which bridge diagnostics still apply
         // without touching a bridge file: the plugin never rewrites the payload for a file it can no
         // longer compile, so the entry stays until something re-reads it. Closing the document
         // already triggers that when the file was open in the editor, which is why the stale
         // diagnostics only survive *sometimes* -- deleted from outside the editor, or never opened,
         // nothing fires. Watching creates as well so restoring the file brings its diagnostics back.
-        // `**/DShader/**` rather than `DShader/**` because plugins carry source roots of their own.
-        const sources = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.Uri.file(root), "**/DShader/**/*.{dsm,dsf,dsh,dss,dsi,dsp}"), false, true, false);
-        registerWatcher(sources);
+        // One pattern per source root -- the project's and every plugin's -- rather than a glob on a
+        // folder name, which would also match an unrelated `Content/Shader`.
+        for (const sourceRoot of collectSourceRoots(root)) {
+            const sources = vscode.workspace.createFileSystemWatcher(
+                new vscode.RelativePattern(vscode.Uri.file(sourceRoot.directory), "**/*.{dsm,dsf,dsh,dss,dsi,dsp}"), false, true, false);
+            registerWatcher(sources);
+        }
     }
 }
 

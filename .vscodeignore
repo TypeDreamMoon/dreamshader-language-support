@@ -6,21 +6,10 @@ test/**
 .github/**
 .vscode/**
 
-# sql.js ships asm.js/browser/worker/debug builds we never load (only dist/sql-wasm.{js,wasm} is
-# used, via src/bridge/database.js's locateFile) -- excluding the rest saves ~18MB in the .vsix.
-node_modules/sql.js/dist/sql-asm*.js
-node_modules/sql.js/dist/sql-wasm-browser*
-node_modules/sql.js/dist/sql-wasm-debug*
-node_modules/sql.js/dist/worker.*
-node_modules/sql.js/*.md
-node_modules/sql.js/.*
-
 # The language-server stack ships source maps and typings alongside its JavaScript. Nothing loads
 # either at runtime -- they are for people developing against the packages, not for the editor
 # running them -- and together they are close to a megabyte, about a third of what the .vsix carries
-# in node_modules. The extension is not bundled (src/bridge/database.js resolves sql.js's WASM
-# through require.resolve, which a bundler would leave pointing at nothing), so this is the trim
-# that is available instead.
+# in node_modules. The extension is not bundled, so this is the trim that is available instead.
 node_modules/vscode-json*/**/*.js.map
 node_modules/vscode-json*/**/*.d.ts
 node_modules/vscode-language*/**/*.js.map
