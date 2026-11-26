@@ -727,7 +727,7 @@ function testConformanceVectors(projectRoot) {
     useProjectRoot(projectRoot);
     const manifest = readPreprocessorDefinesManifest("");
     if (!manifest.available) {
-        console.log(`preprocessor smoke: skipped: no manifest — ${projectRoot} has no Saved/DreamShader/Bridge/preprocessor-defines.json yet (the plugin writes it on its first compile).`);
+        console.log(`preprocessor smoke: skipped: no manifest — ${projectRoot} has no preprocessor-defines manifest yet (shader.db document, or Saved/DreamShader/Bridge/preprocessor-defines.json from an older plugin) (the plugin writes it on its first compile).`);
         return 0;
     }
     if (manifest.conformance.length === 0) {

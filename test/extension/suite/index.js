@@ -30,6 +30,7 @@ async function run() {
     await assertCodeLensProvider(document);
     await assertInlayHintProvider(document);
     await assertBridgeDiagnosticsRefresh(workspaceRoot, document);
+    await assertShaderDatabaseDiagnostics(workspaceRoot, document);
 
     await assertDssLanguageFeatures(workspaceRoot);
     await assertDssHeaderFeatures(workspaceRoot);
@@ -149,6 +150,43 @@ async function assertBridgeDiagnosticsRefresh(workspaceRoot, document) {
 
     const requestDirectory = path.join(workspaceRoot, "Saved", "DreamShader", "Bridge", "Requests");
     assert(!fs.existsSync(requestDirectory) || fs.statSync(requestDirectory).isDirectory(), "Bridge request directory state should remain valid");
+}
+
+// The DreamSource layout (spec 12.3): once Intermediate/DreamSource/shader.db exists it is the only source -- read
+// through `node:sqlite` in the editor's own runtime -- and the old Saved/DreamShader files beside it are stale. The
+// database is removed again afterwards, so the rest of the suite keeps exercising the old layout as the fallback.
+async function assertShaderDatabaseDiagnostics(workspaceRoot, document) {
+    let sqlite;
+    try {
+        sqlite = require("node:sqlite");
+    } catch (_error) {
+        assert.fail("node:sqlite should be available in the editor's runtime (VS Code 1.147+)");
+    }
+    const databasePath = path.join(workspaceRoot, "Intermediate", "DreamSource", "shader.db");
+    fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+    const writer = new sqlite.DatabaseSync(databasePath);
+    try {
+        writer.exec(`PRAGMA journal_mode=WAL;
+            CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE diagnostics(path TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at_utc TEXT NOT NULL);
+            INSERT INTO meta VALUES('schema', '1'), ('revision', '1'), ('diagnostics_revision', '1');`);
+        const sourcePath = path.join(workspaceRoot, "DShader", "M_Test.dsm").replace(/\\/g, "/");
+        writer.prepare("INSERT INTO diagnostics VALUES(?, ?, ?)").run(sourcePath, JSON.stringify({
+            path: sourcePath,
+            diagnostics: [{ severity: "error", message: "shader.db diagnostic", line: 2, column: 1, source: "DreamShader" }]
+        }), new Date(0).toISOString());
+    } finally {
+        writer.close();
+    }
+    try {
+        await vscode.commands.executeCommand("dreamshader.refreshBridgeDiagnostics");
+        const messages = vscode.languages.getDiagnostics(document.uri).map((diagnostic) => diagnostic.message);
+        assert(messages.includes("shader.db diagnostic"), "Bridge diagnostics should come from shader.db when it exists");
+        assert(!messages.includes("Bridge smoke diagnostic"), "The old diagnostics.json beside shader.db should not be read");
+    } finally {
+        fs.rmSync(path.join(workspaceRoot, "Intermediate"), { recursive: true, force: true });
+        await vscode.commands.executeCommand("dreamshader.refreshBridgeDiagnostics");
+    }
 }
 
 // DreamShader 2.0: a `.dss` answers from the symbol index the plugin wrote for it, not from the text. The index below is
