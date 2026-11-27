@@ -11,13 +11,16 @@ const {
     PACKAGE_MANIFEST_NAME
 } = require("../languageData");
 const { normalizeFsPath } = require("./projectRoot");
+const { getShaderSourceDirectory } = require("../project/projects");
 
+// `Packages/` and the lock file sit in the project's source directory, wherever spec 12.2 resolves it:
+// `DreamSource/Shader` (configurable), or the legacy `DShader` while only that exists.
 function getPackagesDirectory(projectRoot) {
-    return path.join(projectRoot, "DShader", "Packages");
+    return path.join(getShaderSourceDirectory(projectRoot), "Packages");
 }
 
 function getPackageLockPath(projectRoot) {
-    return path.join(projectRoot, "DShader", PACKAGE_LOCK_NAME);
+    return path.join(getShaderSourceDirectory(projectRoot), PACKAGE_LOCK_NAME);
 }
 
 function getPackageInstallDirectory(projectRoot, packageName) {
@@ -25,7 +28,7 @@ function getPackageInstallDirectory(projectRoot, packageName) {
     const installDirectory = path.resolve(packagesDirectory, ...normalizePackageName(packageName).split("/"));
     const relative = path.relative(packagesDirectory, installDirectory);
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
-        throw new Error(`Package '${packageName}' resolves outside DShader/Packages.`);
+        throw new Error(`Package '${packageName}' resolves outside ${packagesDirectory}.`);
     }
     return installDirectory;
 }

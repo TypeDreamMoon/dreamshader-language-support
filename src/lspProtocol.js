@@ -9,9 +9,11 @@
 /**
  * Client -> server. "The Bridge output changed; the manifests you read are stale."
  *
- * `bridge.db` and `diagnostics.json` are written by the running Unreal Editor, and the server reads
- * them for completion and for the local diagnostics -- material expressions, Substrate builtins,
- * settings mappings. The client already watches them, because its own diagnostics tree is built from
+ * `Intermediate/DreamSource/shader.db` (or, from an older plugin, `Saved/DreamShader/Bridge/`) is
+ * written by the running Unreal Editor, and the server reads it for completion and for the local
+ * diagnostics -- material expressions, Substrate builtins, settings mappings. The client also sends it
+ * when `Config/DefaultDreamSource.ini` or `DefaultEngine.ini` changed, since those move the source
+ * directory. The client already watches all of them, because its own diagnostics tree is built from
  * the same files, and it watches them in two ways: a workspace-wide glob, and a pattern rooted at
  * each known project root. That second one is why this is a notification rather than a
  * `didChangeWatchedFiles` registration on the server: a project root is allowed to sit outside every

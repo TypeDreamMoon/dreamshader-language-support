@@ -6,8 +6,8 @@ const vscode = require("vscode");
 const { readJsonFile } = require("../common/json");
 const { normalizeFsPath } = require("../common/path");
 const { collectKnownProjectRoots } = require("../project/projects");
-const { getDiagnosticsFilePath, getBridgeDatabasePath } = require("./paths");
-const { queryDiagnosticsFromDatabase } = require("./database");
+const { getDiagnosticsFilePath, getShaderDatabasePath, getLegacyBridgeDatabasePath } = require("./paths");
+const { queryDiagnosticsFromDatabase, getShaderDatabaseStatus, noteLegacyLayoutRead } = require("./database");
 
 // A DSHnnnn code has a section of its own on the plugin's diagnostics pages -- the link the language server already gives
 // the diagnostics it reports. Only the structured `code` field is read, never the message, which an editor running in
@@ -40,17 +40,26 @@ function refreshBridgeDiagnostics(collection, state, activePath = "") {
     resetState(state);
     const roots = collectKnownProjectRoots(activePath);
     for (const root of roots) {
-        // The plugin dual-writes diagnostics to bridge.db alongside diagnostics.json (the JSON file
-        // is deprecated, scheduled for removal in DreamShader plugin 1.7.0). Prefer the database;
-        // fall back to JSON for older plugin versions or before the database has been generated once.
+        // Intermediate/DreamSource/shader.db's `diagnostics` table when it is there (spec 12.3) -- and then
+        // only it, the old files beside an updated plugin being stale. Otherwise the old layout: its
+        // bridge.db, then diagnostics.json, for a plugin from before DreamSource.
+        const shaderStatus = getShaderDatabaseStatus(root);
         const diagnosticsFilePath = getDiagnosticsFilePath(root);
         const fromDatabase = queryDiagnosticsFromDatabase(root);
-        const sourcePath = fromDatabase ? getBridgeDatabasePath(root) : diagnosticsFilePath;
-        if (!fromDatabase && !fs.existsSync(diagnosticsFilePath)) {
+        let sourcePath = diagnosticsFilePath;
+        if (shaderStatus !== "absent") {
+            sourcePath = getShaderDatabasePath(root);
+        } else if (fromDatabase) {
+            sourcePath = getLegacyBridgeDatabasePath(root);
+        }
+        if (!fromDatabase && (shaderStatus !== "absent" || !fs.existsSync(diagnosticsFilePath))) {
             continue;
         }
         state.hasAnyBridgeFile = true;
         const parsed = fromDatabase || readJsonFile(diagnosticsFilePath, null);
+        if (!fromDatabase && parsed) {
+            noteLegacyLayoutRead(root);
+        }
         if (!parsed || !Array.isArray(parsed.files)) {
             continue;
         }

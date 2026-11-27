@@ -1,6 +1,10 @@
 "use strict";
 
-// The builtin node catalog of a project, as the plugin exported it:
+// The builtin node catalog of a project, as the plugin exported it: the `builtin-catalog` document of
+//
+//     <Project>/Intermediate/DreamSource/shader.db
+//
+// or, for a plugin from before DreamSource, the file
 //
 //     <Project>/Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json
 //
@@ -16,12 +20,15 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeFsPath } = require("../common/path");
+const { getLegacyBridgeFilePath } = require("../bridge/paths");
+const { DOCUMENTS, isShaderDatabasePresent, readShaderDocument, noteLegacyLayoutRead } = require("../bridge/database");
 
 const CATALOG_SCHEMA = "dreamshader-builtin-catalog";
 const CATALOG_FILE_NAME = "dreamshader-builtin-catalog.json";
 
+/** The old place, `Saved/DreamShader/Bridge/`: read only when the project has no shader.db (spec 12.3). */
 function getCatalogPath(projectRoot) {
-    return projectRoot ? normalizeFsPath(path.join(projectRoot, "Saved", "DreamShader", "Bridge", CATALOG_FILE_NAME)) : "";
+    return getLegacyBridgeFilePath(projectRoot, CATALOG_FILE_NAME);
 }
 
 /**
@@ -120,14 +127,25 @@ function normalizeCatalog(raw) {
     };
 }
 
-/** One project's catalog, re-read when the file changes. Null until the plugin has written one. */
+/**
+ * One project's catalog: the `builtin-catalog` document of shader.db, or for a plugin from before
+ * DreamSource the old file; re-read when either changes. Null until the plugin has written one.
+ */
 function createCatalogReader(projectRoot) {
     const catalogPath = getCatalogPath(projectRoot);
     let mtimeMs = -1;
     let catalog = null;
+    let fromDatabase = { raw: undefined, catalog: null };
     return {
         catalogPath,
         get() {
+            if (projectRoot && isShaderDatabasePresent(projectRoot)) {
+                const raw = readShaderDocument(projectRoot, DOCUMENTS.builtinCatalog);
+                if (raw !== fromDatabase.raw) {
+                    fromDatabase = { raw, catalog: raw ? normalizeCatalog(raw) : null };
+                }
+                return fromDatabase.catalog;
+            }
             let current = 0;
             try {
                 current = fs.statSync(catalogPath).mtimeMs;
@@ -142,6 +160,9 @@ function createCatalogReader(projectRoot) {
                     catalog = normalizeCatalog(JSON.parse(fs.readFileSync(catalogPath, "utf8")));
                 } catch (_error) {
                     catalog = null;
+                }
+                if (catalog) {
+                    noteLegacyLayoutRead(projectRoot);
                 }
             }
             return catalog;

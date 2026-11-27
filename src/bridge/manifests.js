@@ -17,13 +17,16 @@ const {
     getMaterialExpressionManifestPath,
     getSettingsManifestPath,
     getSubstrateBuiltinsManifestPath,
-    getPreprocessorDefinesManifestPath,
-    getBridgeDatabasePath
+    getPreprocessorDefinesManifestPath
 } = require("./paths");
 const {
+    getDataVersionTag,
+    isShaderDatabasePresent,
+    noteLegacyLayoutRead,
     queryMaterialExpressionsFromDatabase,
     querySubstrateBuiltinsFromDatabase,
-    querySettingsMappingsFromDatabase
+    querySettingsMappingsFromDatabase,
+    queryPreprocessorDefinesFromDatabase
 } = require("./database");
 
 const bundledMaterialExpressionManifestPath = path.join(__dirname, "..", "..", "resources", MATERIAL_EXPRESSION_MANIFEST_NAME);
@@ -61,15 +64,24 @@ function memoizeByFileVersion(computeCacheKey, compute) {
     };
 }
 
-// The plugin dual-writes these manifests to bridge.db alongside the legacy JSON files (the JSON
-// files are deprecated, scheduled for removal in DreamShader plugin 1.7.0). Prefer the database;
-// fall back to JSON for older plugin versions or before the database has been generated once.
+// The editor's manifests come from Intermediate/DreamSource/shader.db (spec 12.3). When that is there it
+// is the only source: json files a plugin from before DreamSource left in Saved/DreamShader/Bridge/ are
+// stale by definition. Without it the old layout is read -- its bridge.db first, the json files beside
+// it after -- which is what a project whose plugin has not been updated yet needs.
 function readBridgeManifest(projectRoot, queryDatabase, jsonPath, fallback) {
     const fromDatabase = queryDatabase(projectRoot);
     if (fromDatabase) {
         return fromDatabase;
     }
-    return readJsonFile(jsonPath, fallback);
+    if (isShaderDatabasePresent(projectRoot)) {
+        return fallback;
+    }
+    const fromJson = readJsonFile(jsonPath, null);
+    if (fromJson) {
+        noteLegacyLayoutRead(projectRoot);
+        return fromJson;
+    }
+    return fallback;
 }
 
 function getConfiguredMaterialExpressionManifestPath() {
@@ -85,7 +97,7 @@ function computeMaterialExpressionSymbolsCacheKey(activePath) {
     const configured = getConfiguredMaterialExpressionManifestPath();
     const parts = [];
     for (const root of roots) {
-        parts.push(getFileVersionTag(getBridgeDatabasePath(root)), getFileVersionTag(getMaterialExpressionManifestPath(root)));
+        parts.push(getDataVersionTag(root, "material_expressions", [getMaterialExpressionManifestPath(root)]));
     }
     parts.push(getFileVersionTag(configured), getFileVersionTag(bundledMaterialExpressionManifestPath));
     return parts.join("|");
@@ -147,7 +159,7 @@ const getUEBuiltinItems = memoizeByFileVersion(computeMaterialExpressionSymbolsC
 const collectDreamShaderSettingMappings = memoizeByFileVersion(
     (activePath, mappingName) => {
         const projectRoot = findProjectRoot(activePath);
-        return `${mappingName}|${getFileVersionTag(getBridgeDatabasePath(projectRoot))}|${getFileVersionTag(getSettingsManifestPath(projectRoot))}`;
+        return `${mappingName}|${getDataVersionTag(projectRoot, "settings_mappings", [getSettingsManifestPath(projectRoot)])}`;
     },
     (activePath, mappingName) => {
         const projectRoot = findProjectRoot(activePath);
@@ -162,7 +174,7 @@ const collectDreamShaderSettingMappings = memoizeByFileVersion(
 const getSubstrateBuiltinItems = memoizeByFileVersion(
     (activePath) => {
         const roots = collectKnownProjectRoots(activePath);
-        return roots.map((root) => `${getFileVersionTag(getBridgeDatabasePath(root))}|${getFileVersionTag(getSubstrateBuiltinsManifestPath(root))}`).join(",");
+        return roots.map((root) => getDataVersionTag(root, "substrate_builtins", [getSubstrateBuiltinsManifestPath(root)])).join(",");
     },
     (activePath) => {
         const items = [];
@@ -232,19 +244,12 @@ const readPreprocessorDefinesManifest = memoizeByFileVersion(
         // manifest tag as "0|0", and without the path a lookup for one would be answered from the
         // other's cache entry. That is harmless while both are absent and wrong the moment one
         // appears, which is the kind of bug that only shows up on someone else's machine.
-        .map((root) => `${root}|${getFileVersionTag(getBridgeDatabasePath(root))}|${getFileVersionTag(getPreprocessorDefinesManifestPath(root))}`)
+        .map((root) => `${root}|${getDataVersionTag(root, "documents", [getPreprocessorDefinesManifestPath(root)])}`)
         .join(","),
     (activePath) => {
-        // Read through the same database-then-JSON path as the other manifests, but without
-        // requiring bridge.db to have a table for it: the query function is looked up by name so
-        // that adding `queryPreprocessorDefinesFromDatabase` to database.js later starts feeding
-        // this reader with no change here, and its absence today costs nothing.
-        const queryDatabase = require("./database").queryPreprocessorDefinesFromDatabase;
-
+        // shader.db carries it as the `preprocessor-defines` document; the old layout only had the json.
         for (const root of collectKnownProjectRoots(activePath)) {
-            const manifest = typeof queryDatabase === "function"
-                ? readBridgeManifest(root, queryDatabase, getPreprocessorDefinesManifestPath(root), null)
-                : readJsonFile(getPreprocessorDefinesManifestPath(root), null);
+            const manifest = readBridgeManifest(root, queryPreprocessorDefinesFromDatabase, getPreprocessorDefinesManifestPath(root), null);
 
             if (!manifest || !Array.isArray(manifest.defines)) {
                 // Missing, unreadable, or written by a plugin whose schema predates this field. All

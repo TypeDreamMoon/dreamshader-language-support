@@ -7,6 +7,12 @@ const { DSS_EXTENSIONS } = require("../dss/languageData");
 const { DSP_EXTENSIONS } = require("../dsp/languageData");
 const { normalizeFsPath, isSameOrSubPath } = require("../common/path");
 const { host } = require("../host");
+const {
+    DREAM_SHADER,
+    DREAM_SOURCE_DIRECTORY,
+    resolveProjectSourceRoot,
+    resolvePluginSourceDirectory
+} = require("./dreamSource");
 
 function getConfiguredProjectRoot() {
     const configured = host().getSetting("projectRoot", "");
@@ -24,12 +30,14 @@ const projectRootCache = new Map();
 const knownProjectRootsCache = new Map();
 const sourceRootsCache = new Map();
 const ancestorSourceRootCache = new Map();
+const projectSourceRootCache = new Map();
 
 function invalidateProjectRootCache() {
     projectRootCache.clear();
     knownProjectRootsCache.clear();
     sourceRootsCache.clear();
     ancestorSourceRootCache.clear();
+    projectSourceRootCache.clear();
 }
 
 function findProjectRoot(inputPath = "") {
@@ -140,51 +148,78 @@ function collectKnownProjectRoots(activePath = "") {
     return result;
 }
 
-function getDShaderRoot(projectRoot) {
-    return projectRoot ? normalizeFsPath(path.join(projectRoot, "DShader")) : "";
+/**
+ * The project's source root as spec 12.2 resolves it: `DreamSource/Shader` (or wherever
+ * Config/DefaultDreamSource.ini points), the legacy `DShader` while only that exists, and the configured
+ * directory when neither does -- it is where the editor creates one. Cached with the other answers here;
+ * `invalidateProjectRootCache()` is what a change to either ini, or a migration, has to call.
+ */
+function resolveProjectShaderSource(projectRoot) {
+    if (!projectRoot) {
+        return null;
+    }
+    if (projectSourceRootCache.has(projectRoot)) {
+        return projectSourceRootCache.get(projectRoot);
+    }
+    const resolved = resolveProjectSourceRoot(projectRoot);
+    projectSourceRootCache.set(projectRoot, resolved);
+    return resolved;
+}
+
+/** The project's source directory -- the target of every write the extension makes to sources. */
+function getShaderSourceDirectory(projectRoot) {
+    const resolved = resolveProjectShaderSource(projectRoot);
+    return resolved ? normalizeFsPath(resolved.directory) : "";
 }
 
 function getPackagesDirectory(projectRoot) {
-    const dshaderRoot = getDShaderRoot(projectRoot);
-    return dshaderRoot ? normalizeFsPath(path.join(dshaderRoot, "Packages")) : "";
+    const sourceDirectory = getShaderSourceDirectory(projectRoot);
+    return sourceDirectory ? normalizeFsPath(path.join(sourceDirectory, "Packages")) : "";
 }
 
 // ------------------------------------------------------------------------- source roots
 
 // Source discovery runs over a list of roots, not a single directory -- the plugin's
-// `FDreamShaderSourceRoot`, mirrored. The project always contributes `<Project>/DShader`; every
-// plugin that ships a `DShader` folder contributes one more, with its own `Packages` beside it.
+// `FDreamShaderSourceRoot`, mirrored. The project always contributes its source directory
+// (`DreamSource/Shader`, configurable, or the legacy `DShader` -- see resolveProjectShaderSource); every
+// plugin that ships a `DreamSource/Shader` (or, failing that, a legacy `DShader`) folder contributes one
+// more, with its own `Packages` beside it.
 //
 // A root is the unit of import resolution: an unqualified specifier is resolved against the bases of
 // the root that owns the importing file and never against another root's, so adding a plugin cannot
-// change what an existing import means. Before this list existed everything resolved against
-// `<Project>/DShader` and was containment-checked against it, which made every import inside a
+// change what an existing import means. Before this list existed everything resolved against the
+// project's directory and was containment-checked against it, which made every import inside a
 // plugin's own tree report as unresolvable. See the plugin's Docs/language/import.md#roots.
 
 /** Directories below `<Project>/Plugins` that are searched for a `.uplugin`. `Plugins/Category/Foo/`. */
 const PLUGIN_SCAN_MAX_DEPTH = 3;
 
-function makeSourceRoot(directory, { displayName = "", pluginName = "", isProjectRoot = false } = {}) {
+function makeSourceRoot(directory, { displayName = "", pluginName = "", isProjectRoot = false, legacy = false } = {}) {
     const resolved = normalizeFsPath(path.resolve(directory));
     return {
         directory: resolved,
         packagesDirectory: normalizeFsPath(path.join(resolved, "Packages")),
         displayName: displayName || pluginName || "Project",
         pluginName,
-        isProjectRoot
+        isProjectRoot,
+        legacy
     };
 }
 
-/** The project root first, then one root per plugin under `<Project>/Plugins` that has a `DShader`. */
+/** The project root first, then one root per plugin under `<Project>/Plugins` that has sources. */
 function collectSourceRoots(projectRoot) {
     if (sourceRootsCache.has(projectRoot)) {
         return sourceRootsCache.get(projectRoot);
     }
 
     const roots = [];
-    const dshaderRoot = getDShaderRoot(projectRoot);
-    if (dshaderRoot) {
-        roots.push(makeSourceRoot(dshaderRoot, { displayName: "Project", isProjectRoot: true }));
+    const resolved = resolveProjectShaderSource(projectRoot);
+    if (resolved) {
+        roots.push(makeSourceRoot(resolved.directory, {
+            displayName: "Project",
+            isProjectRoot: true,
+            legacy: resolved.state === "legacy"
+        }));
         collectPluginSourceRoots(projectRoot, roots);
     }
 
@@ -194,11 +229,11 @@ function collectSourceRoots(projectRoot) {
 
 function collectPluginSourceRoots(projectRoot, roots) {
     for (const plugin of collectPluginDirectories(path.join(projectRoot, "Plugins"), 0, [])) {
-        const candidate = path.join(plugin.directory, "DShader");
-        if (!isDirectory(candidate)) {
+        const found = resolvePluginSourceDirectory(plugin.directory);
+        if (!found) {
             continue;
         }
-        const root = makeSourceRoot(candidate, { displayName: plugin.name, pluginName: plugin.name });
+        const root = makeSourceRoot(found.directory, { displayName: plugin.name, pluginName: plugin.name, legacy: found.legacy });
         // Overlapping roots would hand the same file to two owners and make resolution depend on
         // scan order -- the plugin drops them with a warning, and so do we, silently.
         if (roots.some((existing) => overlaps(existing.directory, root.directory))) {
@@ -260,11 +295,12 @@ function findSourceRootForFile(filePath, roots) {
  * Editor-side fallback for a file the root list does not cover.
  *
  * The plugin asks `IPluginManager` which plugins are mounted; an editor has no such list. A plugin
- * outside `<Project>/Plugins`, an engine plugin, or a bare `DShader` folder opened as a workspace
+ * outside `<Project>/Plugins`, an engine plugin, or a bare source folder opened as a workspace
  * folder with no `.uproject` above it therefore contribute no root here even though the engine
- * compiles them. Walking up to the nearest ancestor named `DShader` recovers the root the engine
- * would have contributed; without it every import in those files reports as unresolvable, which is
- * the worse of the two ways to disagree with the compiler.
+ * compiles them. Walking up to the nearest ancestor that is a source root by its name -- a
+ * `DreamSource/Shader` pair, or a legacy `DShader` -- recovers the root the engine would have
+ * contributed; without it every import in those files reports as unresolvable, which is the worse of
+ * the two ways to disagree with the compiler.
  */
 function findAncestorSourceRoot(filePath) {
     if (!filePath) {
@@ -278,11 +314,18 @@ function findAncestorSourceRoot(filePath) {
     let root = null;
     let current = startDirectory;
     while (current) {
-        if (path.basename(current).toLowerCase() === "dshader" && isDirectory(current)) {
-            root = makeSourceRoot(current, describeSourceRootOwner(path.dirname(current)));
+        const name = path.basename(current).toLowerCase();
+        const parent = path.dirname(current);
+        if (name === DREAM_SHADER.key.toLowerCase()
+            && path.basename(parent).toLowerCase() === DREAM_SOURCE_DIRECTORY.toLowerCase()
+            && isDirectory(current)) {
+            root = makeSourceRoot(current, describeSourceRootOwner(path.dirname(parent)));
             break;
         }
-        const parent = path.dirname(current);
+        if (name === DREAM_SHADER.legacyName.toLowerCase() && isDirectory(current)) {
+            root = makeSourceRoot(current, { ...describeSourceRootOwner(parent), legacy: true });
+            break;
+        }
         if (parent === current) {
             break;
         }
@@ -293,7 +336,7 @@ function findAncestorSourceRoot(filePath) {
     return root;
 }
 
-/** Whether the directory holding a `DShader` folder is a plugin, a project, or neither. */
+/** Whether the directory holding a source folder is a plugin, a project, or neither. */
 function describeSourceRootOwner(ownerDirectory) {
     let entries = [];
     try {
@@ -377,7 +420,8 @@ module.exports = {
     findProjectRootFromDirectory,
     collectKnownProjectRoots,
     invalidateProjectRootCache,
-    getDShaderRoot,
+    resolveProjectShaderSource,
+    getShaderSourceDirectory,
     getPackagesDirectory,
     collectSourceRoots,
     findSourceRootForFile,

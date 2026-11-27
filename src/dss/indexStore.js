@@ -3,13 +3,17 @@
 // The symbol index of a project's 2.0 sources, as the plugin wrote it.
 //
 // The extension does not read `.dss` text for meaning. The compiler does that, and after every compile
-// -- and on `dsc index` -- it writes what it found to
+// -- and on `dsc index` -- it writes what it found to the `source_index` table of
+//
+//     <Project>/Intermediate/DreamSource/shader.db     (root, path relative to that root, json)
+//
+// or, for a plugin from before DreamSource, to the files
 //
 //     <Project>/Saved/DreamShader/Index/<root>/<source path relative to that root>.index.json
 //
 // (schema `dreamshader-symbol-index`, version 1): the declarations of the file and of every header it
 // includes, each with its kind, signature, doc and position; every mention of a name as a span; the
-// resolved include paths; the parameter schema. This module finds those files, keeps them parsed, and
+// resolved include paths; the parameter schema. This module finds those, keeps them parsed, and
 // answers "which index describes this source" -- for a `.dss` its own, for a `.dsh` any index that
 // includes it, since a header has none of its own.
 //
@@ -18,12 +22,28 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeFsPath } = require("../common/path");
+const { getLegacyIndexDirectory, getShaderDatabasePath } = require("../bridge/paths");
+const { isShaderDatabasePresent, readSourceIndexRows, noteLegacyLayoutRead } = require("../bridge/database");
 
 const INDEX_SCHEMA = "dreamshader-symbol-index";
 const INDEX_SUFFIX = ".index.json";
 
+/** The old index folder, `Saved/DreamShader/Index`: read only when the project has no shader.db. */
 function getIndexDirectory(projectRoot) {
-    return projectRoot ? normalizeFsPath(path.join(projectRoot, "Saved", "DreamShader", "Index")) : "";
+    return getLegacyIndexDirectory(projectRoot);
+}
+
+/** Where this project's indices are read from now: shader.db, or the old folder. For status lines. */
+function describeIndexLocation(projectRoot) {
+    if (!projectRoot) {
+        return "";
+    }
+    return isShaderDatabasePresent(projectRoot) ? getShaderDatabasePath(projectRoot) : getIndexDirectory(projectRoot);
+}
+
+/** The name a row of `source_index` is known by, also used as its `indexPath`. */
+function databaseIndexPath(projectRoot, root, relativePath) {
+    return `${getShaderDatabasePath(projectRoot)}#${root}/${String(relativePath).replace(/\\/g, "/")}`;
 }
 
 /** Paths compare without case on the platforms Unreal's editor runs on, and the index spells them the engine's way. */
@@ -180,15 +200,46 @@ function normalizeIndex(raw, indexPath) {
 }
 
 /**
- * One project's indices, read lazily and re-read by modification time. `refresh()` is cheap when nothing
- * changed: one directory walk and one `stat` per file.
+ * One project's indices, read lazily. From shader.db: re-read when the `index` part's revision moves (the
+ * rows are cached by database.js), each row re-parsed only when its json changed. From the old files: by
+ * modification time, one directory walk and one `stat` per file.
  */
 function createIndexStore(projectRoot) {
     const directory = getIndexDirectory(projectRoot);
-    /** indexPath -> { mtimeMs, index } */
+    /** indexPath -> { mtimeMs, index, json? } */
     const entries = new Map();
 
+    function refreshFromDatabase() {
+        const rows = readSourceIndexRows(projectRoot) || [];
+        const present = new Set();
+        for (const row of rows) {
+            const indexPath = databaseIndexPath(projectRoot, row.root, row.path);
+            present.add(indexPath);
+            const known = entries.get(indexPath);
+            if (known && known.json === row.json) {
+                continue;
+            }
+            let index = null;
+            try {
+                index = normalizeIndex(JSON.parse(row.json.replace(/^﻿/, "")), indexPath);
+            } catch (_error) {
+                index = null;
+            }
+            const updated = Date.parse(row.updatedUtc);
+            entries.set(indexPath, { mtimeMs: Number.isFinite(updated) ? updated : 0, index, json: row.json });
+        }
+        for (const indexPath of [...entries.keys()]) {
+            if (!present.has(indexPath)) {
+                entries.delete(indexPath);
+            }
+        }
+    }
+
     function refresh() {
+        if (isShaderDatabasePresent(projectRoot)) {
+            refreshFromDatabase();
+            return;
+        }
         const present = new Set();
         for (const indexPath of listIndexFiles(directory)) {
             present.add(indexPath);
@@ -215,6 +266,9 @@ function createIndexStore(projectRoot) {
             if (!present.has(indexPath)) {
                 entries.delete(indexPath);
             }
+        }
+        if (present.size > 0) {
+            noteLegacyLayoutRead(projectRoot);
         }
     }
 
@@ -257,6 +311,8 @@ module.exports = {
     INDEX_SCHEMA,
     INDEX_SUFFIX,
     getIndexDirectory,
+    describeIndexLocation,
+    databaseIndexPath,
     pathKey,
     normalizeIndex,
     normalizePipeline,

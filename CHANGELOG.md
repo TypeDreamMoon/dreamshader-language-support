@@ -1,6 +1,31 @@
 # Changelog
 
-## 2.2.0
+## 2.3.0
+
+For the DreamSource layout. Projects whose DreamShader plugin predates it keep working, read from the old places.
+
+**Sources in `DreamSource/Shader/`.** The project's source directory is now `DreamSource/Shader` (all Dream
+languages live together under `DreamSource/`), or wherever `Config/DefaultDreamSource.ini` points
+(`[/Script/DreamShader.DreamShaderSourceSettings] SourceDirectory`). A custom `SourceDirectory` still set in
+`DefaultEngine.ini` is honoured; the old default `DShader` there counts as unset. A project that only has
+`DShader/` keeps using it, and is told once that it is deprecated, with **DreamShader: Migrate to DreamSource**
+(and *Don't show again*). The move is refused while the editor has the project open or when the target already
+exists; it moves the folder, clears what an older plugin generated in `Saved/DreamShader/Bridge`,
+`Saved/DreamShader/Index` and `Intermediate/DreamShader`, and re-aims `DreamShader.code-workspace`. A plugin's
+sources are found in `<Plugin>/DreamSource/Shader`, or failing that `<Plugin>/DShader`. Packages, the lock file,
+new-file templates, import resolution and the file watchers all follow the resolved directory; a change to either
+ini file is picked up without a reload.
+
+**The editor's output from `Intermediate/DreamSource/shader.db`.** Diagnostics, material expressions, settings
+mappings, Substrate builtins, the builtin catalog, pass keys, the preprocessor define table, the preview result
+and the symbol index are read from the one database the plugin now writes, through `node:sqlite` — real SQLite,
+so what is still in the WAL is read too, and nothing is re-read until its part's revision moves. A schema this
+extension does not know is left unread, and said so once. Without `shader.db`, the old `Saved/DreamShader/Bridge`
+(its `bridge.db`, then the json files) and `Saved/DreamShader/Index` are read as before, with a one-time hint to
+update the plugin. Bridge requests go to `Intermediate/DreamSource/Shader/Bridge`, or to the old folder while an
+older plugin is the one listening.
+
+**Requires VS Code 1.147 or later** (for `node:sqlite`). sql.js is no longer a dependency.
 
 For DreamShader after 2.1.2. Everything from 2.1.0 keeps working with older plugins.
 

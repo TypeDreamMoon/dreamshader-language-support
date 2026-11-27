@@ -37,7 +37,7 @@ DreamShader 插件保持同步。
 - 声明 metadata 补全，例如 `Group`、`SortPriority`、`Description`、`SamplerType`、`GatherMode` 和纹理采样相关属性。
 - 支持 `Layout = { Node(...); Comment(...); }` 和 Graph `#Region` / `#EndRegion` 布局指令。
 - 条件编译：`#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` / `#endif` / `#define` / `#undef` —— 高亮、打一个 `#` 就补全、`defined` 与六个 `DS_` 内置常量的 hover、折叠、十三条 `DSH103x` / `DSH104x` 诊断，以及把本工程 define 切掉的分支灰显。
-- `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转，按源根解析 —— 工程的 `DShader` 和每个插件各算一个根，也认跨根用的 `Project:` / `Plugin.<名字>:` 限定符。
+- `.dsh` 共享头文件和 `.dsf` 函数文件的 import 路径补全和可点击跳转，按源根解析 —— 工程的 `DreamSource/Shader`（或旧的 `DShader`）和每个插件各算一个根，也认跨根用的 `Project:` / `Plugin.<名字>:` 限定符。
 - `.dsf` 文件形状诊断，支持 `ShaderFunction`、`Function`、`GraphFunction`、`Namespace` 和 `VirtualFunction`。
 - Go to Definition、Find References、Hover、Signature Help、Inlay Hints、文档格式化、折叠和文档符号。
 - Unreal Bridge 诊断面板。
@@ -56,8 +56,8 @@ DreamShader 2.0 在 1.x 语言旁边加了一门 HLSL 形状的语言:`.dss` 是
 
 | 功能 | 答案来自 |
 | :-- | :-- |
-| 转到定义、查找引用、悬停、大纲、签名帮助、重命名 | 插件每次编译后(以及 `dsc index`)写出的**符号索引**:`Saved/DreamShader/Index/<根>/<文件>.index.json` |
-| `UE.` 与 `Substrate.` 的补全和悬停——节点名、引脚与属性、Substrate 语法糖实参(`BaseColor`、`Metallic`、`Haziness`……) | 编辑器加载完成后(以及 `dsc export-catalog`)导出的**内建目录**:`Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json` |
+| 转到定义、查找引用、悬停、大纲、签名帮助、重命名 | 插件每次编译后(以及 `dsc index`)写出的**符号索引**:`Intermediate/DreamSource/shader.db` 的 `source_index` 表(旧插件:`Saved/DreamShader/Index/<根>/<文件>.index.json`) |
+| `UE.` 与 `Substrate.` 的补全和悬停——节点名、引脚与属性、Substrate 语法糖实参(`BaseColor`、`Metallic`、`Haziness`……) | 编辑器加载完成后(以及 `dsc export-catalog`)导出的**内建目录**:`shader.db` 里的 `builtin-catalog` 文档(旧插件:`Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json`) |
 | 诊断 | 与 1.x 相同,走 bridge——编译器自己的诊断,带 `DSHnnnn` 码 |
 | `/// @` 指令、`#pragma` 形式、关键字与类型 | 扩展自带的词表 |
 
@@ -85,7 +85,7 @@ Pass(UE 5.8 及以上)。它以语言 **DreamShader Pipeline**(`dreamshader-dsp`
 
 | 功能 | 答案来自 |
 | :-- | :-- |
-| 键及其取值的补全和悬停——注入点、格式、Pass 种类、各种模式、`Layer(...)` 里工程自己的 Pass 层 | 插件在编辑器启动时和 *Open Dream Shader Workspace* 时写到 `Saved/DreamShader/Bridge` 的 **`pass-keys.json`**;它还不存在时,用扩展自带的一份 |
+| 键及其取值的补全和悬停——注入点、格式、Pass 种类、各种模式、`Layer(...)` 里工程自己的 Pass 层 | 插件在编辑器启动时和 *Open Dream Shader Workspace* 时写到 `shader.db` 的 **pass keys**(旧插件写 `Saved/DreamShader/Bridge/pass-keys.json`);它还不存在时,用扩展自带的一份 |
 | buffer、参数、常量和 Pass 的转到定义与悬停;大纲里的细节 | 管线的**符号索引**及其 `pipeline` 节 |
 | `hlsl` 块内:Pass 的绑定名(`Source`、`SourceSize`、`SourceUVRect`……)、编译器围绕入口语句写出的名字(`Id`、`UV`……)、`DP_*` 和 `DreamPass*` 辅助宏——补全、悬停、语义着色,转到定义跳到绑定那一行 | 从文本读出的 Pass 语句 |
 | `Entry =` | 文件级 `hlsl` 块里的函数;compute Pass 优先列出带 `[numthreads]` 的 |
@@ -247,7 +247,7 @@ Shader(Name="Materials/M_Foo", Root="Game")
 
 被本工程 define 切掉的分支会**灰显**，免得一份带条件的源码变成脑子里要同时装着的两份文本。指令行本身永远不灰 —— 「这块为什么是灰的」，答案就写在它们身上。
 
-灰显要靠 define 表，由插件导出到 `Saved/DreamShader/Bridge/preprocessor-defines.json`。**manifest 不存在时什么都不灰，也不吭声。** 插件版本旧，或者工程的 bridge 还没写过，都属于正常降级，不是故障。预处理器会拒绝的文件同样一块都不灰 —— `#if` 没闭合、条件写错、大小写错的 `#IF` —— 因为灰错了会把人指到错的分支上，而它跟「没这个功能」看起来还不一样：少灰一块只是少个功能，灰错一块是骗人。
+灰显要靠 define 表，由插件导出到 `shader.db`（旧插件导出到 `Saved/DreamShader/Bridge/preprocessor-defines.json`）。**manifest 不存在时什么都不灰，也不吭声。** 插件版本旧，或者工程的 bridge 还没写过，都属于正常降级，不是故障。预处理器会拒绝的文件同样一块都不灰 —— `#if` 没闭合、条件写错、大小写错的 `#IF` —— 因为灰错了会把人指到错的分支上，而它跟「没这个功能」看起来还不一样：少灰一块只是少个功能，灰错一块是骗人。
 
 ```json
 {
@@ -376,15 +376,30 @@ Function Sample2DRGB(in Texture2D texture, in float2 uv, out float3 color) {
 
 大多数情况下 `dreamshader.projectRoot` 可以留空，扩展会根据当前 DreamShader 文件或工作区自动寻找 Unreal 项目根目录。
 
-`dreamshader.materialExpressionManifestPath` 可以直接指向生成出来的 `Saved/DreamShader/Bridge/material-expressions.json`。留空时会使用当前项目的 Bridge manifest，并回退到扩展内置 manifest。
+`dreamshader.materialExpressionManifestPath` 可以直接指向生成出来的 `material-expressions.json`（旧插件写在 `Saved/DreamShader/Bridge`）。留空时会使用当前项目 `shader.db` 里的 manifest，并回退到扩展内置 manifest。
 
 两个 `dreamshader.preprocessor.*` 控制被本工程 define 切掉的 `#if` 分支的灰显，见[未激活分支](#未激活分支)。工程的 bridge 没导出 define 表之前，这两项都不会有任何效果。
 
 ## Bridge 诊断
 
-配合 DreamShader Unreal 插件使用时，扩展会读取项目 `Saved/DreamShader/Bridge` 下生成的诊断文件，并同时显示为编辑器内诊断和 DreamShader Bridge 面板内容。
+配合 DreamShader Unreal 插件使用时，扩展会读取编辑器写入 `Intermediate/DreamSource/shader.db` 的诊断（DreamSource 布局之前的旧插件写在 `Saved/DreamShader/Bridge`，这时改读那里），并同时显示为编辑器内诊断和 DreamShader Bridge 面板内容。
 
-即使只打开项目的 `DShader` 目录作为工作区，也会尝试自动发现 Bridge 输出。
+即使只打开项目的源码目录作为工作区，也会尝试自动发现 Bridge 输出。
+
+## DreamSource 布局
+
+Dream 系列各语言的源码统一放在 `DreamSource/` 下。DreamShader 的是 `DreamSource/Shader`，也可以在 `Config/DefaultDreamSource.ini` 里改：
+
+```ini
+[/Script/DreamShader.DreamShaderSourceSettings]
+SourceDirectory=(Path="DreamSource/Shader")
+```
+
+`DefaultEngine.ini`（`[/Script/DreamShader.DreamShaderSettings]`）里仍然设置了自定义 `SourceDirectory` 的，照用；值是旧默认值 `DShader` 时视为没设置。插件的源码在 `<Plugin>/DreamSource/Shader`，没有就用 `<Plugin>/DShader`。
+
+只有旧 `DShader/` 的项目照常能用，会提示一次"已废弃"。**DreamShader: Migrate to DreamSource** 负责迁移（先关掉 Unreal 编辑器；编辑器在运行或目标已存在时会拒绝），同时清理旧插件留在 `Saved/DreamShader/Bridge`、`Saved/DreamShader/Index`、`Intermediate/DreamShader` 的生成数据，并修正 `DreamShader.code-workspace` 里的路径。
+
+编辑器给工具生成的数据——诊断、各 manifest、builtin catalog、pass keys、define 表、预览结果、符号索引——都在一个 SQLite 库 `Intermediate/DreamSource/shader.db` 里，用 VS Code 自带的 `node:sqlite` 读取（因此需要 VS Code 1.147 及以上）。Bridge 请求写到 `Intermediate/DreamSource/Shader/Bridge`。
 
 ## 开发
 
@@ -422,7 +437,7 @@ $env:DREAMSHADER_CORPUS_DIR = 'I:\...\Plugins\DreamShader'; npm run test:corpus
 `src/language/` 既不 import `vscode` 也不 import 协议，正因如此 provider 才能搬走而不必改动它。语言层
 需要了解外部世界时（某项配置、workspace 目录），它问 `src/host.js`，由两个进程各自填充。
 
-刻意不打包：`src/bridge/database.js` 通过 `require.resolve` 定位 sql.js 的 WASM，打包器会让那个路径指空。
+不打包：扩展原样带上 `node_modules`，`src/bridge/database.js` 用编辑器运行时自带的 `node:sqlite` 读 `shader.db`，没有需要打包的原生模块或 WASM。
 
 `F5` 启动 Extension Development Host。要在 server 里下断点，用 **Extension + Server** 复合配置，
 它会额外挂一个调试器到 6018 端口。

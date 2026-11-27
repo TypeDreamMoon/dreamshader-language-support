@@ -208,7 +208,7 @@ async function removePackageCommand() {
         { label: "$(circle-slash) Cancel", value: "cancel" }
     ], {
         title: `Remove ${picked.entry.name}?`,
-        placeHolder: "This deletes the package folder under DShader/Packages."
+        placeHolder: "This deletes the package folder under the project source directory's Packages/."
     });
 
     if (!confirmation || confirmation.value !== "remove") {
@@ -354,7 +354,7 @@ async function createPackageCommand() {
 
     const targetPick = await vscode.window.showQuickPick([
         {
-            label: "$(folder-library) Create in current project DShader/Packages",
+            label: "$(folder-library) Create in current project Packages/ (source directory)",
             description: "Recommended",
             target: "project"
         },

@@ -5,7 +5,8 @@
 // The other direction lives in the plugin (the material editor's node menu opens the source line). This
 // one asks the running editor, through the bridge, to find the node a line of a 2.0 source became, open
 // the material editor of the asset that owns it, and select it. The editor answers in
-// `Saved/DreamShader/Bridge/Responses/<requestId>.json`; a failure comes back coded (DSH9050-DSH9057),
+// `<bridge>/Responses/<requestId>.json` (`Intermediate/DreamSource/Shader/Bridge`, or `Saved/DreamShader/Bridge`
+// for a plugin from before DreamSource -- see bridge/paths.js); a failure comes back coded (DSH9050-DSH9057),
 // and the two that are about what to do next -- nothing from this source is loaded, or the assets were
 // built before navigation existed -- say so in words.
 
@@ -44,9 +45,11 @@ async function revealInMaterialEditor() {
 
     const requestId = `reveal-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const line = editor.selection.active.line + 1;
+    // The response comes back beside the request, so both are spelled from the one directory chosen here.
+    const bridgeDirectory = getBridgeDirectory(projectRoot);
     writeBridgeRequest(projectRoot, { action: "reveal-node", file: document.fileName.replace(/\\/g, "/"), line, requestId });
 
-    const responsePath = path.join(getBridgeDirectory(projectRoot), "Responses", `${requestId}.json`);
+    const responsePath = path.join(bridgeDirectory, "Responses", `${requestId}.json`);
     const response = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Window, title: `DreamShader: revealing line ${line} in the Material Editor...` },
         () => waitForResponse(responsePath));

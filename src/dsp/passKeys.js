@@ -1,6 +1,7 @@
 "use strict";
 
-// The vocabulary of a `.dsp`, as the plugin exported it:
+// The vocabulary of a `.dsp`, as the plugin exported it: the `pass-keys` document of
+// `<Project>/Intermediate/DreamSource/shader.db`, or for a plugin from before DreamSource the file
 //
 //     <Project>/Saved/DreamShader/Bridge/pass-keys.json
 //
@@ -17,14 +18,17 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeFsPath } = require("../common/path");
+const { getLegacyBridgeFilePath, getShaderDatabasePath } = require("../bridge/paths");
+const { DOCUMENTS, isShaderDatabasePresent, readShaderDocument, noteLegacyLayoutRead } = require("../bridge/database");
 
 const PASS_KEYS_SCHEMA = "DreamShader.PassKeys";
 const PASS_KEYS_VERSION = 1;
 const PASS_KEYS_FILE_NAME = "pass-keys.json";
 const BUNDLED_PASS_KEYS_PATH = path.join(__dirname, "..", "..", "resources", PASS_KEYS_FILE_NAME);
 
+/** The old place, `Saved/DreamShader/Bridge/`: read only when the project has no shader.db (spec 12.3). */
 function getPassKeysPath(projectRoot) {
-    return projectRoot ? normalizeFsPath(path.join(projectRoot, "Saved", "DreamShader", "Bridge", PASS_KEYS_FILE_NAME)) : "";
+    return getLegacyBridgeFilePath(projectRoot, PASS_KEYS_FILE_NAME);
 }
 
 function asArray(value) {
@@ -116,6 +120,7 @@ function readPassKeysFile(filePath) {
 function createPassKeysReader(projectRoot, bundledPath = BUNDLED_PASS_KEYS_PATH) {
     const projectPath = getPassKeysPath(projectRoot);
     let cached = { mtimeMs: -1, keys: null };
+    let fromDatabase = { raw: undefined, keys: null };
     let bundled;
 
     function readBundled() {
@@ -126,7 +131,15 @@ function createPassKeysReader(projectRoot, bundledPath = BUNDLED_PASS_KEYS_PATH)
     }
 
     function get() {
-        if (projectPath) {
+        if (projectRoot && isShaderDatabasePresent(projectRoot)) {
+            const raw = readShaderDocument(projectRoot, DOCUMENTS.passKeys);
+            if (raw !== fromDatabase.raw) {
+                fromDatabase = { raw, keys: raw ? normalizePassKeys(raw) : null };
+            }
+            if (fromDatabase.keys) {
+                return { keys: fromDatabase.keys, source: "project", path: getShaderDatabasePath(projectRoot) };
+            }
+        } else if (projectPath) {
             let mtimeMs = -1;
             try {
                 mtimeMs = fs.statSync(projectPath).mtimeMs;
@@ -135,6 +148,9 @@ function createPassKeysReader(projectRoot, bundledPath = BUNDLED_PASS_KEYS_PATH)
             }
             if (mtimeMs !== cached.mtimeMs) {
                 cached = { mtimeMs, keys: mtimeMs >= 0 ? readPassKeysFile(projectPath) : null };
+                if (cached.keys) {
+                    noteLegacyLayoutRead(projectRoot);
+                }
             }
             if (cached.keys) {
                 return { keys: cached.keys, source: "project", path: projectPath };

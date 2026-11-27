@@ -28,7 +28,6 @@ const { invalidateProjectRootCache } = require("../project/projects");
 const { createLanguageIndexCache } = require("./indexCache");
 const { toFsPath } = require("./documents");
 const providers = require("./providers");
-const { initializeBridgeDatabaseSupport } = require("../bridge/database");
 const { BRIDGE_CHANGED_NOTIFICATION, SETTINGS_SECTION } = require("../lspProtocol");
 
 const DIAGNOSTIC_DEBOUNCE_MS = 150;
@@ -269,8 +268,11 @@ function refreshAllDiagnostics() {
 // --------------------------------------------------------------- custom messages
 
 connection.onNotification(BRIDGE_CHANGED_NOTIFICATION, () => {
-    // The manifests are memoised on a file-version tag, so they re-read themselves; the index is
-    // memoised on document version and dependency mtimes, which a Bridge write does not move.
+    // The manifests are memoised on a data-version tag, so they re-read themselves; the index is
+    // memoised on document version and dependency mtimes, which a Bridge write does not move. The
+    // client also sends this when Config/DefaultDreamSource.ini or DefaultEngine.ini changed, which
+    // can move the project's source directory -- hence the root cache.
+    invalidateProjectRootCache();
     languageIndexCache.invalidateAll();
     refreshAllDiagnostics();
 });
@@ -293,13 +295,3 @@ async function refreshSettings() {
 
 documents.listen(connection);
 connection.listen();
-
-// sql.js's WASM module loads asynchronously, and the manifests behind completion and the local
-// diagnostics prefer bridge.db over the deprecated JSON files. Re-run once it is ready rather than
-// waiting for the next unrelated trigger to notice the better source.
-void initializeBridgeDatabaseSupport().then((SQL) => {
-    if (SQL) {
-        languageIndexCache.invalidateAll();
-        refreshAllDiagnostics();
-    }
-});

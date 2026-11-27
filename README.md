@@ -40,7 +40,7 @@ See the [changelog](./CHANGELOG.md) for what each release changed.
 - Metadata completion for declaration reflection blocks such as `Group`, `SortPriority`, `Description`, `SamplerType`, `GatherMode`, and texture sampling options.
 - Layout authoring support for `Layout = { Node(...); Comment(...); }` and Graph `#Region` / `#EndRegion` directives.
 - Conditional compilation: `#if` / `#ifdef` / `#ifndef` / `#elif` / `#else` / `#endif` / `#define` / `#undef` — highlighting, completion from a bare `#`, hover for `defined` and the six `DS_` builtins, folding, the thirteen `DSH103x` / `DSH104x` diagnostics, and a fade over the branches the project's defines cut.
-- Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files, resolved per source root — the project's `DShader` and each plugin's — including the `Project:` / `Plugin.<Name>:` qualifiers that cross between them.
+- Import path completion and clickable import links for `.dsh` shared headers and `.dsf` function files, resolved per source root — the project's `DreamSource/Shader` (or legacy `DShader`) and each plugin's — including the `Project:` / `Plugin.<Name>:` qualifiers that cross between them.
 - `.dsf` file-shape diagnostics for reusable `ShaderFunction`, `Function`, `GraphFunction`, `Namespace`, and `VirtualFunction` declarations.
 - Go to Definition, Find References, Hover, Signature Help, Inlay Hints, document formatting, folding, and document symbols.
 - Bridge diagnostics panel for Unreal-side DreamShader compiler diagnostics.
@@ -63,8 +63,8 @@ JavaScript would be wrong in exactly the places that matter. So the editor asks 
 
 | Feature | Answered from |
 | :-- | :-- |
-| Go to Definition, Find References, Hover, Outline, Signature Help, Rename | the **symbol index** the plugin writes after every compile, and on `dsc index`: `Saved/DreamShader/Index/<root>/<file>.index.json` |
-| Completion and hover for `UE.` and `Substrate.` — node names, their pins and properties, the Substrate sugar arguments (`BaseColor`, `Metallic`, `Haziness`, ...) | the **builtin catalog** the plugin exports once the editor has loaded, and on `dsc export-catalog`: `Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json` |
+| Go to Definition, Find References, Hover, Outline, Signature Help, Rename | the **symbol index** the plugin writes after every compile, and on `dsc index`: the `source_index` table of `Intermediate/DreamSource/shader.db` (an older plugin: `Saved/DreamShader/Index/<root>/<file>.index.json`) |
+| Completion and hover for `UE.` and `Substrate.` — node names, their pins and properties, the Substrate sugar arguments (`BaseColor`, `Metallic`, `Haziness`, ...) | the **builtin catalog** the plugin exports once the editor has loaded, and on `dsc export-catalog`: the `builtin-catalog` document in `shader.db` (an older plugin: `Saved/DreamShader/Bridge/dreamshader-builtin-catalog.json`) |
 | Diagnostics | the bridge, as for 1.x — the compiler's own, with their `DSHnnnn` codes |
 | `/// @` directives, `#pragma` forms, keywords and types | the extension's own word lists |
 | `#include "` paths; `BL::` and the other header namespaces; what the included headers declare, with hover, definition and signature help — in a file that has not been compiled yet | the **text of the headers**: the include closure is read on the spot, 1.x and 2.0 headers alike |
@@ -111,7 +111,7 @@ toggling, bracket matching and snippets inside a block follow HLSL. A block ends
 
 | Feature | Answered from |
 | :-- | :-- |
-| Completion and hover of keys and their values — injection points, formats, pass kinds, modes, the project's pass layers inside `Layer(...)` | **`pass-keys.json`**, which the plugin writes to `Saved/DreamShader/Bridge` at editor startup and on *Open Dream Shader Workspace*; until it exists, the copy bundled with the extension |
+| Completion and hover of keys and their values — injection points, formats, pass kinds, modes, the project's pass layers inside `Layer(...)` | the **pass keys**, which the plugin writes to `shader.db` (an older plugin: `Saved/DreamShader/Bridge/pass-keys.json`) at editor startup and on *Open Dream Shader Workspace*; until it exists, the copy bundled with the extension |
 | Go to Definition and hover of buffers, parameters, constants and passes; details in the Outline | the pipeline's **symbol index** and its `pipeline` section |
 | Inside an `hlsl` block: a pass's binding names (`Source`, `SourceSize`, `SourceUVRect`, ...), the names written around the statements of an entry (`Id`, `UV`, ...), `DP_*` and the `DreamPass*` helpers — completion, hover, semantic colouring, and Go to Definition to the binding | the pass's statements, read from the text |
 | `Entry =` | the functions of the file's `hlsl` block, `[numthreads]` ones first for a compute pass |
@@ -290,8 +290,8 @@ The branches the project's defines cut are **faded**, so a conditional source st
 reader has to hold in their head. The directive lines themselves never fade — they are the answer to
 "why is this grey".
 
-The fade needs the define table, which the plugin exports to
-`Saved/DreamShader/Bridge/preprocessor-defines.json`. **With no manifest nothing is faded, silently.**
+The fade needs the define table, which the plugin exports to `shader.db` (an older plugin, to
+`Saved/DreamShader/Bridge/preprocessor-defines.json`). **With no manifest nothing is faded, silently.**
 An older plugin, or a project whose bridge has never been written, is a normal degradation and not a
 fault. Nothing is faded in a file the preprocessor would refuse either — an unclosed `#if`, a
 malformed condition, a mis-cased `#IF` — because a wrong grey points an author at the wrong branch,
@@ -433,7 +433,7 @@ Available commands include:
 
 `dreamshader.projectRoot` can be left empty in most workspaces. The extension tries to auto-detect the Unreal project root from the active DreamShader file or workspace.
 
-`dreamshader.materialExpressionManifestPath` can point directly at a generated `Saved/DreamShader/Bridge/material-expressions.json`. Leave it empty to use the active project's bridge manifest plus the bundled fallback manifest.
+`dreamshader.materialExpressionManifestPath` can point directly at a generated `material-expressions.json` (an older plugin writes one to `Saved/DreamShader/Bridge`). Leave it empty to use the active project's manifest from `shader.db` plus the bundled fallback manifest.
 
 `dreamshader.previewTransport` selects how the live preview reaches the editor: `"websocket"` (the default — raw RGBA8 streaming, drag-to-orbit, and Graph breakpoints) or `"file"` (a one-shot PNG through the bridge request/response files, for setups where the WebSocket server is disabled). `dreamshader.previewLiveFrameRate` (default `12`, `0` pauses streaming) and `dreamshader.previewWebSocketPort` (default `17864`) apply to the WebSocket transport only.
 
@@ -441,9 +441,24 @@ The two `dreamshader.preprocessor.*` settings control the fade over the `#if` br
 
 ## Bridge Diagnostics
 
-When used with the DreamShader Unreal plugin, the extension reads bridge diagnostic files generated under the project `Saved/DreamShader/Bridge` directory. Diagnostics are shown both inline and in the DreamShader Bridge panel.
+When used with the DreamShader Unreal plugin, the extension reads the diagnostics the editor writes to `Intermediate/DreamSource/shader.db` (a plugin from before the DreamSource layout writes them to `Saved/DreamShader/Bridge`, which is read instead). Diagnostics are shown both inline and in the DreamShader Bridge panel.
 
-The extension can still discover bridge output when the opened workspace is the project `DShader` directory.
+The extension can still discover bridge output when the opened workspace is the project's source directory.
+
+## DreamSource layout
+
+Every Dream language keeps its sources under one `DreamSource/` folder. DreamShader's is `DreamSource/Shader`, or wherever `Config/DefaultDreamSource.ini` points:
+
+```ini
+[/Script/DreamShader.DreamShaderSourceSettings]
+SourceDirectory=(Path="DreamSource/Shader")
+```
+
+A custom `SourceDirectory` still set in `DefaultEngine.ini` (`[/Script/DreamShader.DreamShaderSettings]`) is honoured; the old default `DShader` there counts as unset. A plugin's sources are in `<Plugin>/DreamSource/Shader`, or failing that `<Plugin>/DShader`.
+
+A project that only has the old `DShader/` keeps working from it, and is told once that it is deprecated. **DreamShader: Migrate to DreamSource** moves it (close the Unreal editor first; it refuses while the editor is running, or when the target already exists), clears the output an older plugin left in `Saved/DreamShader/Bridge`, `Saved/DreamShader/Index` and `Intermediate/DreamShader`, and re-aims `DreamShader.code-workspace`.
+
+Everything the editor generates for tools — diagnostics, the manifests, the builtin catalog, pass keys, the define table, the preview result and the symbol index — is one SQLite database, `Intermediate/DreamSource/shader.db`, read through VS Code's built-in `node:sqlite` (hence VS Code 1.147 or later). Bridge requests go to `Intermediate/DreamSource/Shader/Bridge`.
 
 ## Development
 
@@ -487,8 +502,9 @@ Bridge diagnostics tree and its `dreamshader` collection, the status bar, the co
 without touching it. Where the layer needs to know about the world around it — a setting, the
 workspace folders — it asks `src/host.js`, which each process fills in for itself.
 
-It is deliberately not bundled: `src/bridge/database.js` locates sql.js's WASM through
-`require.resolve`, which a bundler would leave pointing at nothing.
+It is not bundled: the package ships its `node_modules` as they are, and `src/bridge/database.js`
+reads `shader.db` through the editor runtime's built-in `node:sqlite`, so there is no native or WASM
+dependency to package.
 
 `F5` launches an Extension Development Host. To put breakpoints in the server as well, run the
 **Extension + Server** compound, which attaches a second debugger to port 6018.

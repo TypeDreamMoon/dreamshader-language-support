@@ -33,6 +33,7 @@ const { createDebouncedDisposable } = require("../common/debounce");
 const { readPreprocessorDefinesManifest } = require("../bridge/manifests");
 const { computeInactiveRegions } = require("../language/preprocessor");
 const { collectKnownProjectRoots, isDreamShaderDocument } = require("../project/projects");
+const { SHADER_DATABASE_PATTERN, legacyBridgePattern } = require("./watchers");
 
 const DEFAULT_INACTIVE_OPACITY = 0.5;
 // Long enough that typing a `#if` character by character does not restyle the file on every
@@ -220,15 +221,17 @@ class InactiveRegionDecorator {
             this.watchers.push(watcher);
         };
 
-        register(vscode.workspace.createFileSystemWatcher("**/Saved/DreamShader/Bridge/preprocessor-defines.json"));
+        // shader.db (its `preprocessor-defines` document) now; the json file for a plugin from before DreamSource.
+        register(vscode.workspace.createFileSystemWatcher(`**/${SHADER_DATABASE_PATTERN}`));
+        register(vscode.workspace.createFileSystemWatcher(`**/${legacyBridgePattern("preprocessor-defines.json")}`));
         for (const root of roots) {
             // A project root can sit outside every workspace folder -- the extension resolves one
-            // from the active file, not only from the folder list -- and the glob above would never
+            // from the active file, not only from the folder list -- and the globs above would never
             // fire for it. These are what cover that case.
             register(vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/preprocessor-defines.json")));
+                new vscode.RelativePattern(vscode.Uri.file(root), SHADER_DATABASE_PATTERN)));
             register(vscode.workspace.createFileSystemWatcher(
-                new vscode.RelativePattern(vscode.Uri.file(root), "Saved/DreamShader/Bridge/bridge.db")));
+                new vscode.RelativePattern(vscode.Uri.file(root), legacyBridgePattern("preprocessor-defines.json", "bridge.db"))));
         }
     }
 
